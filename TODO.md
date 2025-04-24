@@ -30,3 +30,9 @@
 
 10. **Documentation**:
     - Update the documentation to reflect any new features or changes made to the application.
+
+11. **Integrate Python Script**:
+    - Combine Python script to fetch transactions from PocketSmith API.
+
+12. **Fix Bank Category Dropdown Values**:
+    - Fix these values so they're hardcoded or fetched dynamically from another database
