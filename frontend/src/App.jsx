@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
+import Budgets from './Budgets';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,7 +25,8 @@ ChartJS.register(
   Legend
 );
 
-function App() {
+const App = () => {
+  const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [filters, setFilters] = useState({ labels: [], sortBy: 'date-desc' });
@@ -596,511 +598,661 @@ function App() {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Transactions</h1>
+      <h1>Finance Dashboard</h1>
+      <div style={{ 
+        marginBottom: '20px',
+        display: 'flex',
+        gap: '10px'
+      }}>
+        <button 
+          onClick={() => setActiveTab('transactions')}
+          style={{ 
+            padding: '10px 20px',
+            backgroundColor: activeTab === 'transactions' ? '#4a90e2' : '#f0f0f0',
+            color: activeTab === 'transactions' ? 'white' : '#333',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'transactions' ? 'bold' : 'normal',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        >
+          Transactions
+        </button>
+        <button 
+          onClick={() => setActiveTab('budgets')}
+          style={{ 
+            padding: '10px 20px',
+            backgroundColor: activeTab === 'budgets' ? '#4a90e2' : '#f0f0f0',
+            color: activeTab === 'budgets' ? 'white' : '#333',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'budgets' ? 'bold' : 'normal',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        >
+          Budgets
+        </button>
+      </div>
+      {activeTab === 'transactions' && (
+        <div style={{ position: 'relative' }}>
+          {isUpdating && (
+            <div style={{ 
+              position: 'absolute', 
+              top: '0', 
+              left: '0', 
+              width: '100%', 
+              height: '100%', 
+              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              zIndex: 10,
+              borderRadius: '8px'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: '3px solid #f3f3f3',
+                  borderTop: '3px solid #4a90e2',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                <div style={{ fontWeight: 'bold', color: '#333' }}>Updating transaction...</div>
+              </div>
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          )}
 
-      {/* Show loading indicator when updating a transaction */}
-      {isUpdating && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.3)', 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '20px', 
-            borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center'
-          }}>
-            <div style={{ marginBottom: '15px' }}>Updating transaction...</div>
+          <div>
+            {/* Active filters display */}
+            {(dateFilter.startDate || bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
+              <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <strong>Active Filters:</strong>
+                    {dateFilter.startDate && (
+                      <span style={{ margin: '0 10px' }}>
+                        Date: {dateFilter.startDate} to {dateFilter.endDate}
+                      </span>
+                    )}
+                    {bankCategoryFilter.length > 0 && (
+                      <span style={{ margin: '0 10px' }}>
+                        Bank Categories: {bankCategoryFilter.join(', ')}
+                      </span>
+                    )}
+                    {categoryFilter.length > 0 && (
+                      <span style={{ margin: '0 10px' }}>
+                        Categories: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
+                      </span>
+                    )}
+                    {labelFilter.length > 0 && (
+                      <span style={{ margin: '0 10px' }}>
+                        Labels: {labelFilter.join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <button 
+                    onClick={clearFilters}
+                    style={{ 
+                      padding: '8px 12px',
+                      backgroundColor: '#f0f0f0',
+                      color: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'normal',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chart section with loading indicator */}
+          <div style={{ height: '500px', marginBottom: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {isTransactionsLoading || isLabelsLoading ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '15px', alignItems: 'center' }}>
+                  <div>
+                    <select
+                      value={chartLabelFilter}
+                      onChange={(e) => setChartLabelFilter(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        backgroundColor: 'white',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="All">All Transactions</option>
+                      {labels.length > 0 && (
+                        <>
+                          <option value={labels[0]}>{labels[0]}'s Transactions</option>
+                          <option value={labels[1]}>{labels[1]}'s Transactions</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <button 
+                      onClick={() => setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter')}
+                      style={{ 
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        backgroundColor: categoryFilter.length > 0 ? '#e6f7ff' : 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      <span>Filter by Category</span>
+                      {categoryFilter.length > 0 && (
+                        <span style={{ 
+                          backgroundColor: '#4a90e2', 
+                          color: 'white', 
+                          borderRadius: '50%', 
+                          width: '18px', 
+                          height: '18px', 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          fontSize: '12px'
+                        }}>
+                          {categoryFilter.length}
+                        </span>
+                      )}
+                    </button>
+                    
+                    {activeFilterColumn === 'categoryFilter' && (
+                      <div 
+                        ref={filterPopupRef}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          zIndex: 100,
+                          background: 'white',
+                          border: '1px solid #ccc',
+                          padding: '10px',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          width: '200px',
+                          maxHeight: '300px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {/* Display non-null categories first */}
+                        {availableCategories
+                          .filter(category => category !== null && category !== undefined && category !== '')
+                          .map(category => (
+                            <div key={category} style={{ marginBottom: '6px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={categoryFilter.includes(category)}
+                                  onChange={() => handleCategoryFilterChange(category)}
+                                  style={{ marginRight: '8px' }}
+                                />
+                                {category}
+                              </label>
+                            </div>
+                          ))
+                        }
+                        
+                        {/* Display null/empty category at the bottom if it exists */}
+                        {availableCategories.some(category => category === null || category === undefined || category === '') && (
+                          <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={categoryFilter.includes(null)}
+                                onChange={() => handleCategoryFilterChange(null)}
+                                style={{ marginRight: '8px' }}
+                              />
+                              null
+                            </label>
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                          <button 
+                            onClick={() => setCategoryFilter([])}
+                            style={{ padding: '4px 8px' }}
+                          >
+                            Clear
+                          </button>
+                          <button 
+                            onClick={() => setActiveFilterColumn(null)}
+                            style={{ padding: '4px 8px' }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ width: '90%', maxWidth: '1200px', height: '400px' }}>
+                  <Bar data={data} options={options} />
+                </div>
+              </>
+            )}
+          </div>
+
+          <h2 style={{ marginTop: '30px' }}>Filtered Transactions</h2>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              Sort by:
+              <select 
+                value={filters.sortBy} 
+                onChange={e => setFilters({ ...filters, sortBy: e.target.value })} 
+                style={{ 
+                  marginLeft: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  outline: 'none'
+                }}
+              >
+                <option value="date-desc">Date (Newest First)</option>
+                <option value="date-asc">Date (Oldest First)</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Transactions table with loading indicator */}
+          {isTransactionsLoading || isLabelsLoading ? (
             <LoadingSpinner />
-          </div>
-        </div>
-      )}
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      onClick={() => toggleColumnFilter('date')}
+                    >
+                      Date {activeFilterColumn === 'date' ? '▲' : '▼'}
+                    </div>
+                    {activeFilterColumn === 'date' && (
+                      <div 
+                        ref={filterPopupRef}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 100,
+                          background: 'white',
+                          border: '1px solid #ccc',
+                          padding: '10px',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          width: '250px'
+                        }}
+                      >
+                        <div style={{ marginBottom: '8px' }}>
+                          <label style={{ display: 'block', marginBottom: '4px' }}>From:</label>
+                          <input 
+                            type="date" 
+                            name="startDate"
+                            value={dateFilter.startDate}
+                            onChange={handleDateFilterChange}
+                            min={dateRange.min}
+                            max={dateRange.max}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <label style={{ display: 'block', marginBottom: '4px' }}>To:</label>
+                          <input 
+                            type="date" 
+                            name="endDate"
+                            value={dateFilter.endDate}
+                            onChange={handleDateFilterChange}
+                            min={dateRange.min}
+                            max={dateRange.max}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                          <button 
+                            onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#f0f0f0',
+                              color: '#333',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Clear
+                          </button>
+                          <button 
+                            onClick={() => setActiveFilterColumn(null)}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#4a90e2',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </th>
+                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Description</th>
+                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Amount</th>
+                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      onClick={() => toggleColumnFilter('bankCategory')}
+                    >
+                      Bank Category {activeFilterColumn === 'bankCategory' ? '▲' : '▼'}
+                    </div>
+                    {activeFilterColumn === 'bankCategory' && (
+                      <div 
+                        ref={filterPopupRef}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 100,
+                          background: 'white',
+                          border: '1px solid #ccc',
+                          padding: '10px',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          width: '200px',
+                          maxHeight: '300px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {/* Display non-null categories first */}
+                        {availableBankCategories
+                          .filter(category => category !== null && category !== undefined && category !== '')
+                          .map(category => (
+                            <div key={category} style={{ marginBottom: '6px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={bankCategoryFilter.includes(category)}
+                                  onChange={() => handleBankCategoryFilterChange(category)}
+                                  style={{ marginRight: '8px' }}
+                                />
+                                {category}
+                              </label>
+                            </div>
+                          ))
+                        }
+                        
+                        {/* Display null/empty category at the bottom if it exists */}
+                        {availableBankCategories.some(category => category === null || category === undefined || category === '') && (
+                          <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={bankCategoryFilter.includes(null)}
+                                onChange={() => handleBankCategoryFilterChange(null)}
+                                style={{ marginRight: '8px' }}
+                              />
+                              (Empty)
+                            </label>
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                          <button 
+                            onClick={() => setBankCategoryFilter([])}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#f0f0f0',
+                              color: '#333',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Clear
+                          </button>
+                          <button 
+                            onClick={() => setActiveFilterColumn(null)}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#4a90e2',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </th>
+                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      onClick={() => toggleColumnFilter('label')}
+                    >
+                      Label {activeFilterColumn === 'label' ? '▲' : '▼'}
+                    </div>
+                    {activeFilterColumn === 'label' && (
+                      <div 
+                        ref={filterPopupRef}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 100,
+                          background: 'white',
+                          border: '1px solid #ccc',
+                          padding: '10px',
+                          borderRadius: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          width: '200px'
+                        }}
+                      >
+                        {labels.map(label => (
+                          <div key={label} style={{ marginBottom: '6px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={labelFilter.includes(label)}
+                                onChange={() => handleLabelFilterChange(label)}
+                                style={{ marginRight: '8px' }}
+                              />
+                              {label}
+                            </label>
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                          <button 
+                            onClick={() => setLabelFilter([])}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#f0f0f0',
+                              color: '#333',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Clear
+                          </button>
+                          <button 
+                            onClick={() => setActiveFilterColumn(null)}
+                            style={{ 
+                              padding: '6px 12px',
+                              backgroundColor: '#4a90e2',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.map(transaction => (
+                  <tr key={transaction.id} style={{ backgroundColor: getRowColor(transaction.label) }}>
+                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                      {renderCell(transaction, 'date')}
+                    </td>
+                    <td style={{ border: '1px solid black', padding: '8px' }}>
+                      {renderCell(transaction, 'description')}
+                    </td>
+                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                      {renderCell(transaction, 'amount')}
+                    </td>
+                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                      {renderCell(transaction, 'bank_category')}
+                    </td>
+                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                      {renderCell(transaction, 'label')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
-      <div>
-        {/* Active filters display */}
-        {(dateFilter.startDate || bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
-          <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <strong>Active Filters:</strong>
-                {dateFilter.startDate && (
-                  <span style={{ margin: '0 10px' }}>
-                    Date: {dateFilter.startDate} to {dateFilter.endDate}
-                  </span>
-                )}
-                {bankCategoryFilter.length > 0 && (
-                  <span style={{ margin: '0 10px' }}>
-                    Bank Categories: {bankCategoryFilter.join(', ')}
-                  </span>
-                )}
-                {categoryFilter.length > 0 && (
-                  <span style={{ margin: '0 10px' }}>
-                    Categories: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
-                  </span>
-                )}
-                {labelFilter.length > 0 && (
-                  <span style={{ margin: '0 10px' }}>
-                    Labels: {labelFilter.join(', ')}
-                  </span>
-                )}
-              </div>
-              <button onClick={clearFilters}>Clear All Filters</button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Chart section with loading indicator */}
-      <div style={{ height: '500px', marginBottom: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {isTransactionsLoading || isLabelsLoading ? (
-          <LoadingSpinner />
-        ) : (
-          <>
-            <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '15px', alignItems: 'center' }}>
-              <div>
-                <select
-                  value={chartLabelFilter}
-                  onChange={(e) => setChartLabelFilter(e.target.value)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                    cursor: 'pointer',
-                    height: '34px',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <option value="All">All Transactions</option>
-                  {labels.length > 0 && (
-                    <>
-                      <option value={labels[0]}>{labels[0]}'s Transactions</option>
-                      <option value={labels[1]}>{labels[1]}'s Transactions</option>
-                    </>
-                  )}
-                </select>
-              </div>
-              <div>
-                <button 
-                  onClick={() => setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter')}
+          <h2>Totals</h2>
+          {isTransactionsLoading || isLabelsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+              {labels[0] && (
+                <div 
                   style={{ 
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: categoryFilter.length > 0 ? '#e6f7ff' : 'white',
-                    cursor: 'pointer',
-                    height: '34px',
-                    boxSizing: 'border-box'
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    borderLeft: '5px solid rgba(255, 99, 132, 1)',
+                    display: 'flex',
+                    justifyContent: 'space-between'
                   }}
                 >
-                  Filter by Category {categoryFilter.length > 0 ? `(${categoryFilter.length})` : ''}
-                </button>
-                
-                {activeFilterColumn === 'categoryFilter' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '200px',
-                      maxHeight: '300px',
-                      overflowY: 'auto'
-                    }}
-                  >
-                    {/* Display non-null categories first */}
-                    {availableCategories
-                      .filter(category => category !== null && category !== undefined && category !== '')
-                      .map(category => (
-                        <div key={category} style={{ marginBottom: '6px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={categoryFilter.includes(category)}
-                              onChange={() => handleCategoryFilterChange(category)}
-                              style={{ marginRight: '8px' }}
-                            />
-                            {category}
-                          </label>
-                        </div>
-                      ))
-                    }
-                    
-                    {/* Display null/empty category at the bottom if it exists */}
-                    {availableCategories.some(category => category === null || category === undefined || category === '') && (
-                      <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={categoryFilter.includes(null)}
-                            onChange={() => handleCategoryFilterChange(null)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          null
-                        </label>
-                      </div>
-                    )}
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setCategoryFilter([])}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ width: '90%', maxWidth: '1200px', height: '400px' }}>
-              <Bar data={data} options={options} />
-            </div>
-          </>
-        )}
-      </div>
-
-      <h2 style={{ marginTop: '30px' }}>Filtered Transactions</h2>
-      <div style={{ marginBottom: '15px' }}>
-        <label>
-          Sort by:
-          <select value={filters.sortBy} onChange={e => setFilters({ ...filters, sortBy: e.target.value })} style={{ marginLeft: '8px' }}>
-            <option value="date-desc">Date (Newest First)</option>
-            <option value="date-asc">Date (Oldest First)</option>
-          </select>
-        </label>
-      </div>
-
-      {/* Transactions table with loading indicator */}
-      {isTransactionsLoading || isLabelsLoading ? (
-        <LoadingSpinner />
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('date')}
-                >
-                  Date {activeFilterColumn === 'date' ? '▲' : '▼'}
+                  <span style={{ fontWeight: 'bold' }}>{labels[0]}</span>
+                  <span>
+                    {totals[labels[0]] != null ? 
+                      (totals[labels[0]] < 0 ? 
+                        `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : 
+                        `$${totals[labels[0]].toFixed(2)}`)
+                      : '$0.00'}
+                    {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
+                      (includes 50% of "{labels[2]}" transactions)
+                    </span>}
+                  </span>
                 </div>
-                {activeFilterColumn === 'date' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '250px'
-                    }}
-                  >
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ display: 'block', marginBottom: '4px' }}>From:</label>
-                      <input 
-                        type="date" 
-                        name="startDate"
-                        value={dateFilter.startDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ display: 'block', marginBottom: '4px' }}>To:</label>
-                      <input 
-                        type="date" 
-                        name="endDate"
-                        value={dateFilter.endDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <button 
-                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Description</th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Amount</th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+              )}
+              {labels[1] && (
                 <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('bankCategory')}
+                  style={{ 
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    borderLeft: '5px solid rgba(54, 162, 235, 1)',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}
                 >
-                  Bank Category {activeFilterColumn === 'bankCategory' ? '▲' : '▼'}
+                  <span style={{ fontWeight: 'bold' }}>{labels[1]}</span>
+                  <span>
+                    {totals[labels[1]] != null ? 
+                      (totals[labels[1]] < 0 ? 
+                        `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : 
+                        `$${totals[labels[1]].toFixed(2)}`)
+                      : '$0.00'}
+                    {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
+                      (includes 50% of "{labels[2]}" transactions)
+                    </span>}
+                  </span>
                 </div>
-                {activeFilterColumn === 'bankCategory' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '200px',
-                      maxHeight: '300px',
-                      overflowY: 'auto'
-                    }}
-                  >
-                    {/* Display non-null categories first */}
-                    {availableBankCategories
-                      .filter(category => category !== null && category !== undefined && category !== '')
-                      .map(category => (
-                        <div key={category} style={{ marginBottom: '6px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={bankCategoryFilter.includes(category)}
-                              onChange={() => handleBankCategoryFilterChange(category)}
-                              style={{ marginRight: '8px' }}
-                            />
-                            {category}
-                          </label>
-                        </div>
-                      ))
-                    }
-                    
-                    {/* Display null/empty category at the bottom if it exists */}
-                    {availableBankCategories.some(category => category === null || category === undefined || category === '') && (
-                      <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={bankCategoryFilter.includes(null)}
-                            onChange={() => handleBankCategoryFilterChange(null)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          (Empty)
-                        </label>
-                      </div>
-                    )}
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setBankCategoryFilter([])}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+              )}
+              {labels[2] && (
                 <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('label')}
+                  style={{ 
+                    backgroundColor: 'rgba(75, 192, 95, 0.2)', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    borderLeft: '5px solid rgba(75, 192, 95, 1)',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}
                 >
-                  Label {activeFilterColumn === 'label' ? '▲' : '▼'}
+                  <span style={{ fontWeight: 'bold' }}>Total Spend</span>
+                  <span>
+                    {totals[labels[2]] != null ? 
+                      (totals[labels[2]] < 0 ? 
+                        `-$${Math.abs(totals[labels[2]]).toFixed(2)}` : 
+                        `$${totals[labels[2]].toFixed(2)}`)
+                      : '$0.00'}
+                  </span>
                 </div>
-                {activeFilterColumn === 'label' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '200px'
-                    }}
-                  >
-                    {labels.map(label => (
-                      <div key={label} style={{ marginBottom: '6px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={labelFilter.includes(label)}
-                            onChange={() => handleLabelFilterChange(label)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          {label}
-                        </label>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setLabelFilter([])}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTransactions.map(transaction => (
-              <tr key={transaction.id} style={{ backgroundColor: getRowColor(transaction.label) }}>
-                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                  {renderCell(transaction, 'date')}
-                </td>
-                <td style={{ border: '1px solid black', padding: '8px' }}>
-                  {renderCell(transaction, 'description')}
-                </td>
-                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                  {renderCell(transaction, 'amount')}
-                </td>
-                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                  {renderCell(transaction, 'bank_category')}
-                </td>
-                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                  {renderCell(transaction, 'label')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <h2>Totals</h2>
-      {isTransactionsLoading || isLabelsLoading ? (
-        <LoadingSpinner />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
-          {labels[0] && (
-            <div 
-              style={{ 
-                backgroundColor: 'rgba(255, 99, 132, 0.2)', 
-                padding: '15px', 
-                borderRadius: '8px',
-                borderLeft: '5px solid rgba(255, 99, 132, 1)',
-                display: 'flex',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span style={{ fontWeight: 'bold' }}>{labels[0]}</span>
-              <span>
-                {totals[labels[0]] != null ? 
-                  (totals[labels[0]] < 0 ? 
-                    `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : 
-                    `$${totals[labels[0]].toFixed(2)}`) : 
-                  '$0.00'}
-                {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
-                  (includes 50% of "{labels[2]}" transactions)
-                </span>}
-              </span>
-            </div>
-          )}
-          
-          {labels[1] && (
-            <div 
-              style={{ 
-                backgroundColor: 'rgba(54, 162, 235, 0.2)', 
-                padding: '15px', 
-                borderRadius: '8px',
-                borderLeft: '5px solid rgba(54, 162, 235, 1)',
-                display: 'flex',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span style={{ fontWeight: 'bold' }}>{labels[1]}</span>
-              <span>
-                {totals[labels[1]] != null ? 
-                  (totals[labels[1]] < 0 ? 
-                    `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : 
-                    `$${totals[labels[1]].toFixed(2)}`) : 
-                  '$0.00'}
-                {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
-                  (includes 50% of "{labels[2]}" transactions)
-                </span>}
-              </span>
-            </div>
-          )}
-          
-          {labels[2] && (
-            <div 
-              style={{ 
-                backgroundColor: 'rgba(75, 192, 95, 0.2)', 
-                padding: '15px', 
-                borderRadius: '8px',
-                borderLeft: '5px solid rgba(75, 192, 95, 1)',
-                display: 'flex',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span style={{ fontWeight: 'bold' }}>Total Spend</span>
-              <span>
-                {totals[labels[2]] != null ? 
-                  (totals[labels[2]] < 0 ? 
-                    `-$${Math.abs(totals[labels[2]]).toFixed(2)}` : 
-                    `$${totals[labels[2]].toFixed(2)}`) : 
-                  '$0.00'}
-              </span>
+              )}
             </div>
           )}
         </div>
       )}
+      {activeTab === 'budgets' && <Budgets />}
     </div>
   );
-}
+};
 
 export default App;
