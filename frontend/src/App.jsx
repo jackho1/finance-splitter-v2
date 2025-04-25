@@ -25,10 +25,28 @@ ChartJS.register(
   Legend
 );
 
+// Help Text Component for consistent styling
+const HelpText = ({ children, isVisible, style = {} }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <div className="help-text" style={style}>
+      <div className="help-text-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div className="help-text-content">{children}</div>
+    </div>
+  );
+};
+
 const App = () => {
   const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [allFilteredTransactions, setAllFilteredTransactions] = useState([]); // New state for all months but filtered
   const [filters, setFilters] = useState({ labels: [], sortBy: 'date-desc' });
   const [totals, setTotals] = useState({});
   const [labels, setLabels] = useState([]);
@@ -46,6 +64,9 @@ const App = () => {
   const [categoryFilter, setCategoryFilter] = useState([]);
   // Add label filter for chart
   const [chartLabelFilter, setChartLabelFilter] = useState('All');
+  // Add state for transaction month filtering
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
@@ -54,6 +75,19 @@ const App = () => {
   const [labelFilter, setLabelFilter] = useState([]);
   const [availableBankCategories, setAvailableBankCategories] = useState([]);
   const filterPopupRef = useRef(null);
+  
+  // Add new transaction state
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    amount: '',
+    bank_category: '',
+    label: labels[0] || ''
+  });
+  
+  // Add help text visibility state
+  const [helpTextVisible, setHelpTextVisible] = useState(true);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -95,19 +129,7 @@ const App = () => {
       .then(response => {
         setTransactions(response.data);
         setFilteredTransactions(response.data);
-        
-        // Extract unique bank categories and sort them (null values at the end)
-        const categories = [...new Set(response.data.map(transaction => transaction.bank_category))]
-          .filter(category => category !== null && category !== undefined && category !== '')
-          .sort((a, b) => a.localeCompare(b));
-        
-        // Add null/empty as the last option if they exist in the data
-        if (response.data.some(t => !t.bank_category)) {
-          categories.push(null);
-        }
-        
-        setAvailableBankCategories(categories);
-        // Set loading state to false after successfully fetching data
+        setAllFilteredTransactions(response.data);
         setIsTransactionsLoading(false);
       })
       .catch(err => {
@@ -154,10 +176,23 @@ const App = () => {
       });
   }, []);
 
+  // Fetch bank categories for filters and editing from the backend
+  useEffect(() => {
+    axios.get('http://localhost:5000/bank-categories')
+      .then(response => {
+        setAvailableBankCategories(response.data);
+      })
+      .catch(err => {
+        console.error('Error fetching bank categories:', err);
+      });
+  }, []);
+
   // Close filter dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target)) {
+      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) && 
+          // Make sure we're not clicking on the filter button itself (which has its own handler)
+          !event.target.closest('button[data-filter="category"]')) {
         setActiveFilterColumn(null);
       }
     }
@@ -169,17 +204,59 @@ const App = () => {
   }, []);
 
   // Handle category filter change
-  const handleCategoryFilterChange = (category) => {
+  const handleCategoryFilterChange = (category, e) => {
+    // Stop event propagation to prevent closing the dropdown
+    if (e) {
+      e.stopPropagation();
+    }
+    
     setCategoryFilter(prev => {
-      if (prev.includes(category)) {
-        return prev.filter(cat => cat !== category);
+      // Check if the category is already in the filter
+      const isAlreadyIncluded = prev.some(item => 
+        // Handle null equality properly
+        (item === null && category === null) || item === category
+      );
+
+      if (isAlreadyIncluded) {
+        // Remove the category if it's already included
+        return prev.filter(item => 
+          !((item === null && category === null) || item === category)
+        );
       } else {
+        // Add the category if it's not already included
         return [...prev, category];
       }
     });
   };
 
-  // Add category filtering to the combined filtering logic
+  // Add month navigation handlers
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => (prev === 0 ? 11 : prev - 1));
+    setCurrentYear(prev => (currentMonth === 0 ? prev - 1 : prev));
+  };
+
+  const handleNextMonth = () => {
+    const now = new Date();
+    const currentMonthDate = new Date(currentYear, currentMonth);
+    const nextMonthDate = new Date(currentYear, currentMonth + 1);
+    
+    // Only allow navigating up to the current month
+    if (nextMonthDate <= now) {
+      setCurrentMonth(prev => (prev === 11 ? 0 : prev + 1));
+      setCurrentYear(prev => (currentMonth === 11 ? prev + 1 : prev));
+    }
+  };
+
+  // Add isCurrentMonthCurrent function to check if we're at the current month
+  const isCurrentMonthCurrent = () => {
+    const now = new Date();
+    const currentMonthDate = new Date(currentYear, currentMonth);
+    const nextMonthDate = new Date(currentYear, currentMonth + 1);
+    
+    return nextMonthDate > now;
+  };
+
+  // Now update the useEffect that filters transactions to also filter by month
   useEffect(() => {
     // Use the applyFilters utility function instead of inline logic
     let filtered = applyFilters(transactions, {
@@ -193,14 +270,30 @@ const App = () => {
     if (categoryFilter.length > 0) {
       filtered = filtered.filter(transaction => {
         const category = getCategoryFromMapping(transaction.bank_category);
+        
+        // Check if we're filtering for null and the transaction category is null
+        if (categoryFilter.includes(null) && category === null) {
+          return true;
+        }
+        
+        // Check if the transaction category is in the filter
         return categoryFilter.includes(category);
       });
     }
+    
+    // Store the filtered transactions without month filter for the chart
+    setAllFilteredTransactions(filtered);
+    
+    // Apply month filtering for the table view
+    const monthFiltered = filtered.filter(transaction => {
+      const date = new Date(transaction.date);
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    });
 
-    setFilteredTransactions(filtered);
+    setFilteredTransactions(monthFiltered);
 
-    // Calculate totals using the utility function
-    const newTotals = calculateTotals(filtered, labels);
+    // Calculate totals using the utility function (still use month-filtered transactions for totals)
+    const newTotals = calculateTotals(monthFiltered, labels);
     setTotals(newTotals);
   }, [
     transactions, 
@@ -210,7 +303,9 @@ const App = () => {
     labelFilter, 
     categoryFilter, 
     labels, 
-    categoryMappings
+    categoryMappings,
+    currentMonth,
+    currentYear
   ]);
 
   const data = {
@@ -220,7 +315,7 @@ const App = () => {
 
   // Create datasets for each category (instead of bank category)
   const uniqueCategories = [...new Set(
-    filteredTransactions
+    allFilteredTransactions
       .map(transaction => getCategoryFromMapping(transaction.bank_category))
       .filter(category => category !== null && category !== undefined && category !== '')
   )].sort();
@@ -236,7 +331,7 @@ const App = () => {
   });
 
   // Filter transactions based on chart label filter
-  const chartFilteredTransactions = filteredTransactions.filter(transaction => {
+  const chartFilteredTransactions = allFilteredTransactions.filter(transaction => {
     if (chartLabelFilter === 'All') {
       return true;
     } else if (chartLabelFilter === labels[0]) { // Ruby
@@ -285,8 +380,8 @@ const App = () => {
       title: {
         display: true,
         text: chartLabelFilter === 'All' 
-          ? 'Transactions by Month and Category' 
-          : `${chartLabelFilter}'s Transactions by Month and Category`,
+          ? 'All-Time Transactions by Month and Category' 
+          : `${chartLabelFilter}'s All-Time Transactions by Month and Category`,
         font: {
           size: 24,
           weight: 'bold'
@@ -395,7 +490,12 @@ const App = () => {
   };
 
   const handleInputChange = (e) => {
-    setEditValue(e.target.value);
+    // Handle special case for "null" string value in bank_category field
+    if (editCell && editCell.field === 'bank_category' && e.target.value === 'null') {
+      setEditValue(null);
+    } else {
+      setEditValue(e.target.value);
+    }
   };
 
   const handleUpdate = async (transactionId, field) => {
@@ -495,7 +595,7 @@ const App = () => {
         case 'bank_category':
           return (
             <select 
-              value={editValue || ''} 
+              value={editValue === null ? 'null' : (editValue || '')}
               onChange={handleInputChange} 
               onBlur={() => handleUpdate(transaction.id, field)}
               style={{ width: '100%' }}
@@ -508,6 +608,7 @@ const App = () => {
                   <option key={category} value={category}>{category}</option>
                 ))
               }
+              <option key="null-option" value="null">(null)</option>
             </select>
           );
         case 'label':
@@ -596,45 +697,376 @@ const App = () => {
     </div>
   );
 
+  // Add handlers for new transaction form
+  const handleNewTransactionChange = (e) => {
+    const { name, value } = e.target;
+    setNewTransaction(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const resetNewTransactionForm = () => {
+    setNewTransaction({
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      amount: '',
+      bank_category: '',
+      label: labels[0] || ''
+    });
+  };
+
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
+      alert('Please fill out all required fields: Date, Description, and Amount');
+      return;
+    }
+    
+    try {
+      setIsUpdating(true);
+      
+      // Create a copy of the transaction data with amount converted to number
+      const transactionData = {
+        ...newTransaction,
+        amount: parseFloat(newTransaction.amount)
+      };
+      
+      // Check if amount is a valid number
+      if (isNaN(transactionData.amount)) {
+        alert('Please enter a valid number for the amount');
+        setIsUpdating(false);
+        return;
+      }
+      
+      // Send data to backend
+      const response = await axios.post('http://localhost:5000/transactions', transactionData);
+      
+      if (response.data.success) {
+        // Add the new transaction to state
+        const addedTransaction = response.data.data;
+        
+        // Update transactions list
+        setTransactions(prev => [addedTransaction, ...prev]);
+        
+        // Filter logic for newly added transaction to match our filtering rules
+        const transactionDate = new Date(addedTransaction.date);
+        const isInCurrentMonth = transactionDate.getMonth() === currentMonth && 
+                                transactionDate.getFullYear() === currentYear;
+        
+        // Only add to filtered transactions if it matches current month/year filter
+        if (isInCurrentMonth) {
+          // Check other filters
+          let shouldAdd = true;
+          
+          // Check date filter
+          if (dateFilter.startDate || dateFilter.endDate) {
+            if (dateFilter.startDate && new Date(addedTransaction.date) < new Date(dateFilter.startDate)) {
+              shouldAdd = false;
+            }
+            if (dateFilter.endDate && new Date(addedTransaction.date) > new Date(dateFilter.endDate)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check bank category filter
+          if (bankCategoryFilter.length > 0) {
+            if (!bankCategoryFilter.includes(addedTransaction.bank_category) && 
+                !(bankCategoryFilter.includes(null) && !addedTransaction.bank_category)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check label filter
+          if (labelFilter.length > 0) {
+            if (!labelFilter.includes(addedTransaction.label)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check category filter
+          if (categoryFilter.length > 0) {
+            const category = getCategoryFromMapping(addedTransaction.bank_category);
+            if (!categoryFilter.includes(category) && 
+                !(categoryFilter.includes(null) && category === null)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Add to filtered transactions if it passes all filters
+          if (shouldAdd) {
+            setFilteredTransactions(prev => [addedTransaction, ...prev]);
+            
+            // Update totals
+            const newTotals = calculateTotals([...filteredTransactions, addedTransaction], labels);
+            setTotals(newTotals);
+          }
+        }
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Transaction added successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Reset form and close it
+        resetNewTransactionForm();
+        setIsAddingTransaction(false);
+      } else {
+        // Handle case where server returned error
+        const errorMessage = response.data.error || response.data.errors?.join(', ') || 'Failed to add transaction';
+        alert(errorMessage);
+      }
+    } catch (err) {
+      console.error('Error adding transaction:', err);
+      
+      let errorMessage = 'Failed to add transaction. Please try again.';
+      
+      // Try to extract more specific error from response if available
+      if (err.response && err.response.data) {
+        errorMessage = err.response.data.error || 
+                      (err.response.data.errors && err.response.data.errors.join(', ')) || 
+                      errorMessage;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Function to toggle add transaction form
+  const toggleAddTransactionForm = () => {
+    if (!isAddingTransaction) {
+      // Initialize with current month/year when opening the form
+      resetNewTransactionForm();
+    }
+    setIsAddingTransaction(!isAddingTransaction);
+  };
+
+  const cancelAddTransaction = () => {
+    setIsAddingTransaction(false);
+    resetNewTransactionForm();
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Finance Dashboard</h1>
+      <h1 className="dashboard-title">Finance Dashboard</h1>
+      
+      {/* Global CSS styles */}
+      <style>
+      {`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+          font-family: 'Inter', sans-serif;
+        }
+        
+        .dashboard-title {
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 28px;
+          color: #2c3e50;
+          margin-bottom: 24px;
+          position: relative;
+          display: inline-block;
+          padding-bottom: 8px;
+        }
+        
+        .dashboard-title:after {
+          content: '';
+          position: absolute;
+          left: 0;
+          bottom: 0;
+          height: 3px;
+          width: 40px;
+          background-color: #4a90e2;
+          border-radius: 2px;
+        }
+        
+        .section-title {
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 22px;
+          color: #2c3e50;
+          margin: 20px 0 10px 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .date-label {
+          font-family: 'Inter', sans-serif;
+          font-weight: 400;
+          font-size: 16px;
+          color: #64748b;
+          margin-left: 8px;
+        }
+        
+        .help-text {
+          display: flex;
+          align-items: flex-start;
+          background-color: #f8f9fa;
+          padding: 10px 15px;
+          border-radius: 6px;
+          border-left: 3px solid #4a90e2;
+          margin-bottom: 15px;
+          font-size: 13px;
+          color: #505050;
+          font-family: 'Inter', sans-serif;
+        }
+        
+        .help-text-icon {
+          color: #4a90e2;
+          margin-right: 10px;
+          margin-top: 2px;
+        }
+        
+        .help-text-content {
+          flex: 1;
+        }
+        
+        .nav-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          font-family: 'Inter', sans-serif;
+        }
+        
+        .nav-button.active {
+          background-color: #4a90e2;
+          color: white;
+        }
+        
+        .nav-button:not(.active) {
+          background-color: #f0f0f0;
+          color: #333;
+        }
+        
+        .nav-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .help-toggle {
+          background-color: #f8f9fa;
+          background-image: linear-gradient(to bottom, #ffffff, #f5f5f5);
+          border: 1px solid #e0e0e0;
+          border-radius: 20px;
+          padding: 6px 12px;
+          font-size: 13px;
+          color: #4a6785;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: auto;
+          font-family: 'Inter', sans-serif;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .help-toggle:hover {
+          background-image: linear-gradient(to bottom, #f8f9fa, #f0f0f0);
+          box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+          transform: translateY(-1px);
+        }
+        
+        .help-toggle svg {
+          transition: all 0.2s ease;
+        }
+        
+        .help-toggle:hover svg {
+          transform: scale(1.1);
+        }
+      `}
+      </style>
+      
       <div style={{ 
         marginBottom: '20px',
         display: 'flex',
-        gap: '10px'
+        gap: '10px',
+        alignItems: 'center'
       }}>
         <button 
           onClick={() => setActiveTab('transactions')}
-          style={{ 
-            padding: '10px 20px',
-            backgroundColor: activeTab === 'transactions' ? '#4a90e2' : '#f0f0f0',
-            color: activeTab === 'transactions' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'transactions' ? 'bold' : 'normal',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
+          className={`nav-button ${activeTab === 'transactions' ? 'active' : ''}`}
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
+            <path d="M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M8 3L8 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M16 3L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <rect x="7" y="14" width="4" height="2" rx="0.5" fill="currentColor" />
+            <rect x="13" y="14" width="4" height="2" rx="0.5" fill="currentColor" />
+            <rect x="7" y="17" width="4" height="2" rx="0.5" fill="currentColor" />
+            <rect x="13" y="17" width="4" height="2" rx="0.5" fill="currentColor" />
+          </svg>
           Transactions
         </button>
         <button 
           onClick={() => setActiveTab('budgets')}
-          style={{ 
-            padding: '10px 20px',
-            backgroundColor: activeTab === 'budgets' ? '#4a90e2' : '#f0f0f0',
-            color: activeTab === 'budgets' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'budgets' ? 'bold' : 'normal',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
+          className={`nav-button ${activeTab === 'budgets' ? 'active' : ''}`}
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 3V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M5.5 13.5L7.5 10.5L10.5 11.5L13.5 6.5L16.5 9.5L19.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <rect x="7" y="14" width="2" height="4" rx="0.5" fill="currentColor"/>
+            <rect x="12" y="12" width="2" height="6" rx="0.5" fill="currentColor"/>
+            <rect x="17" y="10" width="2" height="8" rx="0.5" fill="currentColor"/>
+          </svg>
           Budgets
+        </button>
+        
+        <button 
+          className="help-toggle"
+          onClick={() => setHelpTextVisible(!helpTextVisible)}
+          title={helpTextVisible ? "Hide help text" : "Show help text"}
+        >
+          {helpTextVisible ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 21L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Hide Help
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Show Help
+            </>
+          )}
         </button>
       </div>
       {activeTab === 'transactions' && (
@@ -681,7 +1113,14 @@ const App = () => {
           <div>
             {/* Active filters display */}
             {(dateFilter.startDate || bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
-              <div style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
+              <div style={{ 
+                margin: '10px 0', 
+                padding: '10px', 
+                backgroundColor: '#e8f4fd', 
+                borderRadius: '6px',
+                border: '1px solid #d0e8f9',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <strong>Active Filters:</strong>
@@ -710,9 +1149,9 @@ const App = () => {
                     onClick={clearFilters}
                     style={{ 
                       padding: '8px 12px',
-                      backgroundColor: '#f0f0f0',
+                      backgroundColor: 'white',
                       color: '#333',
-                      border: 'none',
+                      border: '1px solid #ddd',
                       borderRadius: '4px',
                       cursor: 'pointer',
                       fontWeight: 'normal',
@@ -759,7 +1198,11 @@ const App = () => {
                   </div>
                   <div>
                     <button 
-                      onClick={() => setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter')}
+                      data-filter="category"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter');
+                      }}
                       style={{ 
                         padding: '8px 12px',
                         borderRadius: '4px',
@@ -770,7 +1213,8 @@ const App = () => {
                         alignItems: 'center',
                         gap: '6px',
                         transition: 'all 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        position: 'relative'
                       }}
                     >
                       <span>Filter by Category</span>
@@ -789,108 +1233,422 @@ const App = () => {
                           {categoryFilter.length}
                         </span>
                       )}
-                    </button>
-                    
-                    {activeFilterColumn === 'categoryFilter' && (
-                      <div 
-                        ref={filterPopupRef}
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          right: 0,
-                          zIndex: 100,
-                          background: 'white',
-                          border: '1px solid #ccc',
-                          padding: '10px',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                          width: '200px',
-                          maxHeight: '300px',
-                          overflowY: 'auto'
-                        }}
-                      >
-                        {/* Display non-null categories first */}
-                        {availableCategories
-                          .filter(category => category !== null && category !== undefined && category !== '')
-                          .map(category => (
-                            <div key={category} style={{ marginBottom: '6px' }}>
-                              <label style={{ display: 'flex', alignItems: 'center' }}>
+
+                      {/* Category filter popup */}
+                      {activeFilterColumn === 'categoryFilter' && (
+                        <div 
+                          ref={filterPopupRef}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            right: '0',
+                            zIndex: 1000,
+                            background: 'white',
+                            border: '1px solid #ccc',
+                            padding: '10px',
+                            borderRadius: '4px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            width: '250px',
+                            maxHeight: '350px',
+                            overflowY: 'auto',
+                            marginTop: '5px'
+                          }}
+                        >
+                          {/* Display non-null categories first */}
+                          {availableCategories
+                            .filter(category => category !== null && category !== undefined && category !== '')
+                            .map(category => (
+                              <div key={category} style={{ marginBottom: '6px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={categoryFilter.includes(category)}
+                                    onChange={(e) => handleCategoryFilterChange(category, e)}
+                                    style={{ marginRight: '8px' }}
+                                  />
+                                  {category}
+                                </label>
+                              </div>
+                            ))
+                          }
+                          
+                          {/* Display null/empty category at the bottom if it exists */}
+                          {availableCategories.some(category => category === null || category === undefined || category === '') && (
+                            <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
                                 <input 
                                   type="checkbox" 
-                                  checked={categoryFilter.includes(category)}
-                                  onChange={() => handleCategoryFilterChange(category)}
+                                  checked={categoryFilter.includes(null)}
+                                  onChange={(e) => handleCategoryFilterChange(null, e)}
                                   style={{ marginRight: '8px' }}
                                 />
-                                {category}
+                                null
                               </label>
                             </div>
-                          ))
-                        }
-                        
-                        {/* Display null/empty category at the bottom if it exists */}
-                        {availableCategories.some(category => category === null || category === undefined || category === '') && (
-                          <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={categoryFilter.includes(null)}
-                                onChange={() => handleCategoryFilterChange(null)}
-                                style={{ marginRight: '8px' }}
-                              />
-                              null
-                            </label>
+                          )}
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCategoryFilter([]);
+                              }}
+                              style={{ 
+                                padding: '6px 12px',
+                                backgroundColor: '#f0f0f0',
+                                color: '#333',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                              }}
+                            >
+                              Clear
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveFilterColumn(null);
+                              }}
+                              style={{ 
+                                padding: '6px 12px',
+                                backgroundColor: '#4a90e2',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                              }}
+                            >
+                              Apply
+                            </button>
                           </div>
-                        )}
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                          <button 
-                            onClick={() => setCategoryFilter([])}
-                            style={{ padding: '4px 8px' }}
-                          >
-                            Clear
-                          </button>
-                          <button 
-                            onClick={() => setActiveFilterColumn(null)}
-                            style={{ padding: '4px 8px' }}
-                          >
-                            Apply
-                          </button>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </button>
                   </div>
                 </div>
-                <div style={{ width: '90%', maxWidth: '1200px', height: '400px' }}>
+                <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
                   <Bar data={data} options={options} />
+                  <HelpText isVisible={helpTextVisible} style={{marginBottom: '8px'}}>
+                    Chart displays data for all months regardless of the month filter above and respects all other applied filters
+                  </HelpText>
                 </div>
               </>
             )}
           </div>
 
-          <h2 style={{ marginTop: '30px' }}>Filtered Transactions</h2>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              Sort by:
-              <select 
-                value={filters.sortBy} 
-                onChange={e => setFilters({ ...filters, sortBy: e.target.value })} 
-                style={{ 
-                  marginLeft: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  outline: 'none'
-                }}
-              >
-                <option value="date-desc">Date (Newest First)</option>
-                <option value="date-asc">Date (Oldest First)</option>
-              </select>
-            </label>
-          </div>
+          <h2 className="section-title">
+            Filtered Transactions 
+            <span className="date-label">
+              ({new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} {currentYear})
+            </span>
+          </h2>
 
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'flex-start',
+            marginBottom: '15px',
+            padding: '10px',
+            backgroundColor: 'transparent',
+            borderRadius: '8px',
+            flexDirection: 'column'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              width: '100%',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  onClick={handlePrevMonth}
+                  style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 15px',
+                    backgroundColor: 'transparent',
+                    color: '#2c3e50',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '5px' }}>
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Previous Month
+                </button>
+                <div style={{ padding: '0 10px', fontWeight: '500' }}>
+                  {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </div>
+                <button 
+                  onClick={handleNextMonth}
+                  style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 15px',
+                    backgroundColor: 'transparent',
+                    color: '#2c3e50',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer',
+                    fontWeight: '500',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isCurrentMonthCurrent() ? 'none' : '0 1px 3px rgba(0,0,0,0.05)',
+                    opacity: isCurrentMonthCurrent() ? 0.7 : 1
+                  }}
+                  disabled={isCurrentMonthCurrent()}
+                >
+                  Next Month
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '5px' }}>
+                    <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div>
+                  <label htmlFor="sort-select" style={{ marginRight: '8px', fontSize: '14px', color: '#555' }}>Sort by:</label>
+                  <select
+                    id="sort-select"
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd',
+                      backgroundColor: 'white',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="date-desc">Date (Newest First)</option>
+                    <option value="date-asc">Date (Oldest First)</option>
+                    <option value="amount-desc">Amount (Highest First)</option>
+                    <option value="amount-asc">Amount (Lowest First)</option>
+                    <option value="description-asc">Description (A-Z)</option>
+                    <option value="description-desc">Description (Z-A)</option>
+                  </select>
+                </div>
+                
+                <button 
+                  onClick={toggleAddTransactionForm}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 15px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add Transaction
+                </button>
+              </div>
+            </div>
+            
+            <HelpText isVisible={helpTextVisible} style={{marginBottom: '0px'}}>
+              Use the month navigation to browse your transaction history. Only transactions from the selected month are shown.
+            </HelpText>
+          </div>
+          
+          {/* Add Transaction Form Modal */}
+          {isAddingTransaction && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '20px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                width: '400px',
+                maxWidth: '90%',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#333', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Add New Transaction</h2>
+                
+                <form onSubmit={handleAddTransaction}>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Date *
+                    </label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={newTransaction.date}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Description *
+                    </label>
+                    <input
+                      type="text"
+                      name="description"
+                      value={newTransaction.description}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                      placeholder="Enter transaction description"
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Amount *
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      step="0.01"
+                      value={newTransaction.amount}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                      placeholder="Enter amount (negative for expenses)"
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Bank Category
+                    </label>
+                    <select
+                      name="bank_category"
+                      value={newTransaction.bank_category}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        backgroundColor: 'white',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Select a category</option>
+                      {availableBankCategories
+                        .filter(category => category !== null && category !== undefined && category !== '')
+                        .map(category => (
+                          <option key={category} value={category}>{category}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Label
+                    </label>
+                    <select
+                      name="label"
+                      value={newTransaction.label}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        backgroundColor: 'white',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Select a label</option>
+                      {labels.map(label => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                    <button
+                      type="button"
+                      onClick={cancelAddTransaction}
+                      style={{
+                        padding: '10px 16px',
+                        backgroundColor: '#f0f0f0',
+                        color: '#333',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Add Transaction
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
           {/* Transactions table with loading indicator */}
           {isTransactionsLoading || isLabelsLoading ? (
             <LoadingSpinner />
@@ -1025,20 +1783,18 @@ const App = () => {
                           ))
                         }
                         
-                        {/* Display null/empty category at the bottom if it exists */}
-                        {availableBankCategories.some(category => category === null || category === undefined || category === '') && (
-                          <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={bankCategoryFilter.includes(null)}
-                                onChange={() => handleBankCategoryFilterChange(null)}
-                                style={{ marginRight: '8px' }}
-                              />
-                              (Empty)
-                            </label>
-                          </div>
-                        )}
+                        {/* Display null category option */}
+                        <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={bankCategoryFilter.includes(null)}
+                              onChange={() => handleBankCategoryFilterChange(null)}
+                              style={{ marginRight: '8px' }}
+                            />
+                            (Empty/Null)
+                          </label>
+                        </div>
                         
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
                           <button 
@@ -1172,7 +1928,7 @@ const App = () => {
             </table>
           )}
 
-          <h2>Totals</h2>
+          <h2 className="section-title">Totals</h2>
           {isTransactionsLoading || isLabelsLoading ? (
             <LoadingSpinner />
           ) : (
@@ -1250,7 +2006,7 @@ const App = () => {
           )}
         </div>
       )}
-      {activeTab === 'budgets' && <Budgets />}
+      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} />}
     </div>
   );
 };
