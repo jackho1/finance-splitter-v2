@@ -68,7 +68,24 @@ const monthlySpendCategories = [
   'Other'
 ];
 
-const Budgets = () => {
+// Help Text Component for consistent styling
+const HelpText = ({ children, isVisible }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <div className="help-text">
+      <div className="help-text-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div className="help-text-content">{children}</div>
+    </div>
+  );
+};
+
+const Budgets = ({ helpTextVisible = true }) => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(defaultBudgets);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -136,8 +153,8 @@ const Budgets = () => {
 
   useEffect(() => {
     if (transactions.length > 0) {
-      const monthlySpend = calculateMonthlySpend();
-      setChartData(createChartData(monthlySpend));
+    const monthlySpend = calculateMonthlySpend();
+    setChartData(createChartData(monthlySpend));
     }
   }, [transactions, budgets, currentMonth, currentYear, categoryMappings]);
 
@@ -523,7 +540,7 @@ const Budgets = () => {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Budget Dashboard</h1>
+      <h1 className="dashboard-title">Budget Dashboard</h1>
       <div className="month-navigation">
         <button 
           className="modern-button navigation" 
@@ -547,13 +564,69 @@ const Budgets = () => {
           </svg>
         </button>
       </div>
-      <div style={{ marginBottom: '10px' }}>
-        <em>Drag categories by clicking and dragging the category name cell. Red highlight indicates categories over budget.</em>
-      </div>
+      
+      <HelpText isVisible={helpTextVisible}>
+        Drag categories by clicking and dragging the category name cell. Red highlight indicates categories over budget.
+      </HelpText>
       
       {/* Add CSS styles for drag and drop */}
       <style>
       {`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        .dashboard-title {
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 28px;
+          color: #2c3e50;
+          margin-bottom: 24px;
+          position: relative;
+          display: inline-block;
+          padding-bottom: 8px;
+        }
+        
+        .dashboard-title:after {
+          content: '';
+          position: absolute;
+          left: 0;
+          bottom: 0;
+          height: 3px;
+          width: 40px;
+          background-color: #4a90e2;
+          border-radius: 2px;
+        }
+        
+        .month-display {
+          font-family: 'Inter', sans-serif;
+          font-size: 18px;
+          font-weight: 500;
+          padding: 0 20px;
+          color: #2c3e50;
+        }
+        
+        .help-text {
+          display: flex;
+          align-items: flex-start;
+          background-color: #f8f9fa;
+          padding: 10px 15px;
+          border-radius: 6px;
+          border-left: 3px solid #4a90e2;
+          margin-bottom: 15px;
+          font-size: 13px;
+          color: #505050;
+          font-family: 'Inter', sans-serif;
+        }
+        
+        .help-text-icon {
+          color: #4a90e2;
+          margin-right: 10px;
+          margin-top: 2px;
+        }
+        
+        .help-text-content {
+          flex: 1;
+        }
+        
         .drag-row {
           cursor: default; /* Change default cursor */
         }
@@ -692,13 +765,6 @@ const Budgets = () => {
           margin-bottom: 20px;
           align-items: center;
         }
-
-        .month-display {
-          font-size: 18px;
-          font-weight: 500;
-          padding: 0 20px;
-          color: #2c3e50;
-        }
       `}
       </style>
       
@@ -764,8 +830,8 @@ const Budgets = () => {
                   }}
                 >
                   {editingBudget === category ? (
-                    <input
-                      type="number"
+                  <input
+                    type="number"
                       className="budget-input"
                       value={editBudgetValue}
                       onChange={handleBudgetInputChange}
@@ -832,9 +898,9 @@ const Budgets = () => {
         <Bar data={chartData} options={chartOptions} />
       </div>
       
-      <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
-        <p>Note: Chart uses logarithmic scale to better visualize both small and large amounts</p>
-      </div>
+      <HelpText isVisible={helpTextVisible}>
+        Chart uses logarithmic scale to better visualize both small and large amounts
+      </HelpText>
     </div>
   );
 };

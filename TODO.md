@@ -39,13 +39,13 @@
 - [ ] **Enable real-time synchronization**:
    - Enable real-time database synchronization so users do not need to manually refresh the webpage.
 
-- [ ] **Filter by Category Fix**:
+- [x] **Filter by Category Fix**:
    - Button is now broken, fix this.
 
 - [ ] **Open Total Spend Summary**:
    - Add the ability to click on a total spend column under Budgets and see what spend amount equates to that number.
 
-- [ ] **Fix Bank Category Filtering**:
+- [x] **Fix Bank Category Filtering**:
    - When double-clicking on a bank_category cell, display all valid values, not just values valid in the past 30 days. Need to fetch from category_mapping table.
 
 - [ ] **Fix Total Calculations**:
@@ -54,7 +54,7 @@
 - [ ] **Display editable cell pencil icon in Filtered Transactions table**:
    - Display editable cell pencil icon in Filtered Transactions table
 
-- [ ] **Create & Delete Transaction Data**:
-   - Add the ability to create and delete transactional data.
+- [WIP] **Create Transaction Data**:
+   - Add the ability to create transactional data.
 
    
