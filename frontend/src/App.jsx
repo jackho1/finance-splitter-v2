@@ -1994,10 +1994,10 @@ const App = () => {
                 >
                   <span style={{ fontWeight: 'bold' }}>Total Spend</span>
                   <span>
-                    {totals[labels[2]] != null ? 
-                      (totals[labels[2]] < 0 ? 
-                        `-$${Math.abs(totals[labels[2]]).toFixed(2)}` : 
-                        `$${totals[labels[2]].toFixed(2)}`)
+                    {(totals[labels[0]] != null && totals[labels[1]] != null) ? 
+                      ((totals[labels[0]] + totals[labels[1]]) < 0 ? 
+                        `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
+                        `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`)
                       : '$0.00'}
                   </span>
                 </div>

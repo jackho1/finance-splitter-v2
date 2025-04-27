@@ -57,4 +57,10 @@
 - [WIP] **Create Transaction Data**:
    - Add the ability to create transactional data.
 
+- [ ] **Add Jacks Buckets**:
+   - Add the Jacks Buckets section to this webpage.
+
+- [ ] **Add Total Balance**:
+   - Add the Total Balance section to this webpage.
+
    
