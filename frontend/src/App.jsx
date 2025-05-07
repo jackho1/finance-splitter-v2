@@ -331,17 +331,36 @@ const App = () => {
   });
 
   // Filter transactions based on chart label filter
-  const chartFilteredTransactions = allFilteredTransactions.filter(transaction => {
-    if (chartLabelFilter === 'All') {
+  const getChartFilteredTransactions = () => {
+    return allFilteredTransactions.filter(transaction => {
+      // 1. Filter out unlabelled transactions
+      if (!transaction.label) {
+        return false;
+      }
+      
+      // 2. Apply chart label filter
+      if (chartLabelFilter !== 'All') {
+        if (chartLabelFilter === labels[0]) { // Ruby
+          return transaction.label === labels[0] || transaction.label === labels[2]; 
+        } else if (chartLabelFilter === labels[1]) { // Jack
+          return transaction.label === labels[1] || transaction.label === labels[2];
+        }
+      }
+      
+      // 3. Skip positive transfer transactions if needed
+      if (transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0) {
+        return false;
+      }
+      
+      // Include transaction if it passed all filters
       return true;
-    } else if (chartLabelFilter === labels[0]) { // Ruby
-      return transaction.label === labels[0] || transaction.label === labels[2]; 
-    } else if (chartLabelFilter === labels[1]) { // Jack
-      return transaction.label === labels[1] || transaction.label === labels[2];
-    }
-    return true;
-  });
-
+    });
+  };
+  
+  // Use the filtering function to get filtered transactions
+  const chartFilteredTransactions = getChartFilteredTransactions();
+  
+  // Then simplify the loop where you process the transactions:
   uniqueCategories.forEach(category => {
     const categoryData = Array(12).fill(0); // Initialize an array for each month
     
@@ -349,10 +368,7 @@ const App = () => {
       const month = new Date(transaction.date).getMonth();
       const transactionCategory = getCategoryFromMapping(transaction.bank_category);
       
-      // Skip positive transfer transactions
-      if (transactionCategory === category && 
-         !(transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0)) {
-        
+      if (transactionCategory === category) {
         let amount = parseFloat(transaction.amount) || 0;
         
         // If it's a "Both" transaction and we're filtering by a specific label, divide by 2
@@ -363,11 +379,11 @@ const App = () => {
         categoryData[month] += amount;
       }
     });
-
+  
     data.datasets.push({
       label: category,
       data: categoryData,
-      backgroundColor: categoryColors.current[category], // Use consistent colors for categories
+      backgroundColor: categoryColors.current[category],
     });
   });
 
@@ -1334,7 +1350,7 @@ const App = () => {
                 <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
                   <Bar data={data} options={options} />
                   <HelpText isVisible={helpTextVisible} style={{marginBottom: '8px'}}>
-                    Chart displays data for all months regardless of the month filter above and respects all other applied filters
+                    Chart displays data for all months regardless of the month filter above and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
                   </HelpText>
                 </div>
               </>

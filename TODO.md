@@ -63,4 +63,17 @@
 - [ ] **Add Total Balance**:
    - Add the Total Balance section to this webpage.
 
-   
+- [x] **Sort By Fix**:
+   - Fix remaining Sort by functionality to work on other sorts.
+
+- [ ] **Default Help Text**:
+   - Help texts to not show by default.
+
+- [ ] **Database Refresh**:
+   - Add a button for PostgreSQL Database Refresh
+
+- [ ] **Remove Unlabelled Transactions from Graph View**:
+   - Remove Unlabelled Transactions from Graph View OR add a separate filter for this only
+
+- [ ] **Fix Date Filtering**:
+   - Fix date filtering such that it allows us to filter based on multiple months instead of just one month currently

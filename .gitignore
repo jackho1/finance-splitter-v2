@@ -1,2 +1,5 @@
 # Ignore database configuration file for index.js
 backend/index.js
+
+# Ignore prompt file
+prompt.txt
