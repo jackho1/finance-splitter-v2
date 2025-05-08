@@ -886,6 +886,35 @@ useEffect(() => {
     resetNewTransactionForm();
   };
 
+  // Add this function to handle navigation from budget chart
+  const handleBudgetChartClick = (category, month, year) => {
+    // Switch to transactions tab
+    setActiveTab('transactions');
+    
+    // Set the month and year to match the budget view
+    setCurrentMonth(month);
+    setCurrentYear(year);
+    
+    // Clear date filter so month navigation works
+    setDateFilter({ startDate: '', endDate: '' });
+    
+    // Clear all filters first
+    setCategoryFilter([]);
+    setBankCategoryFilter([]);
+    setLabelFilter([]);
+    
+    // Find all bank categories that map to this category
+    const matchingBankCategories = Object.entries(categoryMappings)
+      .filter(([bankCat, cat]) => cat === category)
+      .map(([bankCat, _]) => bankCat);
+    
+    // Set the bank category filter to include all matching categories
+    setBankCategoryFilter(matchingBankCategories);
+    
+    // Scroll to top to show the transactions table
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 className="dashboard-title">Finance Dashboard</h1>
@@ -2031,7 +2060,7 @@ useEffect(() => {
           )}
         </div>
       )}
-      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} />}
+      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
     </div>
   );
 };

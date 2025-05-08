@@ -42,7 +42,7 @@
 - [x] **Filter by Category Fix**:
    - Button is now broken, fix this.
 
-- [ ] **Open Total Spend Summary**:
+- [x] **Open Total Spend Summary**:
    - Add the ability to click on a total spend column under Budgets and see what spend amount equates to that number.
 
 - [x] **Fix Bank Category Filtering**:
