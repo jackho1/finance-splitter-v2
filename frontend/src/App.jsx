@@ -87,7 +87,7 @@ const App = () => {
   });
   
   // Add help text visibility state
-  const [helpTextVisible, setHelpTextVisible] = useState(true);
+  const [helpTextVisible, setHelpTextVisible] = useState(false);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -256,15 +256,15 @@ const App = () => {
     return nextMonthDate > now;
   };
 
-  // Now update the useEffect that filters transactions to also filter by month
-  useEffect(() => {
-    // Use the applyFilters utility function instead of inline logic
-    let filtered = applyFilters(transactions, {
-      dateFilter,
-      bankCategoryFilter,
-      labelFilter,
-      sortBy: filters.sortBy
-    });
+// Now update the useEffect that filters transactions to also filter by month
+useEffect(() => {
+  // Use the applyFilters utility function instead of inline logic
+  let filtered = applyFilters(transactions, {
+    dateFilter,
+    bankCategoryFilter,
+    labelFilter,
+    sortBy: filters.sortBy
+  });
 
     // Apply additional category filtering if needed
     if (categoryFilter.length > 0) {
@@ -284,16 +284,21 @@ const App = () => {
     // Store the filtered transactions without month filter for the chart
     setAllFilteredTransactions(filtered);
     
-    // Apply month filtering for the table view
-    const monthFiltered = filtered.filter(transaction => {
-      const date = new Date(transaction.date);
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-    });
+    // Apply month filtering for the table view ONLY if no date filter is active
+    let tableFiltered = filtered;
+    
+    // Only apply month filter if there's no date range filter
+    if (!dateFilter.startDate && !dateFilter.endDate) {
+      tableFiltered = filtered.filter(transaction => {
+        const date = new Date(transaction.date);
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+      });
+    }
 
-    setFilteredTransactions(monthFiltered);
+    setFilteredTransactions(tableFiltered);
 
-    // Calculate totals using the utility function (still use month-filtered transactions for totals)
-    const newTotals = calculateTotals(monthFiltered, labels);
+    // Calculate totals using the utility function
+    const newTotals = calculateTotals(tableFiltered, labels);
     setTotals(newTotals);
   }, [
     transactions, 
@@ -1128,7 +1133,7 @@ const App = () => {
 
           <div>
             {/* Active filters display */}
-            {(dateFilter.startDate || bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
+            {(dateFilter.startDate || dateFilter.endDate ||bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
               <div style={{ 
                 margin: '10px 0', 
                 padding: '10px', 
@@ -1140,9 +1145,9 @@ const App = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <strong>Active Filters:</strong>
-                    {dateFilter.startDate && (
+                    {(dateFilter.startDate || dateFilter.endDate) && (
                       <span style={{ margin: '0 10px' }}>
-                        Date: {dateFilter.startDate} to {dateFilter.endDate}
+                        Date: {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'End'}
                       </span>
                     )}
                     {bankCategoryFilter.length > 0 && (
@@ -1360,7 +1365,11 @@ const App = () => {
           <h2 className="section-title">
             Filtered Transactions 
             <span className="date-label">
-              ({new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} {currentYear})
+              {dateFilter.startDate || dateFilter.endDate ? (
+                `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`
+              ) : (
+                `(${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} ${currentYear})`
+              )}
             </span>
           </h2>
 
@@ -1481,7 +1490,7 @@ const App = () => {
             </div>
             
             <HelpText isVisible={helpTextVisible} style={{marginBottom: '0px'}}>
-              Use the month navigation to browse your transaction history. Only transactions from the selected month are shown.
+              Use the month navigation to browse your transaction history. Only transactions from the selected month are shown unless a date filter is active.
             </HelpText>
           </div>
           
