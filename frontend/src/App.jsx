@@ -89,6 +89,9 @@ const App = () => {
   // Add help text visibility state
   const [helpTextVisible, setHelpTextVisible] = useState(false);
 
+  // Add refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Function to generate a random color
   const getRandomColor = () => {
     const letters = '0123456789ABCDEF';
@@ -256,15 +259,130 @@ const App = () => {
     return nextMonthDate > now;
   };
 
-// Now update the useEffect that filters transactions to also filter by month
-useEffect(() => {
-  // Use the applyFilters utility function instead of inline logic
-  let filtered = applyFilters(transactions, {
-    dateFilter,
-    bankCategoryFilter,
-    labelFilter,
-    sortBy: filters.sortBy
-  });
+  // Function to refresh bank feeds
+  const refreshBankFeeds = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      const response = await axios.post('http://localhost:5000/refresh-bank-feeds');
+      
+      if (response.data.success) {
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Bank feeds refreshed successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Refresh the transactions data
+        const transactionsResponse = await axios.get('http://localhost:5000/transactions');
+        setTransactions(transactionsResponse.data);
+        
+        // Reapply filters to new data
+        let filtered = applyFilters(transactionsResponse.data, {
+          dateFilter,
+          bankCategoryFilter,
+          labelFilter,
+          sortBy: filters.sortBy
+        });
+        
+        if (categoryFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            const category = getCategoryFromMapping(transaction.bank_category);
+            if (categoryFilter.includes(null) && category === null) {
+              return true;
+            }
+            return categoryFilter.includes(category);
+          });
+        }
+        
+        setAllFilteredTransactions(filtered);
+        
+        // Apply month filtering for table view
+        let tableFiltered = filtered;
+        if (!dateFilter.startDate && !dateFilter.endDate) {
+          tableFiltered = filtered.filter(transaction => {
+            const date = new Date(transaction.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          });
+        }
+        
+        setFilteredTransactions(tableFiltered);
+        
+        // Recalculate totals
+        const newTotals = calculateTotals(tableFiltered, labels);
+        setTotals(newTotals);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Failed to refresh bank feeds: ' + response.data.message;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 5 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error refreshing bank feeds:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Error refreshing bank feeds. Check console for details.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      
+      document.body.appendChild(notification);
+      
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Now update the useEffect that filters transactions to also filter by month
+  useEffect(() => {
+    // Use the applyFilters utility function instead of inline logic
+    let filtered = applyFilters(transactions, {
+      dateFilter,
+      bankCategoryFilter,
+      labelFilter,
+      sortBy: filters.sortBy
+    });
 
     // Apply additional category filtering if needed
     if (categoryFilter.length > 0) {
@@ -1054,6 +1172,11 @@ useEffect(() => {
         .help-toggle:hover svg {
           transform: scale(1.1);
         }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
       `}
       </style>
       
@@ -1492,6 +1615,42 @@ useEffect(() => {
                     <option value="description-desc">Description (Z-A)</option>
                   </select>
                 </div>
+                
+                <button 
+                  onClick={refreshBankFeeds}
+                  disabled={isRefreshing}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 15px',
+                    backgroundColor: isRefreshing ? '#95a5a6' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'background-color 0.2s ease',
+                    opacity: isRefreshing ? 0.7 : 1
+                  }}
+                >
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    style={{
+                      animation: isRefreshing ? 'spin 2s linear infinite' : 'none'
+                    }}
+                  >
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                  {isRefreshing ? 'Refreshing...' : 'Refresh Bank Feeds'}
+                </button>
                 
                 <button 
                   onClick={toggleAddTransactionForm}

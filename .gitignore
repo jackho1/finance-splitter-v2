@@ -3,3 +3,6 @@ backend/index.js
 
 # Ignore prompt file
 prompt.txt
+
+# Ignore .env file
+.env

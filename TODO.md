@@ -30,7 +30,7 @@
 - [ ] **Documentation**:
    - Update the documentation to reflect any new features or changes made to the application.
 
-- [ ] **Integrate Python Script**:
+- [x] **Integrate Python Script**:
    - Combine Python script to fetch transactions from PocketSmith API.
 
 - [x] **Fix Bank Category Dropdown Values**:
@@ -48,7 +48,7 @@
 - [x] **Fix Bank Category Filtering**:
    - When double-clicking on a bank_category cell, display all valid values, not just values valid in the past 30 days. Need to fetch from category_mapping table.
 
-- [ ] **Fix Total Calculations**:
+- [x] **Fix Total Calculations**:
    - Total calculation does not dynamically update based on table filters on the webpage.
 
 - [ ] **Display editable cell pencil icon in Filtered Transactions table**:
@@ -69,7 +69,7 @@
 - [x] **Default Help Text**:
    - Help texts to not show by default.
 
-- [ ] **Database Refresh**:
+- [x] **Database Refresh**:
    - Add a button for PostgreSQL Database Refresh
 
 - [x] **Remove Unlabelled Transactions from Graph View**:
@@ -77,3 +77,6 @@
 
 - [x] **Fix Date Filtering**:
    - Fix date filtering such that it allows us to filter based on multiple months instead of just one month currently
+
+- [x] **Test running bank_feeds_psql.py**:
+   - Run this python file to test.
