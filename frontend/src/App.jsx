@@ -87,7 +87,10 @@ const App = () => {
   });
   
   // Add help text visibility state
-  const [helpTextVisible, setHelpTextVisible] = useState(true);
+  const [helpTextVisible, setHelpTextVisible] = useState(false);
+
+  // Add refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -256,6 +259,121 @@ const App = () => {
     return nextMonthDate > now;
   };
 
+  // Function to refresh bank feeds
+  const refreshBankFeeds = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      const response = await axios.post('http://localhost:5000/refresh-bank-feeds');
+      
+      if (response.data.success) {
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Bank feeds refreshed successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Refresh the transactions data
+        const transactionsResponse = await axios.get('http://localhost:5000/transactions');
+        setTransactions(transactionsResponse.data);
+        
+        // Reapply filters to new data
+        let filtered = applyFilters(transactionsResponse.data, {
+          dateFilter,
+          bankCategoryFilter,
+          labelFilter,
+          sortBy: filters.sortBy
+        });
+        
+        if (categoryFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            const category = getCategoryFromMapping(transaction.bank_category);
+            if (categoryFilter.includes(null) && category === null) {
+              return true;
+            }
+            return categoryFilter.includes(category);
+          });
+        }
+        
+        setAllFilteredTransactions(filtered);
+        
+        // Apply month filtering for table view
+        let tableFiltered = filtered;
+        if (!dateFilter.startDate && !dateFilter.endDate) {
+          tableFiltered = filtered.filter(transaction => {
+            const date = new Date(transaction.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          });
+        }
+        
+        setFilteredTransactions(tableFiltered);
+        
+        // Recalculate totals
+        const newTotals = calculateTotals(tableFiltered, labels);
+        setTotals(newTotals);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Failed to refresh bank feeds: ' + response.data.message;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 5 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error refreshing bank feeds:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Error refreshing bank feeds. Check console for details.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      
+      document.body.appendChild(notification);
+      
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Now update the useEffect that filters transactions to also filter by month
   useEffect(() => {
     // Use the applyFilters utility function instead of inline logic
@@ -284,16 +402,21 @@ const App = () => {
     // Store the filtered transactions without month filter for the chart
     setAllFilteredTransactions(filtered);
     
-    // Apply month filtering for the table view
-    const monthFiltered = filtered.filter(transaction => {
-      const date = new Date(transaction.date);
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-    });
+    // Apply month filtering for the table view ONLY if no date filter is active
+    let tableFiltered = filtered;
+    
+    // Only apply month filter if there's no date range filter
+    if (!dateFilter.startDate && !dateFilter.endDate) {
+      tableFiltered = filtered.filter(transaction => {
+        const date = new Date(transaction.date);
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+      });
+    }
 
-    setFilteredTransactions(monthFiltered);
+    setFilteredTransactions(tableFiltered);
 
-    // Calculate totals using the utility function (still use month-filtered transactions for totals)
-    const newTotals = calculateTotals(monthFiltered, labels);
+    // Calculate totals using the utility function
+    const newTotals = calculateTotals(tableFiltered, labels);
     setTotals(newTotals);
   }, [
     transactions, 
@@ -331,17 +454,36 @@ const App = () => {
   });
 
   // Filter transactions based on chart label filter
-  const chartFilteredTransactions = allFilteredTransactions.filter(transaction => {
-    if (chartLabelFilter === 'All') {
+  const getChartFilteredTransactions = () => {
+    return allFilteredTransactions.filter(transaction => {
+      // 1. Filter out unlabelled transactions
+      if (!transaction.label) {
+        return false;
+      }
+      
+      // 2. Apply chart label filter
+      if (chartLabelFilter !== 'All') {
+        if (chartLabelFilter === labels[0]) { // Ruby
+          return transaction.label === labels[0] || transaction.label === labels[2]; 
+        } else if (chartLabelFilter === labels[1]) { // Jack
+          return transaction.label === labels[1] || transaction.label === labels[2];
+        }
+      }
+      
+      // 3. Skip positive transfer transactions if needed
+      if (transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0) {
+        return false;
+      }
+      
+      // Include transaction if it passed all filters
       return true;
-    } else if (chartLabelFilter === labels[0]) { // Ruby
-      return transaction.label === labels[0] || transaction.label === labels[2]; 
-    } else if (chartLabelFilter === labels[1]) { // Jack
-      return transaction.label === labels[1] || transaction.label === labels[2];
-    }
-    return true;
-  });
-
+    });
+  };
+  
+  // Use the filtering function to get filtered transactions
+  const chartFilteredTransactions = getChartFilteredTransactions();
+  
+  // Then simplify the loop where you process the transactions:
   uniqueCategories.forEach(category => {
     const categoryData = Array(12).fill(0); // Initialize an array for each month
     
@@ -349,10 +491,7 @@ const App = () => {
       const month = new Date(transaction.date).getMonth();
       const transactionCategory = getCategoryFromMapping(transaction.bank_category);
       
-      // Skip positive transfer transactions
-      if (transactionCategory === category && 
-         !(transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0)) {
-        
+      if (transactionCategory === category) {
         let amount = parseFloat(transaction.amount) || 0;
         
         // If it's a "Both" transaction and we're filtering by a specific label, divide by 2
@@ -363,11 +502,11 @@ const App = () => {
         categoryData[month] += amount;
       }
     });
-
+  
     data.datasets.push({
       label: category,
       data: categoryData,
-      backgroundColor: categoryColors.current[category], // Use consistent colors for categories
+      backgroundColor: categoryColors.current[category],
     });
   });
 
@@ -865,6 +1004,35 @@ const App = () => {
     resetNewTransactionForm();
   };
 
+  // Add this function to handle navigation from budget chart
+  const handleBudgetChartClick = (category, month, year) => {
+    // Switch to transactions tab
+    setActiveTab('transactions');
+    
+    // Set the month and year to match the budget view
+    setCurrentMonth(month);
+    setCurrentYear(year);
+    
+    // Clear date filter so month navigation works
+    setDateFilter({ startDate: '', endDate: '' });
+    
+    // Clear all filters first
+    setCategoryFilter([]);
+    setBankCategoryFilter([]);
+    setLabelFilter([]);
+    
+    // Find all bank categories that map to this category
+    const matchingBankCategories = Object.entries(categoryMappings)
+      .filter(([bankCat, cat]) => cat === category)
+      .map(([bankCat, _]) => bankCat);
+    
+    // Set the bank category filter to include all matching categories
+    setBankCategoryFilter(matchingBankCategories);
+    
+    // Scroll to top to show the transactions table
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 className="dashboard-title">Finance Dashboard</h1>
@@ -1004,6 +1172,11 @@ const App = () => {
         .help-toggle:hover svg {
           transform: scale(1.1);
         }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
       `}
       </style>
       
@@ -1112,7 +1285,7 @@ const App = () => {
 
           <div>
             {/* Active filters display */}
-            {(dateFilter.startDate || bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
+            {(dateFilter.startDate || dateFilter.endDate ||bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
               <div style={{ 
                 margin: '10px 0', 
                 padding: '10px', 
@@ -1124,9 +1297,9 @@ const App = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <strong>Active Filters:</strong>
-                    {dateFilter.startDate && (
+                    {(dateFilter.startDate || dateFilter.endDate) && (
                       <span style={{ margin: '0 10px' }}>
-                        Date: {dateFilter.startDate} to {dateFilter.endDate}
+                        Date: {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'End'}
                       </span>
                     )}
                     {bankCategoryFilter.length > 0 && (
@@ -1334,7 +1507,7 @@ const App = () => {
                 <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
                   <Bar data={data} options={options} />
                   <HelpText isVisible={helpTextVisible} style={{marginBottom: '8px'}}>
-                    Chart displays data for all months regardless of the month filter above and respects all other applied filters
+                    Chart displays data for all months regardless of the month filter above and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
                   </HelpText>
                 </div>
               </>
@@ -1344,7 +1517,11 @@ const App = () => {
           <h2 className="section-title">
             Filtered Transactions 
             <span className="date-label">
-              ({new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} {currentYear})
+              {dateFilter.startDate || dateFilter.endDate ? (
+                `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`
+              ) : (
+                `(${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} ${currentYear})`
+              )}
             </span>
           </h2>
 
@@ -1440,6 +1617,42 @@ const App = () => {
                 </div>
                 
                 <button 
+                  onClick={refreshBankFeeds}
+                  disabled={isRefreshing}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 15px',
+                    backgroundColor: isRefreshing ? '#95a5a6' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'background-color 0.2s ease',
+                    opacity: isRefreshing ? 0.7 : 1
+                  }}
+                >
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    style={{
+                      animation: isRefreshing ? 'spin 2s linear infinite' : 'none'
+                    }}
+                  >
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                  {isRefreshing ? 'Refreshing...' : 'Refresh Bank Feeds'}
+                </button>
+                
+                <button 
                   onClick={toggleAddTransactionForm}
                   style={{
                     display: 'flex',
@@ -1465,7 +1678,7 @@ const App = () => {
             </div>
             
             <HelpText isVisible={helpTextVisible} style={{marginBottom: '0px'}}>
-              Use the month navigation to browse your transaction history. Only transactions from the selected month are shown.
+              Use the month navigation to browse your transaction history. Only transactions from the selected month are shown unless a date filter is active.
             </HelpText>
           </div>
           
@@ -1994,10 +2207,10 @@ const App = () => {
                 >
                   <span style={{ fontWeight: 'bold' }}>Total Spend</span>
                   <span>
-                    {totals[labels[2]] != null ? 
-                      (totals[labels[2]] < 0 ? 
-                        `-$${Math.abs(totals[labels[2]]).toFixed(2)}` : 
-                        `$${totals[labels[2]].toFixed(2)}`)
+                    {(totals[labels[0]] != null && totals[labels[1]] != null) ? 
+                      ((totals[labels[0]] + totals[labels[1]]) < 0 ? 
+                        `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
+                        `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`)
                       : '$0.00'}
                   </span>
                 </div>
@@ -2006,7 +2219,7 @@ const App = () => {
           )}
         </div>
       )}
-      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} />}
+      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
     </div>
   );
 };

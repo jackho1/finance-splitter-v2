@@ -85,7 +85,7 @@ const HelpText = ({ children, isVisible }) => {
   );
 };
 
-const Budgets = ({ helpTextVisible = true }) => {
+const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(defaultBudgets);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -502,6 +502,22 @@ const Budgets = ({ helpTextVisible = true }) => {
         text: 'Budget vs. Spending (Logarithmic Scale)',
         font: {
           size: 16
+        }
+      }
+    },
+    // Add onClick handler that includes current month and year
+    onClick: (event, elements) => {
+      if (elements.length > 0 && onChartClick) {
+        const element = elements[0];
+        const datasetIndex = element.datasetIndex;
+        
+        // Only handle clicks on the Spend dataset (index 1)
+        if (datasetIndex === 1) {
+          const categoryIndex = element.index;
+          const category = chartData.labels[categoryIndex];
+          
+          // Call the navigation function with category, month, and year
+          onChartClick(category, currentMonth, currentYear);
         }
       }
     }

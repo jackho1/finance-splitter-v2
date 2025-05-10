@@ -30,7 +30,7 @@
 - [ ] **Documentation**:
    - Update the documentation to reflect any new features or changes made to the application.
 
-- [ ] **Integrate Python Script**:
+- [x] **Integrate Python Script**:
    - Combine Python script to fetch transactions from PocketSmith API.
 
 - [x] **Fix Bank Category Dropdown Values**:
@@ -42,13 +42,13 @@
 - [x] **Filter by Category Fix**:
    - Button is now broken, fix this.
 
-- [ ] **Open Total Spend Summary**:
+- [x] **Open Total Spend Summary**:
    - Add the ability to click on a total spend column under Budgets and see what spend amount equates to that number.
 
 - [x] **Fix Bank Category Filtering**:
    - When double-clicking on a bank_category cell, display all valid values, not just values valid in the past 30 days. Need to fetch from category_mapping table.
 
-- [ ] **Fix Total Calculations**:
+- [x] **Fix Total Calculations**:
    - Total calculation does not dynamically update based on table filters on the webpage.
 
 - [ ] **Display editable cell pencil icon in Filtered Transactions table**:
@@ -57,4 +57,26 @@
 - [WIP] **Create Transaction Data**:
    - Add the ability to create transactional data.
 
-   
+- [ ] **Add Jacks Buckets**:
+   - Add the Jacks Buckets section to this webpage.
+
+- [ ] **Add Total Balance**:
+   - Add the Total Balance section to this webpage.
+
+- [x] **Sort By Fix**:
+   - Fix remaining Sort by functionality to work on other sorts.
+
+- [x] **Default Help Text**:
+   - Help texts to not show by default.
+
+- [x] **Database Refresh**:
+   - Add a button for PostgreSQL Database Refresh
+
+- [x] **Remove Unlabelled Transactions from Graph View**:
+   - Remove Unlabelled Transactions from Graph View OR add a separate filter for this only
+
+- [x] **Fix Date Filtering**:
+   - Fix date filtering such that it allows us to filter based on multiple months instead of just one month currently
+
+- [x] **Test running bank_feeds_psql.py**:
+   - Run this python file to test.
