@@ -89,15 +89,13 @@ def categorize_and_label_transactions(transactions):
         bank_category = tx['bank_category']
 
         label = auto_label_bank_category(bank_category)
-        category = None
-        label = label if label else None
 
         categorized_transactions.append({
             'id': tx['id'],
             'date': tx['date'],
             'description': description,
             'amount': amount,
-            'category': category,
+            'category': None,
             'bank_category': bank_category,
             'label': label
         })
