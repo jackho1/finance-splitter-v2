@@ -329,7 +329,7 @@ app.post('/transactions', async (req, res) => {
 // GET /labels — returns distinct labels for dropdown filter
 app.get('/labels', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT DISTINCT label FROM shared_transactions');
+    const { rows } = await pool.query('SELECT DISTINCT label FROM shared_transactions ORDER BY label DESC');
     res.json(rows.map(row => row.label).filter(label => label != null));
   } catch (err) {
     console.error('Error fetching labels:', err);

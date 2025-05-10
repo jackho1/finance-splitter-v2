@@ -145,9 +145,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   // Function to get category from bank_category using mappings
   const getCategoryFromMapping = (bankCategory) => {
-    if (!bankCategory) return 'Other';
+    if (!bankCategory) return null;
     // Only return a value if it exists in the mappings
-    return categoryMappings[bankCategory] || 'Other';
+    return categoryMappings[bankCategory] || null;
   };
 
   useEffect(() => {
@@ -169,7 +169,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-        const category = getCategoryFromMapping(transaction.bank_category) || 'Other';
+        const category = getCategoryFromMapping(transaction.bank_category);
         const amount = parseFloat(transaction.amount) || 0;
 
         if (!spend[category]) {
