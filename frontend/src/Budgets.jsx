@@ -115,7 +115,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   });
   const [draggedCategory, setDraggedCategory] = useState(null);
   const [draggedRowStyle, setDraggedRowStyle] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [editBudgetValue, setEditBudgetValue] = useState('');
   
@@ -281,9 +280,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       return false;
     }
     
-    setDraggedCategory(category);
-    setDragActive(true);
-    
+    setDraggedCategory(category);    
     // Fix for Firefox which may show default ghost image as well
     e.dataTransfer.effectAllowed = 'move';
     
@@ -376,7 +373,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   const handleDragEnd = (e) => {
     setDraggedCategory(null);
-    setDragActive(false);
     setDraggedRowStyle(null);
     
     // Remove all temporary styles from table rows
@@ -409,18 +405,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     // Reset styles
     e.currentTarget.style.backgroundColor = '';
     e.currentTarget.style.borderTop = '';
-  };
-
-  // Function to get the style for a category row based on budget vs spend
-  const getCategoryRowStyle = (category, spend) => {
-    const budget = budgets[category] || 0;
-    const isOverBudget = Math.abs(spend) > budget;
-    
-    return {
-      cursor: 'move',
-      backgroundColor: isOverBudget ? 'rgba(255, 200, 200, 0.3)' : 'transparent',
-      border: isOverBudget ? '1px solid #ff6b6b' : '1px solid black'
-    };
   };
 
   // Add a formatter function for currency display

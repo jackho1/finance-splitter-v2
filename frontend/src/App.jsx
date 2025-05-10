@@ -47,7 +47,7 @@ const App = () => {
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]); // New state for all months but filtered
-  const [filters, setFilters] = useState({ labels: [], sortBy: 'date-desc' });
+  const [filters, setFilters] = useState({ sortBy: 'date-desc' });
   const [totals, setTotals] = useState({});
   const [labels, setLabels] = useState([]);
   const [editCell, setEditCell] = useState(null);
@@ -551,18 +551,6 @@ const App = () => {
       return 'rgba(75, 192, 95, 0.5)';
     }
     return 'transparent'; // Default color
-  };
-
-  const handleLabelChange = (e) => {
-    const value = e.target.value;
-    setFilters(prevFilters => {
-      const labels = [...prevFilters.labels];
-      if (labels.includes(value)) {
-        return { ...prevFilters, labels: labels.filter(label => label !== value) };
-      } else {
-        return { ...prevFilters, labels: [...labels, value] };
-      }
-    });
   };
   
   const toggleColumnFilter = (column) => {

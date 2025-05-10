@@ -85,8 +85,6 @@ app.put('/transactions/:id', async (req, res) => {
       });
     }
     
-    const existingTransaction = checkResult.rows[0];
-    
     // Process and validate field updates
     const validUpdates = {};
     const errors = [];
