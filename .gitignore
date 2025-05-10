@@ -1,8 +1,35 @@
-# Ignore database configuration file for index.js
-backend/index.js
+# Editor and OS files
+.DS_Store
+.vscode/
+*.swp
+*.swo
+Thumbs.db
 
-# Ignore prompt file
-prompt.txt
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
 
-# Ignore .env file
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Environment variables - root directory
 .env
+.env.*
+!.env.template
+
+# Environment variables - any subdirectory
+*/**/.env
+*/**/.env.*
+!*/**/.env.template
+
+# Prompt files
+prompt.txt
+*/**/prompt.txt
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
