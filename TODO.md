@@ -78,5 +78,11 @@
 - [x] **Fix Date Filtering**:
    - Fix date filtering such that it allows us to filter based on multiple months instead of just one month currently
 
-- [x] **Test running bank_feeds_psql.py**:
+- [x] **Test running shared_bank_feed.py**:
    - Run this python file to test.
+
+- [ ] **Rename category_mapping table to shared_category**:
+   - Rename it.
+
+- [ ] **Add foreign key to shared_transaction table for bank_category**:
+   - Link this to category_mapping table to ensure uniqueness. Errors exist today as it is currently not a F.K.

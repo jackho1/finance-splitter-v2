@@ -372,12 +372,12 @@ app.get('/bank-categories', async (req, res) => {
 });
 
 /**
- * POST /refresh-bank-feeds - Executes the Python script to refresh DB with new transactions
+ * POST /refresh-shared-bank-feeds - Executes the Python script to refresh DB with new transactions
  */
-app.post('/refresh-bank-feeds', async (req, res) => {
+app.post('/refresh-shared-bank-feeds', async (req, res) => {
   try {
     // Path to the Python script
-    const scriptPath = path.join(__dirname, 'bank_feeds_psql.py');
+    const scriptPath = path.join(__dirname, 'shared_bank_feed.py');
     
     console.log('Refreshing bank feeds data...');
     
@@ -411,6 +411,168 @@ app.post('/refresh-bank-feeds', async (req, res) => {
       success: false,
       error: 'Failed to refresh bank feeds',
       details: err.message
+    });
+  }
+});
+
+/**
+ * POST /refresh-personal-bank-feeds - Executes the Python script to refresh DB with personal transactions
+ */
+app.post('/refresh-personal-bank-feeds', async (req, res) => {
+  try {
+    // Path to the Python script
+    const scriptPath = path.join(__dirname, 'personal_bank_feed.py');
+    
+    console.log('Refreshing personal bank feeds data...');
+    
+    // Execute the Python script using the promisified exec function
+    const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
+    
+    if (stderr) {
+      console.warn(`Python script warnings: ${stderr}`);
+    }
+    
+    console.log(`Python script output: ${stdout}`);
+    
+    // Check if there's a success message in the output
+    if (stdout.includes('Successfully processed') && stdout.includes('personal transactions')) {
+      return res.status(200).json({
+        success: true,
+        message: 'Personal bank feeds refreshed successfully',
+        details: stdout
+      });
+    } else if (stdout.includes('No transactions found to process')) {
+      return res.status(200).json({
+        success: true,
+        message: 'Personal bank feeds process completed but no new transactions were found',
+        details: stdout
+      });
+    } else {
+      // If the script ran but didn't insert transactions as expected
+      return res.status(200).json({
+        success: true,
+        message: 'Personal bank feeds process completed',
+        details: stdout
+      });
+    }
+  } catch (err) {
+    console.error('Error refreshing personal bank feeds:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to refresh personal bank feeds',
+      details: err.message
+    });
+  }
+});
+
+// GET /personal-transactions - Retrieves personal transactions
+app.get('/personal-transactions', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM personal_transactions ORDER BY date DESC';
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching personal transactions:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+// GET /personal-categories - Retrieves personal categories
+app.get('/personal-categories', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM personal_category ORDER BY category';
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching personal categories:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+// PUT /personal-transactions/:id - Updates a personal transaction
+app.put('/personal-transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = ['date', 'description', 'amount', 'category'];
+    
+    const validUpdates = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        validUpdates[key] = value;
+      }
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    const setClause = Object.entries(validUpdates).map(
+      ([key, _], index) => `${key} = $${index + 1}`
+    ).join(', ');
+    
+    const values = [...Object.values(validUpdates), id];
+    const query = `UPDATE personal_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating personal transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+// POST /personal-transactions - Creates a new personal transaction
+app.post('/personal-transactions', async (req, res) => {
+  try {
+    const { date, description, amount, category } = req.body;
+    
+    if (!date || !description || amount === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: ['Date, description, and amount are required'] 
+      });
+    }
+    
+    const query = `
+      INSERT INTO personal_transactions (date, description, amount, category)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    
+    const { rows } = await pool.query(query, [date, description, amount, category]);
+    
+    res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction created successfully'
+    });
+  } catch (err) {
+    console.error('Error creating personal transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
     });
   }
 });

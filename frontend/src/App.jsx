@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import Budgets from './Budgets';
+import PersonalTransactions from './PersonalTransactions';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -264,7 +265,7 @@ const App = () => {
     try {
       setIsRefreshing(true);
       
-      const response = await axios.post('http://localhost:5000/refresh-bank-feeds');
+      const response = await axios.post('http://localhost:5000/refresh-shared-bank-feeds');
       
       if (response.data.success) {
         // Show success notification
@@ -703,7 +704,26 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ width: '100%' }}
+              style={{ 
+                width: '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
               autoFocus
             />
           );
@@ -715,7 +735,26 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ width: '100%' }}
+              style={{ 
+                width: '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
               autoFocus
             />
           );
@@ -724,18 +763,46 @@ const App = () => {
             <select 
               value={editValue === null ? 'null' : (editValue || '')}
               onChange={handleInputChange} 
-              onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ width: '100%' }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e2e8f0';
+                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                handleUpdate(transaction.id, field);
+              }}
+              style={{ 
+                width: '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '16px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
               autoFocus
             >
-              <option value="">Select a category</option>
+              <option value="" style={{ color: '#a0aec0' }}>Select a category</option>
               {availableBankCategories
                 .filter(category => category !== null && category !== undefined && category !== '')
                 .map(category => (
-                  <option key={category} value={category}>{category}</option>
+                  <option key={category} value={category} style={{ color: '#2d3748' }}>{category}</option>
                 ))
               }
-              <option key="null-option" value="null">(null)</option>
+              <option key="null-option" value="null" style={{ color: '#a0aec0' }}>(null)</option>
             </select>
           );
         case 'label':
@@ -743,13 +810,41 @@ const App = () => {
             <select 
               value={editValue || ''} 
               onChange={handleInputChange} 
-              onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ width: '100%' }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e2e8f0';
+                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                handleUpdate(transaction.id, field);
+              }}
+              style={{ 
+                width: '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '16px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
               autoFocus
             >
-              <option value="">Select a label</option>
+              <option value="" style={{ color: '#a0aec0' }}>Select a label</option>
               {labels.map(label => (
-                <option key={label} value={label}>{label}</option>
+                <option key={label} value={label} style={{ color: '#2d3748' }}>{label}</option>
               ))}
             </select>
           );
@@ -760,7 +855,26 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ width: '100%' }}
+              style={{ 
+                width: field === 'description' ? '400px' : '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
               autoFocus
             />
           );
@@ -1203,6 +1317,17 @@ const App = () => {
             <rect x="17" y="10" width="2" height="8" rx="0.5" fill="currentColor"/>
           </svg>
           Budgets
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('personal')}
+          className={`nav-button ${activeTab === 'personal' ? 'active' : ''}`}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Personal
         </button>
         
         <button 
@@ -2208,6 +2333,7 @@ const App = () => {
         </div>
       )}
       {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
+      {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} />}
     </div>
   );
 };
