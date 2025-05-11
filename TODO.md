@@ -86,3 +86,6 @@
 
 - [ ] **Add foreign key to shared_transaction table for bank_category**:
    - Link this to category_mapping table to ensure uniqueness. Errors exist today as it is currently not a F.K.
+
+- [ ] **Test Add Transaction Functionality**:
+   - Fully test this functionality and amend it if it is broken
