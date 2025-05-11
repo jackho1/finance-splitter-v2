@@ -36,6 +36,72 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  // Add state for category order
+  const [categoryOrder, setCategoryOrder] = useState([]);
+  const [draggedCategory, setDraggedCategory] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Key for localStorage
+  const CATEGORY_ORDER_KEY = 'personal_categories_order';
+  
+  // Load saved order from localStorage on mount
+  useEffect(() => {
+    const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
+    if (savedOrder) {
+      try {
+        const parsedOrder = JSON.parse(savedOrder);
+        setCategoryOrder(parsedOrder);
+      } catch (error) {
+        console.error('Error parsing saved category order:', error);
+        localStorage.removeItem(CATEGORY_ORDER_KEY);
+      }
+    }
+  }, []);
+  
+  // Initialize or update category order when transactions change
+  useEffect(() => {
+    if (transactions.length > 0) {
+      // Calculate category data
+      const categoryData = transactions.reduce((acc, transaction) => {
+        const category = transaction.category || 'Uncategorized';
+        if (!acc[category]) {
+          acc[category] = {
+            total: 0,
+            count: 0
+          };
+        }
+        const amount = typeof transaction.amount === 'number' ? 
+          transaction.amount : parseFloat(transaction.amount) || 0;
+        acc[category].total += amount;
+        acc[category].count += 1;
+        return acc;
+      }, {});
+      
+      const currentCategories = Object.keys(categoryData);
+      
+      // If we have a saved order, check if categories have changed
+      if (categoryOrder.length > 0) {
+        // Check for new categories or removed categories
+        const newCategories = currentCategories.filter(cat => !categoryOrder.includes(cat));
+        const removedCategories = categoryOrder.filter(cat => !currentCategories.includes(cat));
+        
+        if (newCategories.length > 0 || removedCategories.length > 0) {
+          // Update the order: keep existing order but add new categories and remove old ones  
+          const updatedOrder = [
+            ...categoryOrder.filter(cat => currentCategories.includes(cat)), // Keep existing categories in order
+            ...newCategories // Add new categories at the end
+          ];
+          
+          setCategoryOrder(updatedOrder);
+          localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(updatedOrder));
+        }
+      } else {
+        // No saved order, create initial order
+        setCategoryOrder(currentCategories);
+      }
+    }
+  }, [transactions, categoryOrder]);
+
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
@@ -765,6 +831,121 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     return sum + (tx.amount || 0);
   }, 0);
 
+  // Drag and Drop handlers
+  const handleDragStart = (e, category) => {
+    setDraggedCategory(category);
+    setIsDragging(true);
+    
+    // Set drag image and effect
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', category);
+    
+    // For better UX, we can set a custom drag image
+    // This is optional but makes the dragging experience better
+    const dragImage = e.target.cloneNode(true);
+    dragImage.style.opacity = '0.8';
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 20, 20);
+    
+    // Remove the cloned element after the drag operation
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
+  };
+  
+  const handleDragOver = (e, category) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (category !== draggedCategory) {
+      // Reorder the categories on dragover for a live preview
+      const newOrder = [...categoryOrder];
+      const fromIndex = newOrder.indexOf(draggedCategory);
+      const toIndex = newOrder.indexOf(category);
+      
+      if (fromIndex !== -1 && toIndex !== -1) {
+        newOrder.splice(fromIndex, 1);
+        newOrder.splice(toIndex, 0, draggedCategory);
+        setCategoryOrder(newOrder);
+      }
+    }
+  };
+  
+  const handleDragEnd = () => {
+    setDraggedCategory(null);
+    setIsDragging(false);
+    
+    // Persist the new order to localStorage
+    localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(categoryOrder));
+    
+    // Optional: Show a subtle notification that order was saved
+    const notification = document.createElement('div');
+    notification.textContent = 'Category order saved!';
+    notification.style.position = 'fixed';
+    notification.style.bottom = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.padding = '8px 16px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.fontSize = '13px';
+    notification.style.background = 'linear-gradient(90deg, #d4edda 0%, #d1ecf1 100%)';
+    notification.style.border = '1px solid #bee5eb';
+    
+    document.body.appendChild(notification);
+    
+    // Fade out and remove
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transition = 'opacity 0.3s ease';
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    }, 1500);
+  };
+  
+  // Add a reset order function
+  const resetCategoryOrder = () => {
+    if (window.confirm('Are you sure you want to reset the category order to default?')) {
+      // Clear saved order
+      localStorage.removeItem(CATEGORY_ORDER_KEY);
+      
+      // Reset to alphabetical order or original order
+      const categoryData = transactions.reduce((acc, transaction) => {
+        const category = transaction.category || 'Uncategorized';
+        if (!acc[category]) acc[category] = true;
+        return acc;
+      }, {});
+      
+      const defaultOrder = Object.keys(categoryData).sort();
+      setCategoryOrder(defaultOrder);
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Category order reset to default!';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#fff3cd';
+      notification.style.color = '#856404';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 3000);
+    }
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       {isUpdating && (
@@ -844,32 +1025,472 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </div>
       )}
 
-      {/* Placeholder for future chart section */}
+      {/* Category Savings Summary */}
       <div style={{ 
-        height: '300px', 
         marginBottom: '60px', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center',
-        backgroundColor: '#f8f9fa',
-        border: '2px dashed #dee2e6',
-        borderRadius: '8px',
-        justifyContent: 'center',
-        color: '#6c757d'
+        background: 'transparent',
+        padding: '24px', // Reduced from 32px
+        position: 'relative',
       }}>
         {isTransactionsLoading ? (
           <LoadingSpinner />
         ) : (
-          <div style={{ textAlign: 'center' }}>
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 3V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <rect x="7" y="14" width="2" height="4" rx="0.5" fill="currentColor"/>
-              <rect x="12" y="12" width="2" height="6" rx="0.5" fill="currentColor"/>
-              <rect x="17" y="10" width="2" height="8" rx="0.5" fill="currentColor"/>
+          <div>
+            <div style={{ 
+              marginBottom: '20px', // Reduced from 28px
+              textAlign: 'center',
+              position: 'relative',
+            }}>
+              <h3 style={{ 
+                margin: '0',
+                color: '#1a1c1e',
+                fontSize: '24px', // Reduced from 28px
+                fontWeight: '700',
+                letterSpacing: '-0.5px',
+              }}>
+                Category Savings Buckets
+              </h3>
+              
+              {/* Replace inline help text with HelpText component */}
+              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '500px'}}>
+                Drag category cards to reorder them. Your arrangement will be saved automatically.
+              </HelpText>
+              
+              {/* Modern Reset Button */}
+              <button
+                onClick={resetCategoryOrder}
+                style={{
+                  position: 'absolute',
+                  right: '0',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: '13px', // Reduced from 14px
+                  padding: '6px 12px', // Reduced from 8px 16px
+                  backgroundColor: 'transparent',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+        display: 'flex', 
+        alignItems: 'center',
+                  gap: '6px',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#475569';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+                title="Reset to default order"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                Reset Order
+              </button>
+            </div>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', // Reduced from 240px
+              gap: '16px', // Reduced from 24px
+              marginBottom: '30px' // Reduced from 40px
+            }}>
+              {(() => {
+                try {
+                  // Calculate category totals and transaction counts
+                  const categoryData = transactions.reduce((acc, transaction) => {
+                    const category = transaction.category || 'Uncategorized';
+                    // Ensure amount is a number
+                    const amount = typeof transaction.amount === 'number' ? 
+                      transaction.amount : parseFloat(transaction.amount) || 0;
+                    
+                    if (!acc[category]) {
+                      acc[category] = {
+                        total: 0,
+                        count: 0
+                      };
+                    }
+                    acc[category].total += amount;
+                    acc[category].count += 1;
+                    
+                    return acc;
+                  }, {});
+
+                  // Calculate grand total with numeric safety
+                  const grandTotal = Object.values(categoryData)
+                    .reduce((sum, { total }) => {
+                      const numTotal = typeof total === 'number' ? 
+                        total : parseFloat(total) || 0;
+                      return sum + numTotal;
+                    }, 0);
+
+                  // Get latest closing balance with type safety
+                  const latestClosingBalance = transactions.length > 0 
+                    ? (typeof transactions[0].closing_balance === 'number' ?
+                      transactions[0].closing_balance : 
+                      parseFloat(transactions[0].closing_balance) || 0) 
+                    : 0;
+
+                  // Format number with commas
+                  const formatNumber = (number) => {
+                    try {
+                      return number.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      });
+                    } catch (error) {
+                      // Fallback for non-numeric values
+                      console.error("Error formatting number:", error);
+                      return "0.00";
+                    }
+                  };
+
+                  // Generate consistent colors for categories
+                  const getCategoryColor = (category, index) => {
+                    const colors = [
+                      { bg: '#3b82f6', light: '#dbeafe' },
+                      { bg: '#10b981', light: '#d1fae5' },
+                      { bg: '#8b5cf6', light: '#ede9fe' },
+                      { bg: '#f59e0b', light: '#fef3c7' },
+                      { bg: '#ef4444', light: '#fee2e2' },
+                      { bg: '#ec4899', light: '#fce7f3' },
+                      { bg: '#14b8a6', light: '#ccfbf1' },
+                      { bg: '#6366f1', light: '#e0e7ff' },
+                    ];
+                    return colors[index % colors.length];
+                  };
+
+                  // Sort the categories based on categoryOrder state
+                  const sortedCategories = [...Object.keys(categoryData)].sort((a, b) => {
+                    const indexA = categoryOrder.indexOf(a);
+                    const indexB = categoryOrder.indexOf(b);
+                    
+                    // If a category is not in the order array, place it at the end
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    
+                    return indexA - indexB;
+                  });
+
+                  // Check if reconciled
+                  const isReconciled = Math.abs(grandTotal - latestClosingBalance) < 0.01;
+
+                  return (
+                    <>
+                      {/* Display each category's total */}
+                      {sortedCategories.map((category, index) => {
+                        const data = categoryData[category];
+                        const numTotal = typeof data.total === 'number' ? 
+                          data.total : parseFloat(data.total) || 0;
+                        const percentage = grandTotal !== 0 ? 
+                          (numTotal / grandTotal) * 100 : 0;
+                        const color = getCategoryColor(category, index);
+                          
+                        return (
+                          <div 
+                            key={category}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, category)}
+                            onDragOver={(e) => handleDragOver(e, category)}
+                            onDragEnd={handleDragEnd}
+                            style={{  
+                              backgroundColor: 'white',
+                              padding: '16px', // Reduced from 24px
+                              borderRadius: '12px', // Reduced from 16px
+                              border: draggedCategory === category 
+                                ? `2px dashed ${color.bg}` 
+                                : '1px solid rgba(0,0,0,0.06)',
+                              boxShadow: draggedCategory === category
+                                ? '0 15px 35px rgba(0,0,0,0.08)'
+                                : '0 4px 24px rgba(0,0,0,0.02)',
+                              opacity: isDragging && draggedCategory !== category ? 0.5 : 1,
+                              cursor: 'move',
+                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                              transform: draggedCategory === category 
+                                ? 'scale(1.02) rotate(1deg)' 
+                                : 'scale(1)',
+                              position: 'relative',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {/* Background accent */}
+                            <div style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: '4px', // Reduced from 6px
+                              background: `linear-gradient(90deg, ${color.bg}, ${color.bg}dd)`,
+                              borderRadius: '12px 12px 0 0',
+                            }}/>
+                            
+                            {/* Drag handle */}
+                            <div style={{ 
+                              position: 'absolute',
+                              top: '12px',
+                              right: '12px',
+                              padding: '4px',
+                              borderRadius: '6px',
+                              color: color.bg,
+                              cursor: 'move',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              </svg>
+                            </div>
+                            
+                            <div style={{ 
+                              fontSize: '15px', // Reduced from 16px
+                              fontWeight: '600',
+                              color: '#475569',
+                              marginBottom: '8px', // Reduced from 12px
+                              marginTop: '12px', // Reduced from 16px
+                            }}>
+                              {category}
+                            </div>
+                            
+                            <div style={{ 
+                              fontSize: '26px', // Reduced from 32px
+                              fontWeight: '700',
+                              color: numTotal >= 0 ? '#059669' : '#dc2626',
+                              lineHeight: '1',
+                              marginBottom: '12px', // Reduced from 16px
+                            }}>
+                              {numTotal >= 0 
+                                ? `$${formatNumber(numTotal)}` 
+                                : `-$${formatNumber(Math.abs(numTotal))}`}
+                            </div>
+                            
+                            <div style={{ 
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px', // Reduced from 13px
+                              color: '#64748b',
+                            }}>
+                              <span style={{ fontWeight: '500' }}>
+                                {percentage.toFixed(1)}% of total
+                              </span>
+                              <span>
+                                {data.count} item{data.count !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                } catch (error) {
+                  console.error("Error rendering category data:", error);
+                  return (
+                    <div style={{ 
+                      padding: '24px', // Reduced from 32px
+                      textAlign: 'center', 
+                      color: '#dc2626',
+                      backgroundColor: '#fef2f2',
+                      borderRadius: '12px',
+                      border: '1px solid #fecaca'
+                    }}>
+                      <p style={{ margin: 0, fontWeight: '500' }}>
+                        Unable to display category data. Please try refreshing the page.
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
+            {/* Modern Balance Summary Section - Reduced sizing */}
+            <div style={{
+              marginTop: '20px', // Reduced from 24px
+              padding: '16px', // Reduced from 20px
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '10px', // Reduced from 12px
+              border: '1px solid rgba(0,0,0,0.06)',
+              maxWidth: '560px', // Reduced from 600px
+              margin: '20px auto', // Reduced from 24px
+              boxShadow: '0 6px 28px rgba(0,0,0,0.05)', // Reduced shadow
+            }}>
+              {(() => {
+                try {
+                  // Calculate again to ensure we have fresh values in this scope
+                  const categoryTotal = Object.values(transactions.reduce((acc, transaction) => {
+                    const category = transaction.category || 'Uncategorized';
+                    const amount = typeof transaction.amount === 'number' ? 
+                      transaction.amount : parseFloat(transaction.amount) || 0;
+                    
+                    if (!acc[category]) {
+                      acc[category] = 0;
+                    }
+                    acc[category] += amount;
+                    
+                    return acc;
+                  }, {})).reduce((sum, amount) => {
+                    const numAmount = typeof amount === 'number' ? 
+                      amount : parseFloat(amount) || 0;
+                    return sum + numAmount;
+                  }, 0);
+                
+                  // Get latest closing balance with type safety
+                  const latestClosingBalance = transactions.length > 0 
+                    ? (typeof transactions[0].closing_balance === 'number' ?
+                      transactions[0].closing_balance : 
+                      parseFloat(transactions[0].closing_balance) || 0) 
+                    : 0;
+                
+                  // Format number with commas
+                  const formatNumber = (number) => {
+                    try {
+                      return number.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      });
+                    } catch (error) {
+                      console.error("Error formatting number:", error);
+                      return "0.00";
+                    }
+                  };
+                
+                  // Check if reconciled
+                  const isReconciled = Math.abs(categoryTotal - latestClosingBalance) < 0.01;
+                  
+                  return (
+                    <>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '28px', // Reduced from 36px
+                      }}>
+                        {/* Balance information - Reduced sizing */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '28px', // Reduced from 32px
+                          alignItems: 'center',
+                        }}>
+                          <div style={{ 
+                            textAlign: 'center',
+                            padding: '12px 20px', // Reduced from 16px 24px
+                            backgroundColor: '#f0fdf4',
+                            borderRadius: '10px', // Reduced from 12px
+                            border: '1px solid #bbf7d0',
+                          }}>
+                            <div style={{ 
+                              fontSize: '12px', // Reduced from 13px
+                              color: '#059669',
+                              marginBottom: '6px', // Reduced from 8px
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              Current Balance
+                            </div>
+                            <div style={{ 
+                              fontSize: '22px', // Reduced from 24px
+                              fontWeight: '700',
+                              color: '#047857',
+                            }}>
+                              ${formatNumber(latestClosingBalance)}
+                            </div>
+                          </div>
+                          
+                          <div style={{
+                            width: '2px',
+                            height: '50px', // Reduced from 60px
+                            background: 'linear-gradient(180deg, transparent, #e5e7eb, transparent)',
+                          }}/>
+                          
+                          <div style={{ 
+                            textAlign: 'center',
+                            padding: '12px 20px', // Reduced from 16px 24px
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '10px', // Reduced from 12px
+                            border: '1px solid #bae6fd',
+                          }}>
+                            <div style={{ 
+                              fontSize: '12px', // Reduced from 13px
+                              color: '#0369a1',
+                              marginBottom: '6px', // Reduced from 8px
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              Categories Sum
+                            </div>
+                            <div style={{ 
+                              fontSize: '22px', // Reduced from 24px
+                              fontWeight: '700',
+                              color: '#0c4a6e',
+                            }}>
+                              ${formatNumber(categoryTotal)}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Modern Reconciliation Status - Reduced sizing */}
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px', // Reduced from 10px
+                          padding: '8px 16px', // Reduced from 10px 18px
+                          background: isReconciled 
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                            : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                          borderRadius: '20px', // Reduced from 24px
+                          fontSize: '13px', // Reduced from 14px
+                          fontWeight: '600',
+                          color: isReconciled ? '#15803d' : '#b45309',
+                          border: `1px solid ${isReconciled ? '#86efac' : '#fcd34d'}`,
+                          boxShadow: isReconciled 
+                            ? '0 2px 6px rgba(34, 197, 94, 0.2)'
+                            : '0 2px 6px rgba(245, 158, 11, 0.2)',
+                        }}>
+                          {isReconciled ? (
+                            <>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              Reconciled
+                            </>
+                          ) : (
+                            <>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <h3>Category Spending Charts</h3>
-            <p>Charts for grouped categories will be added here</p>
+                              Not Reconciled
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  );
+                } catch (error) {
+                  console.error("Error rendering balance summary:", error);
+                  return (
+                    <div style={{ 
+                      padding: '24px', 
+                      textAlign: 'center', 
+                      color: '#dc2626',
+                      backgroundColor: '#fef2f2',
+                      borderRadius: '12px',
+                      border: '1px solid #fecaca'
+                    }}>
+                      <p style={{ margin: 0, fontWeight: '500' }}>
+                        Unable to display balance summary. Please try refreshing the page.
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
           </div>
         )}
       </div>

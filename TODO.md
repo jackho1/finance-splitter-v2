@@ -89,3 +89,18 @@
 
 - [ ] **Test Add Transaction Functionality**:
    - Fully test this functionality and amend it if it is broken
+
+- [ ] **Split Transactions Functionality**:
+   - Add the ability to split an existing transaction down further
+
+- [ ] **Refactor Naming Labels**:
+   - Refactor naming labels so they're not "hardcoded"
+
+- [x] **Display Summarized Category Data for Personal Webpage**:
+   - Add personal transaction data grouped by category
+
+- [ ] **Show All Related Transactions**:
+   - When double-clicking on a savings buckets, show all transactions for that category
+
+- [ ] **Consistent Styling**:
+   - Ensure consistency of styling across all three webpages. Currently, they're all very inconsistent
