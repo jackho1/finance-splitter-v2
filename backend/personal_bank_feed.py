@@ -49,7 +49,8 @@ def fetch_transactions(start_date=None):
                 'id': tx['id'],
                 'date': tx['date'],
                 'description': tx['payee'],
-                'amount': tx['amount']
+                'amount': tx['amount'],
+                'closing_balance': tx.get('closing_balance', None)  # New field
             })
 
         page += 1  # Move to the next page for the next iteration
@@ -64,8 +65,8 @@ def insert_transactions(transactions):
 
         for tx in transactions:
             insert_query = sql.SQL("""
-                INSERT INTO personal_transactions (id, date, description, amount, category)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO personal_transactions (id, date, description, amount, category, closing_balance)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
             """)
             cursor.execute(insert_query, (
@@ -73,7 +74,8 @@ def insert_transactions(transactions):
                 tx['date'],
                 tx['description'],
                 tx['amount'],
-                None  # Category will be manually populated later
+                None,  # Category will be manually populated later
+                tx['closing_balance']  # New field
             ))
 
         conn.commit()
