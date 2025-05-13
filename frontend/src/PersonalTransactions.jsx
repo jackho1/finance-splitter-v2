@@ -44,6 +44,49 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Key for localStorage
   const CATEGORY_ORDER_KEY = 'personal_categories_order';
   
+  // Double-click feature
+  const handleCategoryDoubleClick = (category) => {
+    // Get the earliest date from all transactions
+    const earliestDate = getMinMaxDates().min;
+    
+    // Set date filter to show from earliest date to today
+    setDateFilter({ 
+      startDate: earliestDate, 
+      endDate: '' // This will default to today/current date
+    });
+    
+    // Set category filter to only show this category
+    setCategoryFilter([category]);
+    
+    // Close any active filter dropdowns
+    setActiveFilterColumn(null);
+    
+    // Show notification
+    const notification = document.createElement('div');
+    notification.textContent = `Now showing all transactions for "${category}"`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#e3f2fd';
+    notification.style.color = '#0d47a1';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #90caf9';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transition = 'opacity 0.3s ease';
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    }, 2000);
+  };
+  
   // Load saved order from localStorage on mount
   useEffect(() => {
     const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
@@ -1001,7 +1044,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               )}
               {categoryFilter.length > 0 && (
                 <span style={{ margin: '0 10px' }}>
-                  Categories: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
+                  {categoryFilter.length === 1 ? 'Category' : 'Categories'}: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
                 </span>
               )}
             </div>
@@ -1041,19 +1084,15 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               textAlign: 'center',
               position: 'relative',
             }}>
-              <h3 style={{ 
-                margin: '0',
-                color: '#1a1c1e',
-                fontSize: '24px', // Reduced from 28px
-                fontWeight: '700',
-                letterSpacing: '-0.5px',
-              }}>
-                Category Savings Buckets
-              </h3>
+              <h2 className="section-title">Savings Buckets</h2>
               
               {/* Replace inline help text with HelpText component */}
-              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '500px'}}>
-                Drag category cards to reorder them. Your arrangement will be saved automatically.
+              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '750px'}}>
+                Drag category cards to reorder them. Your arrangement will be saved automatically. 
+              </HelpText>
+
+              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '750px'}}>
+                Double-click on any category to show all transactions for that category across all months.
               </HelpText>
               
               {/* Modern Reset Button */}
@@ -1131,11 +1170,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       return sum + numTotal;
                     }, 0);
 
-                  // Get latest closing balance with type safety
-                  const latestClosingBalance = transactions.length > 0 
-                    ? (typeof transactions[0].closing_balance === 'number' ?
-                      transactions[0].closing_balance : 
-                      parseFloat(transactions[0].closing_balance) || 0) 
+                  // Get latest closing balance with type safety - FIXING THE BUG
+                  const latestTransaction = transactions.length > 0 
+                    ? transactions.reduce((latest, transaction) => {
+                        return (latest.id > transaction.id) ? latest : transaction;
+                      }, transactions[0])
+                    : null;
+                  
+                  const latestClosingBalance = latestTransaction 
+                    ? (typeof latestTransaction.closing_balance === 'number' ?
+                      latestTransaction.closing_balance : 
+                      parseFloat(latestTransaction.closing_balance) || 0) 
                     : 0;
 
                   // Format number with commas
@@ -1200,10 +1245,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                             onDragStart={(e) => handleDragStart(e, category)}
                             onDragOver={(e) => handleDragOver(e, category)}
                             onDragEnd={handleDragEnd}
+                            onDoubleClick={() => handleCategoryDoubleClick(category)}
                             style={{  
                               backgroundColor: 'white',
-                              padding: '16px', // Reduced from 24px
-                              borderRadius: '12px', // Reduced from 16px
+                              padding: '16px',
+                              borderRadius: '12px',
                               border: draggedCategory === category 
                                 ? `2px dashed ${color.bg}` 
                                 : '1px solid rgba(0,0,0,0.06)',
@@ -1339,11 +1385,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     return sum + numAmount;
                   }, 0);
                 
-                  // Get latest closing balance with type safety
-                  const latestClosingBalance = transactions.length > 0 
-                    ? (typeof transactions[0].closing_balance === 'number' ?
-                      transactions[0].closing_balance : 
-                      parseFloat(transactions[0].closing_balance) || 0) 
+                  // Get latest closing balance with type safety - FIXING THE BUG
+                  const latestTransaction = transactions.length > 0 
+                    ? transactions.reduce((latest, transaction) => {
+                        return (latest.id > transaction.id) ? latest : transaction;
+                      }, transactions[0])
+                    : null;
+                
+                  const latestClosingBalance = latestTransaction 
+                    ? (typeof latestTransaction.closing_balance === 'number' ?
+                      latestTransaction.closing_balance : 
+                      parseFloat(latestTransaction.closing_balance) || 0) 
                     : 0;
                 
                   // Format number with commas
@@ -1496,7 +1548,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       </div>
 
       <h2 className="section-title">
-        Personal Transactions 
+        Personal Transactions
         <span className="date-label">
           {dateFilter.startDate || dateFilter.endDate ? (
             `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`
