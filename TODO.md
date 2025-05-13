@@ -93,7 +93,7 @@
 - [ ] **Split Transactions Functionality**:
    - Add the ability to split an existing transaction down further
 
-- [ ] **Refactor Naming Labels**:
+- [x] **Refactor Naming Labels**:
    - Refactor naming labels so they're not "hardcoded"
 
 - [x] **Display Summarized Category Data for Personal Webpage**:
@@ -108,3 +108,5 @@
 - [ ] **Rename Tabbings**:
    - Transactions, Monthly Budget, Personal Savings
 
+- [ ] **Start Date Incorrect**:
+   - When filtering transactions with start date, it does not include transactions on that exact start date itself.

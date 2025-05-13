@@ -462,11 +462,11 @@ const App = () => {
         return false;
       }
       
-      // 2. Apply chart label filter
+      // 2. Apply chart label filter using configuration instead of hardcoded names
       if (chartLabelFilter !== 'All') {
-        if (chartLabelFilter === labels[0]) { // Ruby
+        if (chartLabelFilter === labels[0]) { // Currently set to Ruby for development purposes
           return transaction.label === labels[0] || transaction.label === labels[2]; 
-        } else if (chartLabelFilter === labels[1]) { // Jack
+        } else if (chartLabelFilter === labels[1]) { // Currently set to Jack for development purposes
           return transaction.label === labels[1] || transaction.label === labels[2];
         }
       }
@@ -544,11 +544,11 @@ const App = () => {
   };
 
   const getRowColor = (label) => {
-    if (label === labels[0]) {
+    if (label === labels[0]) { // Currently set to Ruby for development purposes
       return 'rgba(255, 99, 132, 0.5)';
-    } else if (label === labels[1]) {
+    } else if (label === labels[1]) { // Currently set to Jack for development purposes
       return 'rgba(54, 162, 235, 0.5)';
-    } else if (label === labels[2]) {
+    } else if (label === labels[2]) { // Currently set to Both for development purposes
       return 'rgba(75, 192, 95, 0.5)';
     }
     return 'transparent'; // Default color

@@ -1,18 +1,20 @@
+import { USER_CONFIG } from '../config/userConfig';
+
 /**
  * Calculates totals for each label based on transaction data
  * @param {Array} filtered - Filtered transactions array
- * @param {Array} labels - Array of labels (usually ['Ruby', 'Jack', 'Both'])
+ * @param {Array} labels - Array of labels
  * @returns {Object} - Object with label totals
  */
-export const calculateTotals = (filtered, labels) => {
+export const calculateTotals = (filtered, labels = USER_CONFIG.DEFAULT_LABELS) => {
   const totals = {};
-  const bothLabel = labels.length >= 3 ? labels[2] : null;
-  const rubyLabel = labels.length >= 1 ? labels[0] : null;
-  const jackLabel = labels.length >= 2 ? labels[1] : null;
+  const bothLabel = labels.length >= 3 ? labels[2] : USER_CONFIG.BOTH_LABEL;
+  const primaryUser1Label = labels.length >= 1 ? labels[0] : USER_CONFIG.PRIMARY_USER_1;
+  const primaryUser2Label = labels.length >= 2 ? labels[1] : USER_CONFIG.PRIMARY_USER_2;
 
   // Initialize totals for all labels
-  if (rubyLabel) totals[rubyLabel] = 0;
-  if (jackLabel) totals[jackLabel] = 0;
+  if (primaryUser1Label) totals[primaryUser1Label] = 0;
+  if (primaryUser2Label) totals[primaryUser2Label] = 0;
   if (bothLabel) totals[bothLabel] = 0;
 
   // Calculate totals
@@ -28,9 +30,9 @@ export const calculateTotals = (filtered, labels) => {
       // Add full amount to "Both" total
       totals[bothLabel] += amount;
 
-      // Add half of the amount to Ruby and Jack totals
-      if (rubyLabel) totals[rubyLabel] += amount / 2;
-      if (jackLabel) totals[jackLabel] += amount / 2;
+      // Add half of the amount to both user totals
+      if (primaryUser1Label) totals[primaryUser1Label] += amount / 2;
+      if (primaryUser2Label) totals[primaryUser2Label] += amount / 2;
     } else if (transaction.label && totals[transaction.label] !== undefined) {
       // Add to the specific label's total
       totals[transaction.label] += amount;
