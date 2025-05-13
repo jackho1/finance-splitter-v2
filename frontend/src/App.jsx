@@ -1628,7 +1628,7 @@ const App = () => {
           </div>
 
           <h2 className="section-title">
-            Filtered Transactions 
+            Shared Transactions 
             <span className="date-label">
               {dateFilter.startDate || dateFilter.endDate ? (
                 `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`

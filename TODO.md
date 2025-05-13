@@ -99,8 +99,12 @@
 - [x] **Display Summarized Category Data for Personal Webpage**:
    - Add personal transaction data grouped by category
 
-- [ ] **Show All Related Transactions**:
+- [x] **Show All Related Transactions**:
    - When double-clicking on a savings buckets, show all transactions for that category
 
-- [ ] **Consistent Styling**:
+- [x] **Consistent Styling**:
    - Ensure consistency of styling across all three webpages. Currently, they're all very inconsistent
+
+- [ ] **Rename Tabbings**:
+   - Transactions, Monthly Budget, Personal Savings
+

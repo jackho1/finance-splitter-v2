@@ -540,7 +540,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 className="dashboard-title">Budget Dashboard</h1>
+      <h2 className="section-title">Monthly Expenditure</h2>
       <div className="month-navigation">
         <button 
           className="modern-button navigation" 
@@ -573,28 +573,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       <style>
       {`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        .dashboard-title {
-          font-family: 'Inter', sans-serif;
-          font-weight: 600;
-          font-size: 28px;
-          color: #2c3e50;
-          margin-bottom: 24px;
-          position: relative;
-          display: inline-block;
-          padding-bottom: 8px;
-        }
-        
-        .dashboard-title:after {
-          content: '';
-          position: absolute;
-          left: 0;
-          bottom: 0;
-          height: 3px;
-          width: 40px;
-          background-color: #4a90e2;
-          border-radius: 2px;
-        }
         
         .month-display {
           font-family: 'Inter', sans-serif;
