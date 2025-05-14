@@ -577,6 +577,177 @@ app.post('/personal-transactions', async (req, res) => {
   }
 });
 
+/**
+ * POST /personal-transactions/split - Splits a personal transaction into multiple transactions
+ */
+app.post('/personal-transactions/split', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
+    
+    // Validate input data
+    if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
+      });
+    }
+    
+    // Check if the original transaction exists
+    const originalResult = await client.query(
+      'SELECT * FROM personal_transactions WHERE id = $1',
+      [originalTransactionId]
+    );
+    
+    if (originalResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Original transaction not found'
+      });
+    }
+    
+    const originalTransaction = originalResult.rows[0];
+    const originalAmount = parseFloat(originalTransaction.amount);
+    const isNegative = originalAmount < 0; // Track if original amount is negative
+    
+    // Validate split transactions
+    let splitTotal = 0;
+    const errors = [];
+    
+    splitTransactions.forEach((split, index) => {
+      if (!split.description || !split.amount || !split.category) {
+        errors.push(`Split #${index + 1}: Description, amount, and category are required`);
+      }
+      
+      // Convert amount to absolute value for validation
+      const amount = Math.abs(parseFloat(split.amount));
+      if (isNaN(amount) || amount <= 0) {
+        errors.push(`Split #${index + 1}: Amount must be a non-zero number`);
+      } else {
+        splitTotal += amount;
+      }
+    });
+    
+    if (errors.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        errors: errors
+      });
+    }
+    
+    // Validate that split amounts don't exceed original
+    const absOriginalAmount = Math.abs(originalAmount);
+    const absRemainingAmount = Math.abs(parseFloat(remainingAmount));
+    
+    if (originalAmount < 0) {
+      // For expenses: check absolute values
+      if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          error: 'Split amounts exceed the original transaction amount'
+        });
+      }
+    } else {
+      // For income: total splits should not exceed original
+      if (splitTotal > originalAmount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          error: 'Split amounts exceed the original transaction amount'
+        });
+      }
+    }
+    
+    // Create split transactions
+    const createdTransactions = [];
+    
+    for (const split of splitTransactions) {
+      // Ensure the split amount has the same sign as the original transaction
+      const splitAmount = isNegative ? 
+        -Math.abs(parseFloat(split.amount)) : 
+        Math.abs(parseFloat(split.amount));
+
+      const insertResult = await client.query(
+        `INSERT INTO personal_transactions (date, description, amount, category, is_split)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [
+          originalTransaction.date,
+          split.description,
+          splitAmount,
+          split.category,
+          true
+        ]
+      );
+      createdTransactions.push(insertResult.rows[0]);
+    }
+    
+    // Update the original transaction amount if there's a remaining amount
+    if (absRemainingAmount > 0) {
+      // Ensure the remaining amount has the same sign as the original transaction
+      const newAmount = isNegative ? -absRemainingAmount : absRemainingAmount;
+      
+      const updateResult = await client.query(
+        `UPDATE personal_transactions 
+         SET amount = $1, has_split = $2
+         WHERE id = $3
+         RETURNING *`,
+        [
+          newAmount,
+          true,
+          originalTransactionId
+        ]
+      );
+      
+      if (updateResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to update original transaction'
+        });
+      }
+    } else {
+      // Mark the original transaction as fully split (amount = 0)
+      await client.query(
+        `UPDATE personal_transactions 
+         SET amount = $1, has_split = $2
+         WHERE id = $3`,
+        [0, true, originalTransactionId]
+      );
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Transaction split successfully',
+      data: {
+        originalTransactionId: originalTransactionId,
+        originalAmount: originalAmount, // Include original amount in response
+        splitTransactions: createdTransactions,
+        remainingAmount: isNegative ? -absRemainingAmount : absRemainingAmount // Ensure remaining amount has correct sign
+      }
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error splitting transaction:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to split transaction',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // Default route for root URL
 app.get('/', (req, res) => {
   res.send('Welcome to the Finance Dashboard API! Use /transactions to get transaction data and ?column_name= to filter available data.');

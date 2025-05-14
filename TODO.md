@@ -90,10 +90,10 @@
 - [ ] **Test Add Transaction Functionality**:
    - Fully test this functionality and amend it if it is broken
 
-- [ ] **Split Transactions Functionality**:
+- [x] **Split Transactions Functionality**:
    - Add the ability to split an existing transaction down further
 
-- [ ] **Refactor Naming Labels**:
+- [x] **Refactor Naming Labels**:
    - Refactor naming labels so they're not "hardcoded"
 
 - [x] **Display Summarized Category Data for Personal Webpage**:
@@ -108,3 +108,12 @@
 - [ ] **Rename Tabbings**:
    - Transactions, Monthly Budget, Personal Savings
 
+- [ ] **Start Date Incorrect**:
+   - When filtering transactions with start date, it does not include transactions on that exact start date itself.
+
+- [ ] **Consider alterantive to userConfig.js file**:
+   - Fetching user label names should be fetched from the DB, not "hardcoded" in the src/config/userConfig.js file still.
+
+
+- [ ] **Minor Split Transaction View Fix**:
+   - Some UI consistency on this pop up window can be made, particularly with the category field.

@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
+import { USER_CONFIG } from './config/userConfig';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -85,6 +86,18 @@ const HelpText = ({ children, isVisible }) => {
   );
 };
 
+// Refactored budget calculation function that uses configuration
+const calculateCategorySpend = (spend, category) => {
+  const { PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
+  
+  // Using configuration values instead of hardcoded names
+  const categorySpend = spend[category] || { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
+  
+  // Refactored calculation using configuration values
+  const totalSpend = -(categorySpend[PRIMARY_USER_2] + categorySpend[BOTH_LABEL] / 2);
+  return totalSpend;
+};
+
 const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(defaultBudgets);
@@ -96,6 +109,10 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     const savedOrder = localStorage.getItem('categoryOrder');
     return savedOrder ? JSON.parse(savedOrder) : defaultCategoryOrder;
   });
+  
+  // Get user labels from configuration
+  const { PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
+
   const [chartData, setChartData] = useState({
     labels: Object.keys(defaultBudgets).filter(cat => cat !== 'Mortgage'),
     datasets: [
@@ -159,11 +176,11 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   const calculateMonthlySpend = () => {
     const spend = {};
-    const labels = ["Jack", "Both"];
+    const labels = [PRIMARY_USER_2, BOTH_LABEL];
 
     // Initialize spend object with all budget categories
     Object.keys(budgets).forEach(category => {
-      spend[category] = { Jack: 0, Both: 0 };
+      spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
     });
 
     transactions.forEach(transaction => {
@@ -173,7 +190,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         const amount = parseFloat(transaction.amount) || 0;
 
         if (!spend[category]) {
-          spend[category] = { Jack: 0, Both: 0 };
+          spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
         }
 
         if (labels.includes(transaction.label)) {
@@ -191,8 +208,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     
     const budgetData = filteredCategories.map(label => budgets[label]);
     const spendData = filteredCategories.map(label => {
-      const categorySpend = monthlySpend[label] || { Jack: 0, Both: 0 };
-      return Math.abs(-(categorySpend.Jack || 0) - (categorySpend.Both || 0) / 2); // Use absolute values for log scale
+      // Use the helper function and get absolute value for the chart
+      return Math.abs(calculateCategorySpend(monthlySpend, label));
     });
 
     return {
@@ -237,8 +254,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     let monthlyBudgetTotal = 0;
     
     monthlySpendCategories.forEach(category => {
-      const categorySpend = spend[category] || { Jack: 0, Both: 0 };
-      monthlySpendTotal += (categorySpend.Jack || 0) + (categorySpend.Both || 0) / 2;
+      // Use helper function for consistent calculation
+      monthlySpendTotal += -calculateCategorySpend(spend, category);
       monthlyBudgetTotal += budgets[category] || 0;
     });
     
@@ -247,10 +264,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     let totalBudgetAmount = 0;
     
     categoryOrder.forEach(category => {
-      const categorySpend = spend[category] || { Jack: 0, Both: 0 };
       // For all categories except Mortgage, use actual spending
       if (category !== 'Mortgage') {
-        totalSpendAmount += (categorySpend.Jack || 0) + (categorySpend.Both || 0) / 2;
+        totalSpendAmount += -calculateCategorySpend(spend, category);
       } else {
         // For Mortgage, we'll add the hardcoded 3000 later
         // Just add the budget amount
@@ -767,8 +783,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
               totalSpend = 3000;
               remainingBalance = budget - Math.abs(totalSpend);
             } else {
-              const spend = (transactions.length > 0 ? calculateMonthlySpend() : {})[category] || { Jack: 0, Both: 0 };
-              totalSpend = -(spend.Jack + spend.Both / 2);
+              // Use the helper function for consistent calculation
+              const spend = transactions.length > 0 ? calculateMonthlySpend() : {};
+              totalSpend = calculateCategorySpend(spend, category);
               remainingBalance = budget - Math.abs(totalSpend);
             }
 
