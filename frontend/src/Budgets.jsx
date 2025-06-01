@@ -255,31 +255,26 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     
     monthlySpendCategories.forEach(category => {
       // Use helper function for consistent calculation
-      monthlySpendTotal += -calculateCategorySpend(spend, category);
+      monthlySpendTotal += Math.abs(calculateCategorySpend(spend, category));
       monthlyBudgetTotal += budgets[category] || 0;
     });
     
-    // Calculate total spend (all categories)
+    // Calculate total spend (all categories including Mortgage)
     let totalSpendAmount = 0;
     let totalBudgetAmount = 0;
     
     categoryOrder.forEach(category => {
-      // For all categories except Mortgage, use actual spending
-      if (category !== 'Mortgage') {
-        totalSpendAmount += -calculateCategorySpend(spend, category);
+      if (category === 'Mortgage') {
+        totalSpendAmount += 3000;
       } else {
-        // For Mortgage, we'll add the hardcoded 3000 later
-        // Just add the budget amount
+        totalSpendAmount += Math.abs(calculateCategorySpend(spend, category));
       }
       totalBudgetAmount += budgets[category] || 0;
     });
     
-    // Add hardcoded -3000 for Mortgage to totalSpendAmount
-    totalSpendAmount += 3000; // Adding positive 3000 since we'll negate it later
-    
     return {
-      monthlySpend: monthlySpendTotal, // Negate for display
-      totalSpend: -totalSpendAmount, // Negate for display
+      monthlySpend: monthlySpendTotal,
+      totalSpend: totalSpendAmount, // No need to negate since we want positive numbers
       monthlyBudget: monthlyBudgetTotal,
       totalBudget: totalBudgetAmount
     };
@@ -555,7 +550,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: '15px', fontFamily: 'Arial, sans-serif' }}>
       <h2 className="section-title">Monthly Expenditure</h2>
       <div className="month-navigation">
         <button 
@@ -592,9 +587,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         
         .month-display {
           font-family: 'Inter', sans-serif;
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 500;
-          padding: 0 20px;
+          padding: 0 15px;
           color: #2c3e50;
         }
         
@@ -602,11 +597,11 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           display: flex;
           align-items: flex-start;
           background-color: #f8f9fa;
-          padding: 10px 15px;
+          padding: 8px 12px;
           border-radius: 6px;
           border-left: 3px solid #4a90e2;
-          margin-bottom: 15px;
-          font-size: 13px;
+          margin-bottom: 12px;
+          font-size: 12px;
           color: #505050;
           font-family: 'Inter', sans-serif;
         }
@@ -746,7 +741,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         .modern-button.navigation {
           display: inline-flex;
           align-items: center;
-          padding: 8px 15px;
+          padding: 6px 12px;
         }
 
         .modern-button.navigation svg {
@@ -756,140 +751,365 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         /* Month navigation controls */
         .month-navigation {
           display: flex;
-          margin-bottom: 20px;
+          margin-bottom: 15px;
           align-items: center;
+        }
+        
+        /* Modern table styling */
+        .modern-table-container {
+          margin-top: 15px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          overflow: hidden;
+          background-color: #ffffff;
+        }
+        
+        .modern-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-family: 'Inter', sans-serif;
+          color: #1a202c;
+        }
+        
+        .modern-table thead {
+          background-color: #f7fafc;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .modern-table th {
+          padding: 8px 10px;
+          text-align: left;
+          font-weight: 600;
+          font-size: 0.85rem;
+          color: #4a5568;
+          border: none;
+          white-space: nowrap;
+        }
+        
+        .modern-table td {
+          padding: 6px 10px;
+          border-top: 1px solid #e2e8f0;
+          border-bottom: 1px solid #e2e8f0;
+          border-left: none;
+          border-right: none;
+          vertical-align: middle;
+          font-size: 0.9rem;
+          text-align: left;
+        }
+        
+        .modern-table tr:hover {
+          background-color: #f7fafc;
+        }
+        
+        .empty-state {
+          text-align: center;
+          padding: 32px;
+          color: #718096;
+        }
+        
+        .empty-state h3 {
+          font-weight: 500;
+          font-size: 1.125rem;
+          margin-bottom: 8px;
+        }
+        
+        .empty-state p {
+          font-size: 0.875rem;
+        }
+        
+        /* Amount styling */
+        .amount-negative {
+          color: #e53e3e;
+          font-weight: 500;
+        }
+        
+        .amount-positive {
+          color: #38a169;
+          font-weight: 500;
+        }
+        
+        .row-expense {
+          background-color: rgba(255, 240, 240, 0.1);
+        }
+        
+        .row-income {
+          background-color: rgba(240, 255, 240, 0.1);
+        }
+        
+        .action-buttons {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        
+        /* Progress bar for budget tracking */
+        .budget-progress {
+          width: 100%;
+          height: 6px;
+          background-color: #edf2f7;
+          border-radius: 3px;
+          overflow: hidden;
+          margin-top: 2px;
+        }
+        
+        .budget-progress-bar {
+          height: 100%;
+          transition: width 0.3s ease;
+        }
+        
+        /* Category indicator */
+        .category-indicator {
+          display: inline-block;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          margin-right: 6px;
+          vertical-align: middle;
+        }
+        
+        /* Summary rows styling */
+        .summary-row {
+          font-weight: 600;
+          background-color: #f1f5f9;
+          border-top: 2px solid #cbd5e1;
+        }
+        
+        .summary-row td {
+          padding-top: 10px;
+          padding-bottom: 10px;
+          font-size: 0.95rem;
+        }
+        
+        .total-row {
+          font-weight: 700;
+          background-color: #e0f2fe;
+          border-top: 2px solid #7dd3fc;
+          border-bottom: 2px solid #7dd3fc;
+        }
+        
+        .total-row td {
+          padding-top: 10px;
+          padding-bottom: 10px;
+          font-size: 1rem;
+        }
+        
+        .modern-table td, .modern-table th {
+          line-height: 1.1;
         }
       `}
       </style>
       
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ border: '1px solid black', padding: '8px' }}>Category</th>
-            <th style={{ border: '1px solid black', padding: '8px' }}>Budget</th>
-            <th style={{ border: '1px solid black', padding: '8px' }}>Total Spend</th>
-            <th style={{ border: '1px solid black', padding: '8px' }}>Remaining Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categoryOrder.map((category, index) => {
-            const budget = budgets[category];
-            
-            // For Mortgage, hardcode the spend as -3000
-            let totalSpend;
-            let remainingBalance;
-            
-            if (category === 'Mortgage') {
-              totalSpend = 3000;
-              remainingBalance = budget - Math.abs(totalSpend);
-            } else {
-              // Use the helper function for consistent calculation
-              const spend = transactions.length > 0 ? calculateMonthlySpend() : {};
-              totalSpend = calculateCategorySpend(spend, category);
-              remainingBalance = budget - Math.abs(totalSpend);
-            }
+      <div className="modern-table-container">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Category</th>
+              <th style={{ textAlign: 'left' }}>Budget</th>
+              <th style={{ textAlign: 'left' }}>Actual Spend</th>
+              <th style={{ textAlign: 'left' }}>Remaining</th>
+              <th style={{ textAlign: 'left', minWidth: '120px' }}>Progress</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categoryOrder.map((category, index) => {
+              const budget = budgets[category];
+              
+              // For Mortgage, hardcode the spend as -3000
+              let totalSpend;
+              let remainingBalance;
+              
+              if (category === 'Mortgage') {
+                totalSpend = 3000;
+                remainingBalance = budget - Math.abs(totalSpend);
+              } else {
+                // Use the helper function for consistent calculation
+                const spend = transactions.length > 0 ? calculateMonthlySpend() : {};
+                totalSpend = calculateCategorySpend(spend, category);
+                remainingBalance = budget - Math.abs(totalSpend);
+              }
+              
+              // Calculate if this category is over budget for styling
+              const isOverBudget = Math.abs(totalSpend) > budget;
+              
+              // Calculate progress percentage
+              const progressPercentage = budget !== 0 ? (Math.abs(totalSpend) / budget) * 100 : 0;
+              
+              // Generate a stable color based on category name
+              const getColorFromString = (str) => {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                  hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const hue = Math.abs(hash % 360);
+                return `hsl(${hue}, 70%, 50%)`;
+              };
+              
+              const categoryColor = getColorFromString(category);
 
-            // Calculate if this category is over budget for styling
-            const isOverBudget = Math.abs(totalSpend) > budget;
-
-            return (
-              <tr 
-                key={index}
-                className={`drag-row ${draggedCategory === category ? 'dragging' : ''}`}
-                style={draggedCategory === category ? draggedRowStyle : {}}
-              >
-                <td 
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, category, e.target.parentElement)}
-                  onDragOver={(e) => handleDragOver(e, category)}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  onDrop={(e) => handleDrop(e, category)}
-                  className="category-name-cell"
-                  style={{ 
-                    border: '1px solid black', 
-                    padding: '8px',
-                    backgroundColor: isOverBudget ? 'rgba(255, 200, 200, 0.3)' : 'transparent'
-                  }}
+              return (
+                <tr 
+                  key={index}
+                  className={`drag-row ${draggedCategory === category ? 'dragging' : ''}`}
+                  style={draggedCategory === category ? draggedRowStyle : {}}
                 >
-                  {category}
-                </td>
-                <td 
-                  className="budget-cell"
-                  onDoubleClick={() => handleBudgetDoubleClick(category, budget)}
-                  style={{ 
-                    border: '1px solid black', 
-                    padding: '8px',
-                    backgroundColor: isOverBudget ? 'rgba(255, 200, 200, 0.1)' : 'transparent'
-                  }}
-                >
-                  {editingBudget === category ? (
-                  <input
-                    type="number"
-                      className="budget-input"
-                      value={editBudgetValue}
-                      onChange={handleBudgetInputChange}
-                      onBlur={handleBudgetEditDone}
-                      onKeyDown={handleBudgetKeyPress}
-                      autoFocus
+                  <td 
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, category, e.target.parentElement)}
+                    onDragOver={(e) => handleDragOver(e, category)}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, category)}
+                    className="category-name-cell"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <div className="category-indicator" style={{ backgroundColor: categoryColor }} />
+                      {category}
+                    </div>
+                  </td>
+                  <td 
+                    className="budget-cell"
+                    onDoubleClick={() => handleBudgetDoubleClick(category, budget)}
+                  >
+                    {editingBudget === category ? (
+                      <input
+                        type="number"
+                        className="budget-input"
+                        value={editBudgetValue}
+                        onChange={handleBudgetInputChange}
+                        onBlur={handleBudgetEditDone}
+                        onKeyDown={handleBudgetKeyPress}
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="amount-positive">
+                        {formatCurrency(budget)}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'left' }}>
+                    <span className="amount-negative">
+                      {formatCurrency(totalSpend)}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={remainingBalance < 0 ? 'amount-negative' : 'amount-positive'}>
+                      {formatCurrency(remainingBalance)}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', width: '100%' }}>
+                      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
+                          {progressPercentage.toFixed(1)}%
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
+                          {isOverBudget ? 'Over' : 'Under'}
+                        </span>
+                      </div>
+                      <div className="budget-progress" style={{ height: '7px' }}>
+                        <div 
+                          className="budget-progress-bar"
+                          style={{
+                            width: `${Math.min(progressPercentage, 100)}%`,
+                            backgroundColor: isOverBudget ? '#ef4444' : '#10b981',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            
+            {/* Monthly Spend Summary Row */}
+            <tr className="summary-row">
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className="category-indicator" style={{ backgroundColor: '#4299e1', width: '10px', height: '10px', boxShadow: '0 0 0 2px rgba(66, 153, 225, 0.2)' }} />
+                  <strong>Monthly Spend</strong>
+                </div>
+              </td>
+              <td>
+                <span className="amount-positive" style={{ fontSize: '0.95rem' }}>{formatCurrency(summaryData.monthlyBudget)}</span>
+              </td>
+              <td style={{ textAlign: 'left' }}>
+                <span className="amount-negative" style={{ fontSize: '0.95rem' }}>{formatCurrency(summaryData.monthlySpend)}</span>
+              </td>
+              <td>
+                <span className={summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? 'amount-negative' : 'amount-positive'} style={{ fontSize: '0.95rem' }}>
+                  {formatCurrency(summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend))}
+                </span>
+              </td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
+                  <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
+                      {(summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0).toFixed(1)}%
+                    </span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
+                      {summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? 'Over' : 'Under'}
+                    </span>
+                  </div>
+                  <div className="budget-progress" style={{ height: '7px' }}>
+                    <div 
+                      className="budget-progress-bar"
+                      style={{
+                        width: `${Math.min(summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0, 100)}%`,
+                        backgroundColor: summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? '#ef4444' : '#10b981',
+                      }}
                     />
-                  ) : (
-                    formatCurrency(budget)
-                  )}
-                </td>
-                <td 
-                  style={{ 
-                    border: '1px solid black', 
-                    padding: '8px',
-                    color: isOverBudget ? '#d32f2f' : 'inherit',
-                    fontWeight: isOverBudget ? 'bold' : 'normal',
-                    backgroundColor: isOverBudget ? 'rgba(255, 200, 200, 0.3)' : 'transparent'
-                  }}
-                >
-                  {formatCurrency(totalSpend)}
-                </td>
-                <td 
-                  style={{ 
-                    border: '1px solid black', 
-                    padding: '8px',
-                    color: remainingBalance < 0 ? '#d32f2f' : 'inherit',
-                    fontWeight: remainingBalance < 0 ? 'bold' : 'normal',
-                    backgroundColor: isOverBudget ? 'rgba(255, 200, 200, 0.3)' : 'transparent'
-                  }}
-                >
-                  {formatCurrency(remainingBalance)}
-                </td>
-              </tr>
-            );
-          })}
-          
-          {/* Monthly Spend Summary Row */}
-          <tr style={{ 
-            backgroundColor: '#f0f8ff', 
-            fontWeight: 'bold',
-            borderTop: '2px solid #333'
-          }}>
-            <td style={{ border: '1px solid black', padding: '8px' }}>Monthly Spend</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.monthlyBudget)}</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.monthlySpend)}</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend))}</td>
-          </tr>
-          
-          {/* Total Spend Summary Row */}
-          <tr style={{ 
-            backgroundColor: '#e6f7ff', 
-            fontWeight: 'bold',
-            borderTop: '1px solid #333'
-          }}>
-            <td style={{ border: '1px solid black', padding: '8px' }}>Total</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.totalBudget)}</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.totalSpend)}</td>
-            <td style={{ border: '1px solid black', padding: '8px' }}>{formatCurrency(summaryData.totalBudget - Math.abs(summaryData.totalSpend))}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            
+            {/* Total Spend Summary Row */}
+            <tr className="total-row">
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className="category-indicator" style={{ backgroundColor: '#38b2ac', width: '12px', height: '12px', boxShadow: '0 0 0 2px rgba(56, 178, 172, 0.3)' }} />
+                  <strong>Total</strong>
+                </div>
+              </td>
+              <td>
+                <span className="amount-positive" style={{ fontSize: '1rem' }}>{formatCurrency(summaryData.totalBudget)}</span>
+              </td>
+              <td style={{ textAlign: 'left' }}>
+                <span className="amount-negative" style={{ fontSize: '1rem' }}>{formatCurrency(summaryData.totalSpend)}</span>
+              </td>
+              <td>
+                <span className={summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? 'amount-negative' : 'amount-positive'} style={{ fontSize: '1rem' }}>
+                  {formatCurrency(summaryData.totalBudget - Math.abs(summaryData.totalSpend))}
+                </span>
+              </td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
+                  <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                      {(summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0).toFixed(1)}%
+                    </span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                      {summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? 'Over' : 'Under'}
+                    </span>
+                  </div>
+                  <div className="budget-progress" style={{ height: '8px' }}>
+                    <div 
+                      className="budget-progress-bar"
+                      style={{
+                        width: `${Math.min(summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0, 100)}%`,
+                        backgroundColor: summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? '#dc2626' : '#059669',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ width: '90%', maxWidth: '1200px', height: '350px', margin: '25px auto' }}>
         <Bar data={chartData} options={chartOptions} />
       </div>
       

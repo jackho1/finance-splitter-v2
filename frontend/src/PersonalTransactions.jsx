@@ -5,14 +5,46 @@ import axios from 'axios';
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
 
+// Add help-text styles for consistent appearance (copied from Budgets.jsx)
+const helpTextStyle = `
+  .help-text {
+    display: flex;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border-left: 3px solid #4a90e2;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #505050;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.3;
+  }
+  .help-text-icon {
+    color: #4a90e2;
+    margin-right: 8px;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+  .help-text-content {
+    flex: 1;
+  }
+`;
+if (typeof document !== 'undefined' && !document.getElementById('help-text-style')) {
+  const style = document.createElement('style');
+  style.id = 'help-text-style';
+  style.innerHTML = helpTextStyle;
+  document.head.appendChild(style);
+}
+
 // Help Text Component for consistent styling
-const HelpText = ({ children, isVisible, style = {} }) => {
+const HelpText = ({ children, isVisible }) => {
   if (!isVisible) return null;
   
   return (
-    <div className="help-text" style={style}>
+    <div className="help-text">
       <div className="help-text-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
           <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
@@ -1267,13 +1299,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               <h2 className="section-title">Savings Buckets</h2>
               
               {/* Replace inline help text with HelpText component */}
-              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '750px'}}>
-                Drag category cards to reorder them. Your arrangement will be saved automatically. 
-              </HelpText>
+              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+                <HelpText isVisible={helpTextVisible}>
+                  Drag category cards to reorder them. Your arrangement will be saved automatically. 
+                </HelpText>
+              </div>
 
-              <HelpText isVisible={helpTextVisible} style={{margin: '8px auto 0', maxWidth: '750px'}}>
-                Double-click on any category to show all transactions for that category across all months.
-              </HelpText>
+              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+                <HelpText isVisible={helpTextVisible}>
+                  Double-click on any category to show all transactions for that category across all months.
+                </HelpText>
+              </div>
               
               {/* Modern Reset Button */}
               <button
@@ -1890,9 +1926,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           </div>
         </div>
         
-        <HelpText isVisible={helpTextVisible} style={{marginBottom: '0px'}}>
-          Use the month navigation to browse your personal transaction history. Only transactions from the selected month are shown unless a date filter is active.
-        </HelpText>
+        <div style={{ marginBottom: '4px' }}>
+          <HelpText isVisible={helpTextVisible}>
+            Use the month navigation to browse your personal transaction history. Only transactions from the selected month are shown unless a date filter is active.
+          </HelpText>
+        </div>
       </div>
       
       {/* Add Transaction Form Modal */}
@@ -2488,7 +2526,38 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   </td>
                   <td style={{ border: '1px solid black', padding: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      {renderCell(transaction, 'description')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {renderCell(transaction, 'description')}
+                        {transaction.has_split && (
+                          <span 
+                            title="This transaction has been split"
+                            style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 6px',
+                              backgroundColor: '#e0f2fe',
+                              color: '#0369a1',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              border: '1px solid #bae6fd'
+                            }}
+                          >
+                            <svg 
+                              width="12" 
+                              height="12" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2"
+                              style={{ marginRight: '4px' }}
+                            >
+                              <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                            </svg>
+                            Split
+                          </span>
+                        )}
+                      </div>
                       <svg 
                         width="16" 
                         height="16" 

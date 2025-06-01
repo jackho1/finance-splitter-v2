@@ -13,6 +13,7 @@
     "@atlaskit/pragmatic-drag-and-drop": "^1.6.1",
     "axios": "^1.5.0",
     "chart.js": "^4.3.0",
+    "html2canvas": "^1.4.1",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",

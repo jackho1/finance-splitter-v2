@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
+import html2canvas from 'html2canvas';
 import Budgets from './Budgets';
 import PersonalTransactions from './PersonalTransactions';
 import {
@@ -16,6 +17,7 @@ import {
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import './ModernTables.css';
 
 ChartJS.register(
   CategoryScale,
@@ -27,11 +29,11 @@ ChartJS.register(
 );
 
 // Help Text Component for consistent styling
-const HelpText = ({ children, isVisible, style = {} }) => {
+const HelpText = ({ children, isVisible }) => {
   if (!isVisible) return null;
   
   return (
-    <div className="help-text" style={style}>
+    <div className="help-text">
       <div className="help-text-icon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
@@ -42,6 +44,20 @@ const HelpText = ({ children, isVisible, style = {} }) => {
     </div>
   );
 };
+
+// Modern filter button component
+const FilterButton = ({ isActive, onClick, children }) => (
+  <button 
+    className={`filter-button ${isActive ? 'active' : ''}`}
+    onClick={onClick}
+    title="Filter"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+    </svg>
+    {children}
+  </button>
+);
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('transactions');
@@ -92,6 +108,10 @@ const App = () => {
 
   // Add refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Add screen grab state
+  const [isScreenGrabOpen, setIsScreenGrabOpen] = useState(false);
+  const screenGrabRef = useRef(null);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -543,15 +563,12 @@ const App = () => {
     maintainAspectRatio: false,
   };
 
-  const getRowColor = (label) => {
-    if (label === labels[0]) { // Currently set to Ruby for development purposes
-      return 'rgba(255, 99, 132, 0.5)';
-    } else if (label === labels[1]) { // Currently set to Jack for development purposes
-      return 'rgba(54, 162, 235, 0.5)';
-    } else if (label === labels[2]) { // Currently set to Both for development purposes
-      return 'rgba(75, 192, 95, 0.5)';
-    }
-    return 'transparent'; // Default color
+  // Updated getRowColor function using modern classes
+  const getRowLabelClass = (label) => {
+    if (label === labels[0]) return 'row-ruby';
+    if (label === labels[1]) return 'row-jack';
+    if (label === labels[2]) return 'row-both';
+    return '';
   };
   
   const toggleColumnFilter = (column) => {
@@ -694,6 +711,7 @@ const App = () => {
     }
   };
 
+  // Modernized renderCell function
   const renderCell = (transaction, field) => {
     if (editCell && editCell.transactionId === transaction.id && editCell.field === field) {
       switch (field) {
@@ -701,29 +719,11 @@ const App = () => {
           return (
             <input
               type="date"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ textAlign: 'center' }}
               autoFocus
             />
           );
@@ -732,119 +732,47 @@ const App = () => {
             <input
               type="number"
               step="0.01"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ textAlign: 'center' }}
               autoFocus
             />
           );
         case 'bank_category':
           return (
             <select 
+              className="modern-select"
               value={editValue === null ? 'null' : (editValue || '')}
               onChange={handleInputChange} 
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e2e8f0';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-                handleUpdate(transaction.id, field);
-              }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                backgroundSize: '16px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              style={{ textAlign: 'center' }}
               autoFocus
             >
-              <option value="" style={{ color: '#a0aec0' }}>Select a category</option>
+              <option value="">Select a category</option>
               {availableBankCategories
                 .filter(category => category !== null && category !== undefined && category !== '')
                 .map(category => (
-                  <option key={category} value={category} style={{ color: '#2d3748' }}>{category}</option>
+                  <option key={category} value={category}>{category}</option>
                 ))
               }
-              <option key="null-option" value="null" style={{ color: '#a0aec0' }}>(null)</option>
+              <option value="null">(Empty/Null)</option>
             </select>
           );
         case 'label':
           return (
             <select 
+              className="modern-select"
               value={editValue || ''} 
               onChange={handleInputChange} 
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e2e8f0';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-                handleUpdate(transaction.id, field);
-              }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                backgroundSize: '16px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              style={{ textAlign: 'center' }}
               autoFocus
             >
-              <option value="" style={{ color: '#a0aec0' }}>Select a label</option>
+              <option value="">Select a label</option>
               {labels.map(label => (
-                <option key={label} value={label} style={{ color: '#2d3748' }}>{label}</option>
+                <option key={label} value={label}>{label}</option>
               ))}
             </select>
           );
@@ -852,36 +780,18 @@ const App = () => {
           return (
             <input
               type="text"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
-              style={{ 
-                width: field === 'description' ? '400px' : '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ width: field === 'description' ? '400px' : '200px', textAlign: 'center' }}
               autoFocus
             />
           );
       }
     }
 
-    // Special handling for empty cells
+    // Display cell content
     const isEmpty = 
       transaction[field] === null || 
       transaction[field] === undefined || 
@@ -889,22 +799,21 @@ const App = () => {
     
     return (
       <div 
+        className="cell-content editable-cell"
         onDoubleClick={() => handleDoubleClick(transaction.id, field, transaction[field] || '')}
-        style={{ 
-          cursor: 'pointer',
-          minHeight: '1.2em'
-        }}
       >
         {isEmpty ? (
-          ''
+          <span className="empty-value"></span>
         ) : field === 'date' ? (
           new Date(transaction[field]).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
           })
-        ) : field === 'amount' && transaction[field] != null && !isNaN(transaction[field]) ? (
-          transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`
+        ) : field === 'amount' ? (
+          <span className={transaction[field] < 0 ? 'amount-negative' : 'amount-positive'}>
+            {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
+          </span>
         ) : (
           transaction[field]
         )}
@@ -1135,6 +1044,438 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Add screen grab handler
+  const handleScreenGrab = async () => {
+    setIsScreenGrabOpen(true);
+    // Wait for the modal to render
+    setTimeout(async () => {
+      if (screenGrabRef.current) {
+        try {
+          const canvas = await html2canvas(screenGrabRef.current, {
+            scale: 2, // Higher quality
+            useCORS: true,
+            backgroundColor: '#ffffff'
+          });
+          
+          // Get date range for filename
+          const getDateRangeForFilename = () => {
+            if (filteredTransactions.length === 0) return '';
+            
+            const dates = filteredTransactions.map(t => new Date(t.date));
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date(Math.max(...dates));
+            
+            // If all transactions are from the same month
+            if (minDate.getMonth() === maxDate.getMonth() && 
+                minDate.getFullYear() === maxDate.getFullYear()) {
+              // If it's the same day
+              if (minDate.getDate() === maxDate.getDate()) {
+                return `${minDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${minDate.getFullYear()}`;
+              }
+              // If it's different days in the same month
+              return `${minDate.getDate()}-${maxDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${minDate.getFullYear()}`;
+            }
+            
+            // If transactions span multiple months
+            return `${minDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${maxDate.getDate()}-${maxDate.toLocaleString('default', { month: 'short' })}-${maxDate.getFullYear()}`;
+          };
+          
+          // Create download link with date range in filename
+          const link = document.createElement('a');
+          link.download = `transactions-${getDateRangeForFilename()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        } catch (error) {
+          console.error('Error generating screen grab:', error);
+          alert('Failed to generate screen grab. Please try again.');
+        }
+      }
+    }, 100);
+  };
+
+  // Transactions table modernized render
+  const renderTransactionsTable = () => (
+    <div className="modern-table-container fade-in">
+      {isTransactionsLoading || isLabelsLoading ? (
+        <div className="loading-spinner" />
+      ) : (
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Date</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'date'}
+                    onClick={() => toggleColumnFilter('date')}
+                  />
+                </div>
+                {activeFilterColumn === 'date' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-group">
+                      <label>From:</label>
+                      <input 
+                        type="date" 
+                        name="startDate"
+                        className="modern-input"
+                        value={dateFilter.startDate}
+                        onChange={handleDateFilterChange}
+                        min={dateRange.min}
+                        max={dateRange.max}
+                      />
+                    </div>
+                    <div className="filter-group">
+                      <label>To:</label>
+                      <input 
+                        type="date" 
+                        name="endDate"
+                        className="modern-input"
+                        value={dateFilter.endDate}
+                        onChange={handleDateFilterChange}
+                        min={dateRange.min}
+                        max={dateRange.max}
+                      />
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Description</span>
+                </div>
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Amount</span>
+                </div>
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Bank Category</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'bankCategory'}
+                    onClick={() => toggleColumnFilter('bankCategory')}
+                  />
+                </div>
+                {activeFilterColumn === 'bankCategory' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-options">
+                      {availableBankCategories
+                        .filter(category => category !== null && category !== undefined && category !== '')
+                        .map(category => (
+                          <label key={category} className="filter-option">
+                            <input 
+                              type="checkbox"
+                              className="modern-checkbox"
+                              checked={bankCategoryFilter.includes(category)}
+                              onChange={() => handleBankCategoryFilterChange(category)}
+                            />
+                            <span>{category}</span>
+                          </label>
+                        ))
+                      }
+                      <label className="filter-option">
+                        <input 
+                          type="checkbox"
+                          className="modern-checkbox"
+                          checked={bankCategoryFilter.includes(null)}
+                          onChange={() => handleBankCategoryFilterChange(null)}
+                        />
+                        <span>(Empty/Null)</span>
+                      </label>
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setBankCategoryFilter([])}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Label</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'label'}
+                    onClick={() => toggleColumnFilter('label')}
+                  />
+                </div>
+                {activeFilterColumn === 'label' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-options">
+                      {labels.map(label => (
+                        <label key={label} className="filter-option">
+                          <input 
+                            type="checkbox"
+                            className="modern-checkbox"
+                            checked={labelFilter.includes(label)}
+                            onChange={() => handleLabelFilterChange(label)}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setLabelFilter([])}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTransactions.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="empty-state">
+                  <div className="empty-state-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </div>
+                  <h3>No transactions found</h3>
+                  <p>Try adjusting your filters or add a new transaction</p>
+                </td>
+              </tr>
+            ) : (
+              filteredTransactions.map(transaction => (
+                <tr key={transaction.id} className={getRowLabelClass(transaction.label)}>
+                  <td>{renderCell(transaction, 'date')}</td>
+                  <td>{renderCell(transaction, 'description')}</td>
+                  <td>{renderCell(transaction, 'amount')}</td>
+                  <td>{renderCell(transaction, 'bank_category')}</td>
+                  <td>{renderCell(transaction, 'label')}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  // Add this before the return statement
+  const renderMobileTransactions = () => {
+    // Get date range from filtered transactions
+    const getDateRange = () => {
+      if (filteredTransactions.length === 0) return '';
+      
+      const dates = filteredTransactions.map(t => new Date(t.date));
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+      
+      // If all transactions are from the same month
+      if (minDate.getMonth() === maxDate.getMonth() && 
+          minDate.getFullYear() === maxDate.getFullYear()) {
+        // If it's the same day
+        if (minDate.getDate() === maxDate.getDate()) {
+          return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} ${minDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+        }
+        // If it's different days in the same month
+        return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} - ${maxDate.getDate()}${getOrdinalSuffix(maxDate.getDate())} ${minDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+      }
+      
+      // If transactions span multiple months
+      return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} ${minDate.toLocaleString('default', { month: 'short', year: 'numeric' })} - ${maxDate.getDate()}${getOrdinalSuffix(maxDate.getDate())} ${maxDate.toLocaleString('default', { month: 'short', year: 'numeric' })}`;
+    };
+
+    // Helper function to get ordinal suffix for dates
+    const getOrdinalSuffix = (day) => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+
+    // Get transaction count
+    const transactionCount = filteredTransactions.length;
+    
+    return (
+      <div ref={screenGrabRef} style={{
+        padding: '10px',
+        backgroundColor: 'white',
+        maxWidth: '500px',
+        margin: '0 auto',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <h2 style={{
+          textAlign: 'center',
+          marginBottom: '10px',
+          color: '#2c3e50',
+          fontSize: '20px',
+          borderBottom: '2px solid #4a90e2',
+          paddingBottom: '5px'
+        }}>
+          {transactionCount} Transactions - {getDateRange()}
+        </h2>
+        
+        {filteredTransactions.map(transaction => (
+          <div key={transaction.id} style={{
+            marginBottom: '8px',
+            padding: '8px',
+            borderRadius: '4px',
+            backgroundColor: transaction.label === labels[0] ? 'rgba(255, 99, 132, 0.1)' :
+                           transaction.label === labels[1] ? 'rgba(54, 162, 235, 0.1)' :
+                           transaction.label === labels[2] ? 'rgba(75, 192, 95, 0.1)' :
+                           '#f8f9fa',
+            borderLeft: `3px solid ${
+              transaction.label === labels[0] ? 'rgba(255, 99, 132, 0.8)' :
+              transaction.label === labels[1] ? 'rgba(54, 162, 235, 0.8)' :
+              transaction.label === labels[2] ? 'rgba(75, 192, 95, 0.8)' :
+              '#d1d1d1'
+            }`,
+            fontSize: '13px',
+            lineHeight: '1.3'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '2px'
+                }}>
+                  <span style={{ 
+                    fontWeight: 'bold', 
+                    color: '#2c3e50',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    marginRight: '8px'
+                  }}>
+                    {new Date(transaction.date).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short'
+                    })}
+                  </span>
+                  <span style={{
+                    fontWeight: 'bold',
+                    color: transaction.amount < 0 ? '#e53935' : '#43a047',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {transaction.amount < 0 ? `-$${Math.abs(transaction.amount)}` : `$${transaction.amount}`}
+                  </span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: '#34495e',
+                  fontSize: '12px'
+                }}>
+                  <span style={{ 
+                    flex: 1, 
+                    marginRight: '8px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {transaction.description}
+                  </span>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px',
+                    whiteSpace: 'nowrap',
+                    fontSize: '11px',
+                    color: '#7f8c8d'
+                  }}>
+                    <span>{transaction.bank_category || 'No Cat'}</span>
+                    <span>{transaction.label || 'No Label'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        <div style={{ 
+          marginTop: '10px', 
+          padding: '8px', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          <h3 style={{ 
+            marginBottom: '5px', 
+            color: '#2c3e50',
+            fontSize: '14px',
+            borderBottom: '1px solid #dee2e6',
+            paddingBottom: '3px'
+          }}>Summary</h3>
+          {labels[0] && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>{labels[0]}</span>
+              <span style={{ fontWeight: 'bold', color: totals[labels[0]] < 0 ? '#e53935' : '#43a047' }}>
+                {totals[labels[0]] < 0 ? `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : `$${totals[labels[0]].toFixed(2)}`}
+              </span>
+            </div>
+          )}
+          {labels[1] && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>{labels[1]}</span>
+              <span style={{ fontWeight: 'bold', color: totals[labels[1]] < 0 ? '#e53935' : '#43a047' }}>
+                {totals[labels[1]] < 0 ? `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : `$${totals[labels[1]].toFixed(2)}`}
+              </span>
+            </div>
+          )}
+          {labels[2] && (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              marginTop: '5px', 
+              paddingTop: '5px', 
+              borderTop: '1px solid #dee2e6',
+              fontWeight: 'bold'
+            }}>
+              <span>Total Spend</span>
+              <span style={{ color: (totals[labels[0]] + totals[labels[1]]) < 0 ? '#e53935' : '#43a047' }}>
+                {(totals[labels[0]] + totals[labels[1]]) < 0 ? 
+                  `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
+                  `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 className="dashboard-title">Finance Dashboard</h1>
@@ -1148,6 +1489,7 @@ const App = () => {
           font-family: 'Inter', sans-serif;
         }
         
+        /* Center-aligned headings */
         .dashboard-title {
           font-family: 'Inter', sans-serif;
           font-weight: 600;
@@ -1155,19 +1497,21 @@ const App = () => {
           color: #2c3e50;
           margin-bottom: 24px;
           position: relative;
-          display: inline-block;
+          display: block;
           padding-bottom: 8px;
+          text-align: center;
         }
         
         .dashboard-title:after {
           content: '';
           position: absolute;
-          left: 0;
+          left: 50%;
           bottom: 0;
           height: 3px;
           width: 40px;
           background-color: #4a90e2;
           border-radius: 2px;
+          transform: translateX(-50%);
         }
         
         .section-title {
@@ -1178,38 +1522,181 @@ const App = () => {
           margin: 20px 0 10px 0;
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 8px;
+          text-align: center;
         }
         
-        .date-label {
-          font-family: 'Inter', sans-serif;
-          font-weight: 400;
-          font-size: 16px;
-          color: #64748b;
-          margin-left: 8px;
+        /* Styles for the enhanced edit inputs */
+        .modern-input, 
+        .modern-select {
+          border-radius: 20px;
+          border: 1px solid #e2e8f0;
+          padding: 8px 16px;
+          font-size: 14px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+          outline: none;
+          transition: all 0.2s ease;
+          background-color: white;
+          min-width: 180px;
         }
         
-        .help-text {
+        .modern-input:focus, 
+        .modern-select:focus {
+          border-color: #4a90e2;
+          box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+        }
+        
+        .modern-select {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 16px;
+          padding-right: 36px;
+        }
+        
+        /* Special styling for description field */
+        input[type="text"].modern-input {
+          width: 300px;
+        }
+        
+        /* Compact table styling */
+        .modern-table {
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 14px;
+        }
+        
+        .modern-table td {
+          padding: 2px 8px;
+          vertical-align: middle;
+          transition: all 0.15s ease;
+          height: 20px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: center;
+          line-height: 1;
+        }
+        
+        .modern-table th {
+          padding: 2px 8px;
+          font-weight: 600;
+          background-color: #f8fafc;
+          text-align: center;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          height: 20px;
+          border-bottom: 1px solid #eaecef;
+          line-height: 1;
+        }
+        
+        .modern-table tr {
+          line-height: 1;
+          border-bottom: 1px solid #f1f1f1;
+        }
+        
+        .modern-table tbody tr:hover {
+          background-color: rgba(0,0,0,0.02);
+        }
+        
+        /* Cell content styling */
+        .cell-content {
+          max-width: 250px;
+          overflow: hidden;
+          text-overflow: ellipsis;
           display: flex;
-          align-items: flex-start;
-          background-color: #f8f9fa;
-          padding: 10px 15px;
-          border-radius: 6px;
-          border-left: 3px solid #4a90e2;
-          margin-bottom: 15px;
-          font-size: 13px;
-          color: #505050;
-          font-family: 'Inter', sans-serif;
+          justify-content: center;
+          align-items: center;
+          line-height: 1;
         }
         
-        .help-text-icon {
-          color: #4a90e2;
-          margin-right: 10px;
-          margin-top: 2px;
+        /* Description column specific width */
+        .modern-table td:nth-child(2) .cell-content {
+          max-width: 400px;
+          padding-right: 0;
+          min-width: 150px;
+          justify-content: center;
+          text-align: center;
         }
         
-        .help-text-content {
-          flex: 1;
+        /* Amount column specific width */
+        .modern-table td:nth-child(3) {
+          min-width: 80px;
+          text-align: right;
+        }
+        
+        /* Category and label columns */
+        .modern-table td:nth-child(4),
+        .modern-table td:nth-child(5) {
+          min-width: 100px;
+          max-width: 120px;
+        }
+        
+        /* Modern inputs when editing */
+        .modern-table td input.modern-input,
+        .modern-table td select.modern-select {
+          padding: 0px 8px;
+          font-size: 14px;
+          height: 20px;
+          line-height: 1;
+        }
+        
+        /* Filter header */
+        .modern-filter-header {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          padding: 0 16px;
+          line-height: 1;
+        }
+        
+        /* Filter button */
+        .filter-button {
+          position: absolute;
+          right: 2px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 20px;
+          height: 20px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .modern-table {
+            font-size: 13px;
+          }
+          
+          .modern-table td {
+            padding: 2px 6px;
+            height: 18px;
+          }
+          
+          .modern-table th {
+            padding: 2px 6px;
+            height: 18px;
+          }
+          
+          .modern-table td:nth-child(2) .cell-content {
+            max-width: 200px;
+            min-width: 120px;
+          }
+          
+          .modern-table td:nth-child(4),
+          .modern-table td:nth-child(5) {
+            min-width: 80px;
+            max-width: 100px;
+          }
+          
+          .modern-table td input.modern-input,
+          .modern-table td select.modern-select {
+            padding: 0px 6px;
+            font-size: 13px;
+            height: 18px;
+          }
         }
         
         .nav-button {
@@ -1275,9 +1762,91 @@ const App = () => {
           transform: scale(1.1);
         }
         
+        /* Enhanced row styling for better discernibility */
+        .row-ruby {
+          background-color: rgba(255, 99, 132, 0.25) !important;
+          border-left: 4px solid rgba(255, 99, 132, 0.8);
+        }
+        
+        .row-jack {
+          background-color: rgba(54, 162, 235, 0.25) !important;
+          border-left: 4px solid rgba(54, 162, 235, 0.8);
+        }
+        
+        .row-both {
+          background-color: rgba(75, 192, 95, 0.25) !important;
+          border-left: 4px solid rgba(75, 192, 95, 0.8);
+        }
+        
+        /* Add striping for unlabeled rows */
+        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-both) {
+          background-color: #f7f7f7;
+          border-left: 4px solid #d1d1d1;
+        }
+        
+        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-both):nth-child(odd) {
+          background-color: #eaeaea;
+        }
+        
+        .empty-value {
+          font-style: italic;
+          color: transparent;
+        }
+        
+        .amount-negative {
+          color: #e53935;
+          font-weight: 500;
+        }
+        
+        .amount-positive {
+          color: #43a047;
+          font-weight: 500;
+        }
+        
+        .editable-cell {
+          position: relative;
+          cursor: pointer;
+        }
+        
+        .editable-cell:hover::after {
+          content: '✎';
+          position: absolute;
+          top: 2px;
+          right: 5px;
+          font-size: 12px;
+          color: #aaa;
+        }
+        
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        
+        /* Description column specific width and alignment */
+        .modern-table td:nth-child(2) {
+          text-align: left; /* Left align description cells */
+        }
+        
+        .modern-table td:nth-child(2) .cell-content {
+          max-width: 600px;
+          padding-right: 0;
+          min-width: 180px;
+          justify-content: flex-start; /* Left align description content */
+          text-align: left;
+        }
+        
+        /* When editing description, make input left-aligned */
+        .modern-table td:nth-child(2) input[type="text"].modern-input {
+          text-align: left;
+        }
+        
+        /* Keep description header centered */
+        .modern-table th:nth-child(2) {
+          text-align: center;
+        }
+        
+        .modern-table th:nth-child(2) .modern-filter-header {
+          justify-content: center;
         }
       `}
       </style>
@@ -1619,7 +2188,7 @@ const App = () => {
                 </div>
                 <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
                   <Bar data={data} options={options} />
-                  <HelpText isVisible={helpTextVisible} style={{marginBottom: '8px'}}>
+                  <HelpText isVisible={helpTextVisible}>
                     Chart displays data for all months regardless of the month filter above and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
                   </HelpText>
                 </div>
@@ -1790,7 +2359,7 @@ const App = () => {
               </div>
             </div>
             
-            <HelpText isVisible={helpTextVisible} style={{marginBottom: '0px'}}>
+            <HelpText isVisible={helpTextVisible}>
               Use the month navigation to browse your transaction history. Only transactions from the selected month are shown unless a date filter is active.
             </HelpText>
           </div>
@@ -1975,286 +2544,9 @@ const App = () => {
             </div>
           )}
           
-          {/* Transactions table with loading indicator */}
-          {isTransactionsLoading || isLabelsLoading ? (
-            <LoadingSpinner />
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                    <div 
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={() => toggleColumnFilter('date')}
-                    >
-                      Date {activeFilterColumn === 'date' ? '▲' : '▼'}
-                    </div>
-                    {activeFilterColumn === 'date' && (
-                      <div 
-                        ref={filterPopupRef}
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 100,
-                          background: 'white',
-                          border: '1px solid #ccc',
-                          padding: '10px',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                          width: '250px'
-                        }}
-                      >
-                        <div style={{ marginBottom: '8px' }}>
-                          <label style={{ display: 'block', marginBottom: '4px' }}>From:</label>
-                          <input 
-                            type="date" 
-                            name="startDate"
-                            value={dateFilter.startDate}
-                            onChange={handleDateFilterChange}
-                            min={dateRange.min}
-                            max={dateRange.max}
-                            style={{ width: '100%' }}
-                          />
-                        </div>
-                        <div style={{ marginBottom: '8px' }}>
-                          <label style={{ display: 'block', marginBottom: '4px' }}>To:</label>
-                          <input 
-                            type="date" 
-                            name="endDate"
-                            value={dateFilter.endDate}
-                            onChange={handleDateFilterChange}
-                            min={dateRange.min}
-                            max={dateRange.max}
-                            style={{ width: '100%' }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                          <button 
-                            onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#f0f0f0',
-                              color: '#333',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Clear
-                          </button>
-                          <button 
-                            onClick={() => setActiveFilterColumn(null)}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#4a90e2',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Description</th>
-                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Amount</th>
-                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                    <div 
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={() => toggleColumnFilter('bankCategory')}
-                    >
-                      Bank Category {activeFilterColumn === 'bankCategory' ? '▲' : '▼'}
-                    </div>
-                    {activeFilterColumn === 'bankCategory' && (
-                      <div 
-                        ref={filterPopupRef}
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 100,
-                          background: 'white',
-                          border: '1px solid #ccc',
-                          padding: '10px',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                          width: '200px',
-                          maxHeight: '300px',
-                          overflowY: 'auto'
-                        }}
-                      >
-                        {/* Display non-null categories first */}
-                        {availableBankCategories
-                          .filter(category => category !== null && category !== undefined && category !== '')
-                          .map(category => (
-                            <div key={category} style={{ marginBottom: '6px' }}>
-                              <label style={{ display: 'flex', alignItems: 'center' }}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={bankCategoryFilter.includes(category)}
-                                  onChange={() => handleBankCategoryFilterChange(category)}
-                                  style={{ marginRight: '8px' }}
-                                />
-                                {category}
-                              </label>
-                            </div>
-                          ))
-                        }
-                        
-                        {/* Display null category option */}
-                        <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={bankCategoryFilter.includes(null)}
-                              onChange={() => handleBankCategoryFilterChange(null)}
-                              style={{ marginRight: '8px' }}
-                            />
-                            (Empty/Null)
-                          </label>
-                        </div>
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                          <button 
-                            onClick={() => setBankCategoryFilter([])}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#f0f0f0',
-                              color: '#333',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Clear
-                          </button>
-                          <button 
-                            onClick={() => setActiveFilterColumn(null)}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#4a90e2',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-                  <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                    <div 
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={() => toggleColumnFilter('label')}
-                    >
-                      Label {activeFilterColumn === 'label' ? '▲' : '▼'}
-                    </div>
-                    {activeFilterColumn === 'label' && (
-                      <div 
-                        ref={filterPopupRef}
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 100,
-                          background: 'white',
-                          border: '1px solid #ccc',
-                          padding: '10px',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                          width: '200px'
-                        }}
-                      >
-                        {labels.map(label => (
-                          <div key={label} style={{ marginBottom: '6px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={labelFilter.includes(label)}
-                                onChange={() => handleLabelFilterChange(label)}
-                                style={{ marginRight: '8px' }}
-                              />
-                              {label}
-                            </label>
-                          </div>
-                        ))}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                          <button 
-                            onClick={() => setLabelFilter([])}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#f0f0f0',
-                              color: '#333',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Clear
-                          </button>
-                          <button 
-                            onClick={() => setActiveFilterColumn(null)}
-                            style={{ 
-                              padding: '6px 12px',
-                              backgroundColor: '#4a90e2',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map(transaction => (
-                  <tr key={transaction.id} style={{ backgroundColor: getRowColor(transaction.label) }}>
-                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                      {renderCell(transaction, 'date')}
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '8px' }}>
-                      {renderCell(transaction, 'description')}
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                      {renderCell(transaction, 'amount')}
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                      {renderCell(transaction, 'bank_category')}
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                      {renderCell(transaction, 'label')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          <h2 className="section-title">Totals</h2>
+          {/* Transactions table with modern styling */}
+          {renderTransactionsTable()}
+          
           {isTransactionsLoading || isLabelsLoading ? (
             <LoadingSpinner />
           ) : (
@@ -2265,22 +2557,24 @@ const App = () => {
                     backgroundColor: 'rgba(255, 99, 132, 0.2)', 
                     padding: '15px', 
                     borderRadius: '8px',
-                    borderLeft: '5px solid rgba(255, 99, 132, 1)',
+                    borderRight: '5px solid rgba(255, 99, 132, 1)',
                     display: 'flex',
-                    justifyContent: 'space-between'
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    maxWidth: 'fit-content',
+                    marginLeft: 'auto'
                   }}
                 >
-                  <span style={{ fontWeight: 'bold' }}>{labels[0]}</span>
-                  <span>
+                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                    {labels[0]}
+                  </div>
+                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
                     {totals[labels[0]] != null ? 
                       (totals[labels[0]] < 0 ? 
                         `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : 
                         `$${totals[labels[0]].toFixed(2)}`)
                       : '$0.00'}
-                    {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
-                      (includes 50% of "{labels[2]}" transactions)
-                    </span>}
-                  </span>
+                  </div>
                 </div>
               )}
               {labels[1] && (
@@ -2289,22 +2583,24 @@ const App = () => {
                     backgroundColor: 'rgba(54, 162, 235, 0.2)', 
                     padding: '15px', 
                     borderRadius: '8px',
-                    borderLeft: '5px solid rgba(54, 162, 235, 1)',
+                    borderRight: '5px solid rgba(54, 162, 235, 1)',
                     display: 'flex',
-                    justifyContent: 'space-between'
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    maxWidth: 'fit-content',
+                    marginLeft: 'auto'
                   }}
                 >
-                  <span style={{ fontWeight: 'bold' }}>{labels[1]}</span>
-                  <span>
+                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                    {labels[1]}
+                  </div>
+                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
                     {totals[labels[1]] != null ? 
                       (totals[labels[1]] < 0 ? 
                         `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : 
                         `$${totals[labels[1]].toFixed(2)}`)
                       : '$0.00'}
-                    {labels[2] && <span style={{ fontSize: '0.85em', marginLeft: '8px', opacity: 0.75 }}>
-                      (includes 50% of "{labels[2]}" transactions)
-                    </span>}
-                  </span>
+                  </div>
                 </div>
               )}
               {labels[2] && (
@@ -2313,27 +2609,112 @@ const App = () => {
                     backgroundColor: 'rgba(75, 192, 95, 0.2)', 
                     padding: '15px', 
                     borderRadius: '8px',
-                    borderLeft: '5px solid rgba(75, 192, 95, 1)',
+                    borderRight: '5px solid rgba(75, 192, 95, 1)',
                     display: 'flex',
-                    justifyContent: 'space-between'
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    maxWidth: 'fit-content',
+                    marginLeft: 'auto'
                   }}
                 >
-                  <span style={{ fontWeight: 'bold' }}>Total Spend</span>
-                  <span>
+                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                    Total Spend
+                  </div>
+                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
                     {(totals[labels[0]] != null && totals[labels[1]] != null) ? 
                       ((totals[labels[0]] + totals[labels[1]]) < 0 ? 
                         `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
                         `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`)
                       : '$0.00'}
-                  </span>
+                  </div>
                 </div>
               )}
+
+              {/* Screen Grab Button */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                marginTop: '20px',
+                padding: '15px',
+                borderTop: '1px solid #eee'
+              }}>
+                <button 
+                  onClick={handleScreenGrab}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 20px',
+                    backgroundColor: '#6c5ce7',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  Download Mobile View
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
       {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
       {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} />}
+
+      {/* Add this at the end of the transactions view, before the closing div */}
+      {isScreenGrabOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            maxWidth: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: '#333' }}>Mobile View</h2>
+              <button
+                onClick={() => setIsScreenGrabOpen(false)}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {renderMobileTransactions()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
