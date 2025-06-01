@@ -54,7 +54,7 @@ const HelpText = ({ children, isVisible }) => {
   );
 };
 
-const PersonalTransactions = ({ helpTextVisible }) => {
+const OffsetTransactions = ({ helpTextVisible }) => {
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
@@ -68,6 +68,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  // Add label-related states
+  const [labels, setLabels] = useState([]);
+  const [labelFilter, setLabelFilter] = useState([]);
+  const [isLabelsLoading, setIsLabelsLoading] = useState(false);
+
+  // Add refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Add state for category order
   const [categoryOrder, setCategoryOrder] = useState([]);
   const [draggedCategory, setDraggedCategory] = useState(null);
@@ -79,63 +87,28 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [splitTransactions, setSplitTransactions] = useState([{
     description: '',
     amount: '',
-    category: ''
+    category: '',
+    label: ''
   }]);
   const [isSavingSplit, setIsSavingSplit] = useState(false);
-  
+
   // Add state for expanded row
   const [expandedRow, setExpandedRow] = useState(null);
   
   // Add settings states
   const [showSettings, setShowSettings] = useState(false);
   const [hideZeroBalanceBuckets, setHideZeroBalanceBuckets] = useState(false);
-  
+
+  // Add date filter and active filter column states
+  const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
+  const [activeFilterColumn, setActiveFilterColumn] = useState(null);
+
+  // Add state for showing all transactions (bypass month filtering)
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+
   // Key for localStorage
-  const CATEGORY_ORDER_KEY = 'personal_categories_order';
-  const SETTINGS_KEY = 'personal_transactions_settings';
-  
-  // Double-click feature
-  const handleCategoryDoubleClick = (category) => {
-    // Get the earliest date from all transactions
-    const earliestDate = getMinMaxDates().min;
-    
-    // Set date filter to show from earliest date to today
-    setDateFilter({ 
-      startDate: earliestDate, 
-      endDate: '' // This will default to today/current date
-    });
-    
-    // Set category filter to only show this category
-    setCategoryFilter([category]);
-    
-    // Close any active filter dropdowns
-    setActiveFilterColumn(null);
-    
-    // Show notification
-    const notification = document.createElement('div');
-    notification.textContent = `Now showing all transactions for "${category}"`;
-    notification.style.position = 'fixed';
-    notification.style.top = '20px';
-    notification.style.right = '20px';
-    notification.style.backgroundColor = '#e3f2fd';
-    notification.style.color = '#0d47a1';
-    notification.style.padding = '10px 20px';
-    notification.style.borderRadius = '4px';
-    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-    notification.style.zIndex = '1000';
-    notification.style.border = '1px solid #90caf9';
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transition = 'opacity 0.3s ease';
-      
-      setTimeout(() => {
-        document.body.removeChild(notification);
-      }, 300);
-    }, 2000);
-  };
+  const CATEGORY_ORDER_KEY = 'offset_categories_order';
+  const SETTINGS_KEY = 'offset_transactions_settings';
   
   // Load saved order from localStorage on mount
   useEffect(() => {
@@ -222,9 +195,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   }, [transactions]); // Remove categoryOrder from dependencies
 
-  // Column filtering states
-  const [activeFilterColumn, setActiveFilterColumn] = useState(null);
-  const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
   const filterPopupRef = useRef(null);
   
   // Add new transaction state
@@ -233,17 +203,15 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     date: new Date().toISOString().split('T')[0],
     description: '',
     amount: '',
-    category: null
+    category: null,
+    label: ''
   });
   
-  // Add refresh state
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Fetch personal transactions from the backend
+  // Fetch offset transactions from the backend
   useEffect(() => {
     setIsTransactionsLoading(true);
     
-    axios.get('http://localhost:5000/personal-transactions')
+    axios.get('http://localhost:5000/offset-transactions')
       .then(response => {
         setTransactions(response.data);
         setFilteredTransactions(response.data);
@@ -258,14 +226,29 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   // Update the useEffect that fetches categories
   useEffect(() => {
-    axios.get('http://localhost:5000/personal-categories')
+    axios.get('http://localhost:5000/offset-categories')
       .then(response => {
         // Map the data to extract just the category names
         const categories = response.data.map(item => item.category);
         setAvailableCategories(categories);
       })
       .catch(err => {
-        console.error('Error fetching personal categories:', err);
+        console.error('Error fetching offset categories:', err);
+      });
+  }, []);
+
+  // Fetch labels from the backend
+  useEffect(() => {
+    setIsLabelsLoading(true);
+    
+    axios.get('http://localhost:5000/labels')
+      .then(response => {
+        setLabels(response.data);
+        setIsLabelsLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching labels:', err);
+        setIsLabelsLoading(false);
       });
   }, []);
 
@@ -305,10 +288,53 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     });
   };
 
+  // Handle category double click to filter by that category
+  const handleCategoryDoubleClick = (category) => {
+    // Clear date filter so we see all transactions for this category
+    setDateFilter({ startDate: '', endDate: '' });
+    
+    // Set category filter to only show this category
+    setCategoryFilter([category]);
+    
+    // Clear other filters
+    setLabelFilter([]);
+    
+    // Set flag to show all transactions (bypass month filtering)
+    setShowAllTransactions(true);
+    
+    // Scroll to transactions table
+    const transactionsSection = document.querySelector('h2');
+    if (transactionsSection) {
+      transactionsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Handle label filter change
+  const handleLabelFilterChange = (label, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    setLabelFilter(prev => {
+      const isAlreadyIncluded = prev.some(item => 
+        (item === null && label === null) || item === label
+      );
+
+      if (isAlreadyIncluded) {
+        return prev.filter(item => 
+          !((item === null && label === null) || item === label)
+        );
+      } else {
+        return [...prev, label];
+      }
+    });
+  };
+
   // Month navigation handlers
   const handlePrevMonth = () => {
     setCurrentMonth(prev => (prev === 0 ? 11 : prev - 1));
     setCurrentYear(prev => (currentMonth === 0 ? prev - 1 : prev));
+    setShowAllTransactions(false); // Reset to month view when navigating
   };
 
   const handleNextMonth = () => {
@@ -319,6 +345,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     if (nextMonthDate <= now) {
       setCurrentMonth(prev => (prev === 11 ? 0 : prev + 1));
       setCurrentYear(prev => (currentMonth === 11 ? prev + 1 : prev));
+      setShowAllTransactions(false); // Reset to month view when navigating
     }
   };
 
@@ -330,17 +357,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     return nextMonthDate > now;
   };
 
-  // Function to refresh personal bank feeds
-  const refreshPersonalBankFeeds = async () => {
+  // Function to refresh offset bank feeds
+  const refreshOffsetBankFeeds = async () => {
     try {
       setIsRefreshing(true);
       
-      const response = await axios.post('http://localhost:5000/refresh-personal-bank-feeds');
+      const response = await axios.post('http://localhost:5000/refresh-offset-bank-feeds');
       
       if (response.data.success) {
         // Show success notification
         const notification = document.createElement('div');
-        notification.textContent = 'Personal bank feeds refreshed successfully!';
+        notification.textContent = 'Offset bank feeds refreshed successfully!';
         notification.style.position = 'fixed';
         notification.style.top = '20px';
         notification.style.right = '20px';
@@ -358,7 +385,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }, 3000);
         
         // Refresh the transactions data
-        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        const transactionsResponse = await axios.get('http://localhost:5000/offset-transactions');
         setTransactions(transactionsResponse.data);
         
         // Reapply filters to new data
@@ -373,6 +400,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               return true;
             }
             return categoryFilter.includes(transaction.category);
+          });
+        }
+
+        if (labelFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            return labelFilter.includes(transaction.label);
           });
         }
         
@@ -392,7 +425,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       } else {
         // Show error notification
         const notification = document.createElement('div');
-        notification.textContent = 'Failed to refresh personal bank feeds: ' + response.data.message;
+        notification.textContent = 'Failed to refresh offset bank feeds: ' + response.data.message;
         notification.style.position = 'fixed';
         notification.style.top = '20px';
         notification.style.right = '20px';
@@ -410,10 +443,10 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }, 5000);
       }
     } catch (error) {
-      console.error('Error refreshing personal bank feeds:', error);
+      console.error('Error refreshing offset bank feeds:', error);
       
       const notification = document.createElement('div');
-      notification.textContent = 'Error refreshing personal bank feeds. Check console for details.';
+      notification.textContent = 'Error refreshing offset bank feeds. Check console for details.';
       notification.style.position = 'fixed';
       notification.style.top = '20px';
       notification.style.right = '20px';
@@ -449,11 +482,21 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         return categoryFilter.includes(transaction.category);
       });
     }
+
+    if (labelFilter.length > 0) {
+      filtered = filtered.filter(transaction => {
+        if (labelFilter.includes(null) && !transaction.label) {
+          return true;
+        }
+        return labelFilter.includes(transaction.label);
+      });
+    }
     
     setAllFilteredTransactions(filtered);
     
     let tableFiltered = filtered;
-    if (!dateFilter.startDate && !dateFilter.endDate) {
+    // Only apply month filter if there's no date range filter AND showAllTransactions is false
+    if (!dateFilter.startDate && !dateFilter.endDate && !showAllTransactions) {
       tableFiltered = filtered.filter(transaction => {
         const date = new Date(transaction.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
@@ -461,7 +504,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
     
     setFilteredTransactions(tableFiltered);
-  }, [transactions, filters.sortBy, dateFilter, categoryFilter, currentMonth, currentYear]);
+  }, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
 
   const toggleColumnFilter = (column) => {
     setActiveFilterColumn(activeFilterColumn === column ? null : column);
@@ -470,12 +513,15 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const handleDateFilterChange = (e) => {
     const { name, value } = e.target;
     setDateFilter(prev => ({ ...prev, [name]: value }));
+    setShowAllTransactions(false); // Reset to date-filtered view when applying date filters
   };
   
   const clearFilters = () => {
     setDateFilter({ startDate: '', endDate: '' });
     setCategoryFilter([]);
+    setLabelFilter([]);
     setActiveFilterColumn(null);
+    setShowAllTransactions(false);
   };
   
   const getMinMaxDates = () => {
@@ -559,7 +605,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       setIsUpdating(true);
       
-      const response = await axios.put(`http://localhost:5000/personal-transactions/${transactionId}`, { 
+      const response = await axios.put(`http://localhost:5000/offset-transactions/${transactionId}`, { 
         [field]: editValue 
       });
       
@@ -731,6 +777,47 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               ))}
             </select>
           );
+        case 'label':
+          return (
+            <select 
+              value={editValue || ''}
+              onChange={handleInputChange} 
+              onBlur={() => handleUpdate(transaction.id, field)}
+              style={{ 
+                width: '200px',
+                maxWidth: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                position: 'relative',
+                zIndex: 1000,
+                backgroundColor: 'white',
+                color: '#2d3748',
+                fontSize: '14px',
+                cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '16px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4299e1';
+                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
+              }}
+              autoFocus
+            >
+              <option value="" style={{ color: '#a0aec0' }}>Select a label</option>
+              {labels.map(label => (
+                <option key={label} value={label} style={{ color: '#2d3748' }}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          );
         default:
           return (
             <input
@@ -832,7 +919,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       date: new Date().toISOString().split('T')[0],
       description: '',
       amount: '',
-      category: null
+      category: null,
+      label: ''
     });
   };
 
@@ -858,7 +946,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         return;
       }
       
-      const response = await axios.post('http://localhost:5000/personal-transactions', transactionData);
+      const response = await axios.post('http://localhost:5000/offset-transactions', transactionData);
       
       if (response.data.success) {
         const addedTransaction = response.data.data;
@@ -884,6 +972,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           if (categoryFilter.length > 0) {
             if (!categoryFilter.includes(addedTransaction.category) && 
                 !(categoryFilter.includes(null) && !addedTransaction.category)) {
+              shouldAdd = false;
+            }
+          }
+          
+          if (labelFilter.length > 0) {
+            if (!labelFilter.includes(addedTransaction.label)) {
               shouldAdd = false;
             }
           }
@@ -1072,7 +1166,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     setSplitTransactions([{
       description: '',
       amount: '',
-      category: ''
+      category: '',
+      label: ''
     }]);
     setIsSplitting(true);
   };
@@ -1092,7 +1187,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     setSplitTransactions(prev => [...prev, {
       description: '',
       amount: '',
-      category: ''
+      category: '',
+      label: ''
     }]);
   };
 
@@ -1174,15 +1270,16 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           date: transactionToSplit.date, // Use the same date as original
           description: split.description,
           amount: parseFloat(split.amount),
-          category: split.category
+          category: split.category,
+          label: split.label
         }))
       };
       
-      const response = await axios.post('http://localhost:5000/personal-transactions/split', splitData);
+      const response = await axios.post('http://localhost:5000/offset-transactions/split', splitData);
       
       if (response.data.success) {
         // Refresh the transactions
-        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        const transactionsResponse = await axios.get('http://localhost:5000/offset-transactions');
         setTransactions(transactionsResponse.data);
         
         // Show success notification
@@ -1210,7 +1307,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         setSplitTransactions([{
           description: '',
           amount: '',
-          category: ''
+          category: '',
+          label: ''
         }]);
       } else {
         showErrorNotification(response.data.error || 'Failed to split transaction');
@@ -1229,7 +1327,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     setSplitTransactions([{
       description: '',
       amount: '',
-      category: ''
+      category: '',
+      label: ''
     }]);
   };
 
@@ -1283,7 +1382,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       )}
 
       {/* Active filters display */}
-      {(dateFilter.startDate || dateFilter.endDate || categoryFilter.length > 0) && (
+      {(dateFilter.startDate || dateFilter.endDate || categoryFilter.length > 0 || labelFilter.length > 0) && (
         <div style={{ 
           margin: '10px 0', 
           padding: '10px', 
@@ -1303,6 +1402,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               {categoryFilter.length > 0 && (
                 <span style={{ margin: '0 10px' }}>
                   {categoryFilter.length === 1 ? 'Category' : 'Categories'}: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
+                </span>
+              )}
+              {labelFilter.length > 0 && (
+                <span style={{ margin: '0 10px' }}>
+                  {labelFilter.length === 1 ? 'Label' : 'Labels'}: {labelFilter.map(label => label === null ? 'null' : label).join(', ')}
                 </span>
               )}
             </div>
@@ -1862,7 +1966,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       </div>
 
       <h2 className="section-title">
-        Personal Transactions
+        Offset Transactions
         <span className="date-label">
           {dateFilter.startDate || dateFilter.endDate ? (
             `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`
@@ -1964,7 +2068,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             </div>
             
             <button 
-              onClick={refreshPersonalBankFeeds}
+              onClick={refreshOffsetBankFeeds}
               disabled={isRefreshing}
               style={{
                 display: 'flex',
@@ -2209,7 +2313,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
-            <h2 style={{ marginTop: 0, color: '#333', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Add Personal Transaction</h2>
+            <h2 style={{ marginTop: 0, color: '#333', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Add Transaction</h2>
             
             <form onSubmit={handleAddTransaction}>
               <div style={{ marginBottom: '15px' }}>
@@ -2760,6 +2864,92 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   </div>
                 )}
               </th>
+              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
+                <div 
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => toggleColumnFilter('label')}
+                >
+                  Label {activeFilterColumn === 'label' ? '▲' : '▼'}
+                </div>
+                {activeFilterColumn === 'label' && (
+                  <div 
+                    ref={filterPopupRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 100,
+                      background: 'white',
+                      border: '1px solid #ccc',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      width: '200px',
+                      maxHeight: '300px',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    {labels.map(label => (
+                      <div key={label} style={{ marginBottom: '6px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={labelFilter.includes(label)}
+                            onChange={(e) => handleLabelFilterChange(label, e)}
+                            style={{ marginRight: '8px' }}
+                          />
+                          {label}
+                        </label>
+                      </div>
+                    ))}
+                    
+                    <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={labelFilter.includes(null)}
+                          onChange={(e) => handleLabelFilterChange(null, e)}
+                          style={{ marginRight: '8px' }}
+                        />
+                        (Empty/Null)
+                      </label>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                      <button 
+                        onClick={() => setLabelFilter([])}
+                        style={{ 
+                          padding: '6px 12px',
+                          backgroundColor: '#f0f0f0',
+                          color: '#333',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        onClick={() => setActiveFilterColumn(null)}
+                        style={{ 
+                          padding: '6px 12px',
+                          backgroundColor: '#4a90e2',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -2856,10 +3046,13 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
                     {renderCell(transaction, 'category')}
                   </td>
+                  <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                    {renderCell(transaction, 'label')}
+                  </td>
                 </tr>
                 {expandedRow === transaction.id && (
                   <tr>
-                    <td colSpan="4" style={{ 
+                    <td colSpan="5" style={{ 
                       padding: '0',
                       backgroundColor: '#f8fafc',
                       border: '1px solid #e2e8f0'
@@ -2924,4 +3117,4 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   );
 };
 
-export default PersonalTransactions;
+export default OffsetTransactions;
