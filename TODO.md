@@ -117,3 +117,48 @@
 
 - [ ] **Minor Split Transaction View Fix**:
    - Some UI consistency on this pop up window can be made, particularly with the category field.
+
+- [x] **Add progress bar on Budgets**:
+   - Able to view budget spend amounts at a glance
+
+- [ ] **Clean  up files**:
+   - Refactor file location so it is more maintainable, especially frontend/src
+
+- [x] **See which transactions are split**:
+   - Add indicator to see which transactions have been split and which it has been split to.
+
+- [x] **Fix Total Budgets calculation**:
+   - Currently, it is incorrectly calculated
+
+- [ ] **Make Transactions table colors more prominent**:
+   - Currently, it makes it a little bit difficult to read, need to compare results.
+
+- [x] **Center Transaction Table Values**:
+   - Center all Transaction Rows including headers except for the description rows.
+
+- [ ] **Database Operation Enhancements**:
+   - If a cell was being edit has no changes made, do not perform an update database operation
+
+- [ ] **Transfer Savings Bucket**:
+   - Add functionality so users can transfer amounts from one savings bucket to another
+
+- [ ] **Table Filter Bug**:
+   - Fix a bug in our table filters such that if the results are small or empty, the filtering options are cut-off.
+
+- [ ] **Total Monthly Spend Carry Forward**:
+   - Add a feature that calculates total monthly spend, and have that number carry forward.
+
+- [ ] **Add Gift & Holiday Saving Buckets**:
+   - Add these two categories within the Personal webpage. 
+
+- [ ] **Auto Monthly Bucket Distribution**:
+   - Within the Personal webpage, add an auto distribution feature to allocate certain amount of money from one bucket to multiple other buckets. This should be in a form of a button where these list of auto distribution can be added/updated/deleted. This will enable users to  distribute monthly salaries into Gift & Holiday saving buckets for example. A database operation where it will split transactions will be performed automatically in the backend.
+
+- [ ] **Offset Balance Buckets (Front-end)**:
+   - Create an offset balance webpage where it categorizes different spending into different buckets. The best way forward to this is to fetch the total balance of the offset, and then create "dummy" transactions to create the initial buckets, similar to how the personal transaction buckets were created.   
+
+- [ ] **Offset Balance Buckets (Back-end)**:
+   - Create an offset balance database table, similar to the personal transactions table. Then create a category table for these buckets. They can include additional personal savings on offset, extra mortgage repayments (all users), family member #1 contributions, family member #2 contribution, additional secondary person savings on offset.
+
+- [ ] **Fix dropdown menu sizing**:
+   - Fix it so the dropdown menu sizing is consistent with the table cell length.
