@@ -748,6 +748,340 @@ app.post('/personal-transactions/split', async (req, res) => {
   }
 });
 
+/**
+ * POST /refresh-offset-bank-feeds - Executes the Python script to refresh DB with offset transactions
+ */
+app.post('/refresh-offset-bank-feeds', async (req, res) => {
+  try {
+    // Path to the Python script
+    const scriptPath = path.join(__dirname, 'offset_bank_feed.py');
+    
+    console.log('Refreshing offset bank feeds data...');
+    
+    // Execute the Python script using the promisified exec function
+    const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
+    
+    if (stderr) {
+      console.warn(`Python script warnings: ${stderr}`);
+    }
+    
+    console.log(`Python script output: ${stdout}`);
+    
+    // Check if there's a success message in the output
+    if (stdout.includes('Successfully processed') && stdout.includes('offset transactions')) {
+      return res.status(200).json({
+        success: true,
+        message: 'Offset bank feeds refreshed successfully',
+        details: stdout
+      });
+    } else if (stdout.includes('No transactions found to process')) {
+      return res.status(200).json({
+        success: true,
+        message: 'Offset bank feeds process completed but no new transactions were found',
+        details: stdout
+      });
+    } else {
+      // If the script ran but didn't insert transactions as expected
+      return res.status(200).json({
+        success: true,
+        message: 'Offset bank feeds process completed',
+        details: stdout
+      });
+    }
+  } catch (err) {
+    console.error('Error refreshing offset bank feeds:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to refresh offset bank feeds',
+      details: err.message
+    });
+  }
+});
+
+// GET /offset-transactions - Retrieves offset transactions
+app.get('/offset-transactions', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM offset_transactions ORDER BY date DESC';
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching offset transactions:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+// GET /offset-categories - Retrieves offset categories
+app.get('/offset-categories', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM offset_category ORDER BY category';
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching offset categories:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+// PUT /offset-transactions/:id - Updates an offset transaction
+app.put('/offset-transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
+    
+    const validUpdates = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        validUpdates[key] = value;
+      }
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    const setClause = Object.entries(validUpdates).map(
+      ([key, _], index) => `${key} = $${index + 1}`
+    ).join(', ');
+    
+    const values = [...Object.values(validUpdates), id];
+    const query = `UPDATE offset_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating offset transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+// POST /offset-transactions - Creates a new offset transaction
+app.post('/offset-transactions', async (req, res) => {
+  try {
+    const { date, description, amount, category, label } = req.body;
+    
+    if (!date || !description || amount === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: ['Date, description, and amount are required'] 
+      });
+    }
+    
+    const query = `
+      INSERT INTO offset_transactions (date, description, amount, category, label)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const { rows } = await pool.query(query, [date, description, amount, category, label]);
+    
+    res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction created successfully'
+    });
+  } catch (err) {
+    console.error('Error creating offset transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * POST /offset-transactions/split - Splits an offset transaction into multiple transactions
+ */
+app.post('/offset-transactions/split', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
+    
+    // Validate input data
+    if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
+      });
+    }
+    
+    // Check if the original transaction exists
+    const originalResult = await client.query(
+      'SELECT * FROM offset_transactions WHERE id = $1',
+      [originalTransactionId]
+    );
+    
+    if (originalResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Original transaction not found'
+      });
+    }
+    
+    const originalTransaction = originalResult.rows[0];
+    const originalAmount = parseFloat(originalTransaction.amount);
+    const isNegative = originalAmount < 0; // Track if original amount is negative
+    
+    // Validate split transactions
+    let splitTotal = 0;
+    const errors = [];
+    
+    splitTransactions.forEach((split, index) => {
+      if (!split.description || !split.amount || !split.category) {
+        errors.push(`Split #${index + 1}: Description, amount, and category are required`);
+      }
+      
+      // Convert amount to absolute value for validation
+      const amount = Math.abs(parseFloat(split.amount));
+      if (isNaN(amount) || amount <= 0) {
+        errors.push(`Split #${index + 1}: Amount must be a non-zero number`);
+      } else {
+        splitTotal += amount;
+      }
+    });
+    
+    if (errors.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        errors: errors
+      });
+    }
+    
+    // Validate that split amounts don't exceed original
+    const absOriginalAmount = Math.abs(originalAmount);
+    const absRemainingAmount = Math.abs(parseFloat(remainingAmount));
+    
+    if (originalAmount < 0) {
+      // For expenses: check absolute values
+      if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          error: 'Split amounts exceed the original transaction amount'
+        });
+      }
+    } else {
+      // For income: total splits should not exceed original
+      if (splitTotal > originalAmount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          error: 'Split amounts exceed the original transaction amount'
+        });
+      }
+    }
+    
+    // Create split transactions
+    const createdTransactions = [];
+    
+    for (const split of splitTransactions) {
+      // Ensure the split amount has the same sign as the original transaction
+      const splitAmount = isNegative ? 
+        -Math.abs(parseFloat(split.amount)) : 
+        Math.abs(parseFloat(split.amount));
+
+      const insertResult = await client.query(
+        `INSERT INTO offset_transactions (date, description, amount, category, label, is_split)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          originalTransaction.date,
+          split.description,
+          splitAmount,
+          split.category,
+          split.label || originalTransaction.label, // Use split label or inherit from original
+          true
+        ]
+      );
+      createdTransactions.push(insertResult.rows[0]);
+    }
+    
+    // Update the original transaction amount if there's a remaining amount
+    if (absRemainingAmount > 0) {
+      // Ensure the remaining amount has the same sign as the original transaction
+      const newAmount = isNegative ? -absRemainingAmount : absRemainingAmount;
+      
+      const updateResult = await client.query(
+        `UPDATE offset_transactions 
+         SET amount = $1, has_split = $2
+         WHERE id = $3
+         RETURNING *`,
+        [
+          newAmount,
+          true,
+          originalTransactionId
+        ]
+      );
+      
+      if (updateResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to update original transaction'
+        });
+      }
+    } else {
+      // Mark the original transaction as fully split (amount = 0)
+      await client.query(
+        `UPDATE offset_transactions 
+         SET amount = $1, has_split = $2
+         WHERE id = $3`,
+        [0, true, originalTransactionId]
+      );
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Transaction split successfully',
+      data: {
+        originalTransactionId: originalTransactionId,
+        originalAmount: originalAmount, // Include original amount in response
+        splitTransactions: createdTransactions,
+        remainingAmount: isNegative ? -absRemainingAmount : absRemainingAmount // Ensure remaining amount has correct sign
+      }
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error splitting transaction:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to split transaction',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // Default route for root URL
 app.get('/', (req, res) => {
   res.send('Welcome to the Finance Dashboard API! Use /transactions to get transaction data and ?column_name= to filter available data.');

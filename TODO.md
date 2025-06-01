@@ -114,7 +114,6 @@
 - [ ] **Consider alterantive to userConfig.js file**:
    - Fetching user label names should be fetched from the DB, not "hardcoded" in the src/config/userConfig.js file still.
 
-
 - [ ] **Minor Split Transaction View Fix**:
    - Some UI consistency on this pop up window can be made, particularly with the category field.
 
@@ -148,17 +147,26 @@
 - [ ] **Total Monthly Spend Carry Forward**:
    - Add a feature that calculates total monthly spend, and have that number carry forward.
 
-- [ ] **Add Gift & Holiday Saving Buckets**:
+- [x] **Add Gift & Holiday Saving Buckets**:
    - Add these two categories within the Personal webpage. 
 
 - [ ] **Auto Monthly Bucket Distribution**:
    - Within the Personal webpage, add an auto distribution feature to allocate certain amount of money from one bucket to multiple other buckets. This should be in a form of a button where these list of auto distribution can be added/updated/deleted. This will enable users to  distribute monthly salaries into Gift & Holiday saving buckets for example. A database operation where it will split transactions will be performed automatically in the backend.
 
-- [ ] **Offset Balance Buckets (Front-end)**:
+- [x] **Offset Balance Buckets (Front-end)**:
    - Create an offset balance webpage where it categorizes different spending into different buckets. The best way forward to this is to fetch the total balance of the offset, and then create "dummy" transactions to create the initial buckets, similar to how the personal transaction buckets were created.   
 
-- [ ] **Offset Balance Buckets (Back-end)**:
+- [x] **Offset Balance Buckets (Back-end)**:
    - Create an offset balance database table, similar to the personal transactions table. Then create a category table for these buckets. They can include additional personal savings on offset, extra mortgage repayments (all users), family member #1 contributions, family member #2 contribution, additional secondary person savings on offset.
 
 - [ ] **Fix dropdown menu sizing**:
    - Fix it so the dropdown menu sizing is consistent with the table cell length.
+
+- [ ] **Implement solution for inactive savings buckets under Personal webpage**:
+   - Find a solution to deal with savings buckets that are not in use or have $0 in them. Simplest solution is to add another column under the personal_category table and have it set to a true/false boolean. The backend api will then fetch only active buckets. Albeit, there are also other solutions available.
+
+- [ ] **Fix categories sum calculation**:
+   - There is a common case where buckets will go into the negative (such as high bill periods, or spending more money than usual on gifts e.g., Christmas, or general monthly expenditure is high for a certain month). As such, this calculation would need to be accounted for in the "Categories Sum" section so that it aligns with the actual current balance. To do this, consider deducting any negative buckets from a selected bucket e.g., Salary Bucket. This ensures the categories sum and current balance is ALWAYS aligned even if a certain bucket goes into the negative. 
+
+- [x] **Add Settings option**:
+   - Add a settings option to enable/disable various functionality
