@@ -170,3 +170,9 @@
 
 - [x] **Add Settings option**:
    - Add a settings option to enable/disable various functionality
+
+- [ ] **Reduce whitespacing in settings**:
+   - Reduce whitespacing for each settings option
+
+- [ ] **Replicate auto monthly distribution rules to offset page**:
+   - low priority as not really required atm
