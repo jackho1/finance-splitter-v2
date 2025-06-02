@@ -89,10 +89,22 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Add settings states
   const [showSettings, setShowSettings] = useState(false);
   const [hideZeroBalanceBuckets, setHideZeroBalanceBuckets] = useState(false);
+  // Add state for negative bucket offset setting
+  const [enableNegativeOffsetBucket, setEnableNegativeOffsetBucket] = useState(false);
+  const [selectedNegativeOffsetBucket, setSelectedNegativeOffsetBucket] = useState('');
+  
+  // Updated states for multiple auto distributions
+  const [autoDistributionEnabled, setAutoDistributionEnabled] = useState(false);
+  const [autoDistributionRules, setAutoDistributionRules] = useState([]);
+  const [lastAutoDistributionMonth, setLastAutoDistributionMonth] = useState('');
+  const [isDistributing, setIsDistributing] = useState(false);
+  const [showDistributionSummary, setShowDistributionSummary] = useState(false);
   
   // Key for localStorage
   const CATEGORY_ORDER_KEY = 'personal_categories_order';
   const SETTINGS_KEY = 'personal_transactions_settings';
+  const AUTO_DISTRIBUTION_KEY = 'personal_auto_distribution_settings';
+  const LAST_DISTRIBUTION_KEY = 'personal_last_auto_distribution';
   
   // Double-click feature
   const handleCategoryDoubleClick = (category) => {
@@ -151,19 +163,167 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   }, []);
   
-  // Load saved settings on mount
+  // Load saved settings on mount - includes negative offset bucket settings
   useEffect(() => {
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
     if (savedSettings) {
       try {
         const parsedSettings = JSON.parse(savedSettings);
         setHideZeroBalanceBuckets(parsedSettings.hideZeroBalanceBuckets || false);
+        setEnableNegativeOffsetBucket(parsedSettings.enableNegativeOffsetBucket || false);
+        setSelectedNegativeOffsetBucket(parsedSettings.selectedNegativeOffsetBucket || '');
       } catch (error) {
         console.error('Error parsing saved settings:', error);
         localStorage.removeItem(SETTINGS_KEY);
       }
     }
   }, []);
+  
+  // Load auto distribution settings on mount
+  useEffect(() => {
+    const savedAutoDistribution = localStorage.getItem(AUTO_DISTRIBUTION_KEY);
+    if (savedAutoDistribution) {
+      try {
+        const parsedSettings = JSON.parse(savedAutoDistribution);
+        setAutoDistributionEnabled(parsedSettings.enabled || false);
+        
+        // Ensure each rule has a name property when loading from storage
+        const rules = parsedSettings.rules || [];
+        const updatedRules = rules.map(rule => ({
+          id: rule.id,
+          name: rule.name || `Rule ${rule.id}`,
+          amount: rule.amount || '',
+          sourceBucket: rule.sourceBucket || '',
+          destBucket: rule.destBucket || ''
+        }));
+        
+        setAutoDistributionRules(updatedRules);
+      } catch (error) {
+        console.error('Error parsing auto distribution settings:', error);
+        localStorage.removeItem(AUTO_DISTRIBUTION_KEY);
+      }
+    }
+    
+    const lastDistribution = localStorage.getItem(LAST_DISTRIBUTION_KEY);
+    if (lastDistribution) {
+      setLastAutoDistributionMonth(lastDistribution);
+    }
+  }, []);
+  
+  // Function to perform auto distribution
+  const performAutoDistribution = async () => {
+    if (!autoDistributionRules || autoDistributionRules.length === 0) {
+      return;
+    }
+    
+    try {
+      setIsDistributing(true);
+      
+      const currentDate = new Date();
+      const monthYearStr = `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
+      
+      let successCount = 0;
+      let failureCount = 0;
+      
+      for (const rule of autoDistributionRules) {
+        if (!rule.sourceBucket || !rule.destBucket || !rule.amount) {
+          failureCount++;
+          continue;
+        }
+        
+        const amount = parseFloat(rule.amount);
+        if (isNaN(amount) || amount <= 0) {
+          failureCount++;
+          continue;
+        }
+        
+        try {
+          // Create source transaction (negative amount)
+          const sourceTransaction = {
+            date: currentDate.toISOString().split('T')[0],
+            description: `${rule.name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
+            amount: -amount,
+            category: rule.sourceBucket
+          };
+          
+          // Create destination transaction (positive amount)
+          const destTransaction = {
+            date: currentDate.toISOString().split('T')[0],
+            description: `${rule.name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
+            amount: amount,
+            category: rule.destBucket
+          };
+          
+          // Add both transactions
+          const sourceResponse = await axios.post('http://localhost:5000/personal-transactions', sourceTransaction);
+          const destResponse = await axios.post('http://localhost:5000/personal-transactions', destTransaction);
+          
+          if (sourceResponse.data.success && destResponse.data.success) {
+            successCount++;
+          } else {
+            failureCount++;
+          }
+        } catch (error) {
+          console.error('Error in distribution rule:', error);
+          failureCount++;
+        }
+      }
+      
+      // Update the last distribution month
+      const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+      setLastAutoDistributionMonth(currentMonthKey);
+      localStorage.setItem(LAST_DISTRIBUTION_KEY, currentMonthKey);
+      
+      // Refresh transactions
+      const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+      setTransactions(transactionsResponse.data);
+      
+      // Show success notification
+      const notification = document.createElement('div');
+      notification.textContent = `Monthly distribution completed: ${successCount} successful, ${failureCount} failed`;
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = failureCount > 0 ? '#fff3cd' : '#d4edda';
+      notification.style.color = failureCount > 0 ? '#856404' : '#155724';
+      notification.style.padding = '15px 20px';
+      notification.style.borderRadius = '6px';
+      notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+      notification.style.zIndex = '1000';
+      notification.style.maxWidth = '400px';
+      notification.style.border = `1px solid ${failureCount > 0 ? '#ffeaa7' : '#c3e6cb'}`;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.3s ease';
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error performing auto distribution:', error);
+      showErrorNotification('Error performing monthly distribution. Please check console for details.');
+    } finally {
+      setIsDistributing(false);
+    }
+  };
+  
+  // Check if we need to perform auto distribution
+  useEffect(() => {
+    if (autoDistributionEnabled && transactions.length > 0 && autoDistributionRules.length > 0) {
+      const currentDate = new Date();
+      const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+      
+      if (lastAutoDistributionMonth !== currentMonthKey) {
+        // New month detected, perform auto distribution
+        performAutoDistribution();
+      }
+    }
+  }, [autoDistributionEnabled, transactions, lastAutoDistributionMonth, autoDistributionRules]);
   
   // Initialize or update category order when transactions change
   useEffect(() => {
@@ -220,7 +380,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         setCategoryOrder(currentCategories);
       }
     }
-  }, [transactions]); // Remove categoryOrder from dependencies
+  }, [transactions]);
 
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
@@ -1236,15 +1396,106 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Function to save settings to localStorage
   const saveSettings = (newSettings) => {
     const settings = {
-      hideZeroBalanceBuckets: newSettings.hideZeroBalanceBuckets
+      hideZeroBalanceBuckets: newSettings.hideZeroBalanceBuckets,
+      enableNegativeOffsetBucket: newSettings.enableNegativeOffsetBucket,
+      selectedNegativeOffsetBucket: newSettings.selectedNegativeOffsetBucket
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  };
+
+  // Updated function to save auto distribution settings - now properly saves
+  const saveAutoDistributionSettings = () => {
+    const settings = {
+      enabled: autoDistributionEnabled,
+      rules: autoDistributionRules
+    };
+    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
   };
 
   // Handle settings change
   const handleHideZeroBalanceBucketsChange = (checked) => {
     setHideZeroBalanceBuckets(checked);
-    saveSettings({ hideZeroBalanceBuckets: checked });
+    saveSettings({ 
+      hideZeroBalanceBuckets: checked, 
+      enableNegativeOffsetBucket: enableNegativeOffsetBucket,
+      selectedNegativeOffsetBucket: selectedNegativeOffsetBucket 
+    });
+  };
+
+  // Handle negative offset bucket checkbox change
+  const handleEnableNegativeOffsetBucketChange = (checked) => {
+    setEnableNegativeOffsetBucket(checked);
+    saveSettings({
+      hideZeroBalanceBuckets: hideZeroBalanceBuckets,
+      enableNegativeOffsetBucket: checked,
+      selectedNegativeOffsetBucket: checked ? selectedNegativeOffsetBucket : ''
+    });
+  };
+
+  // Handle negative offset bucket selection change
+  const handleNegativeOffsetBucketChange = (bucketName) => {
+    setSelectedNegativeOffsetBucket(bucketName);
+    saveSettings({ 
+      hideZeroBalanceBuckets: hideZeroBalanceBuckets, 
+      enableNegativeOffsetBucket: enableNegativeOffsetBucket,
+      selectedNegativeOffsetBucket: bucketName 
+    });
+  };
+
+  // Handle auto distribution settings changes - properly saves state
+  const handleAutoDistributionEnabledChange = (checked) => {
+    setAutoDistributionEnabled(checked);
+    // Save immediately
+    const settings = {
+      enabled: checked,
+      rules: autoDistributionRules
+    };
+    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  };
+
+  // Add a new distribution rule
+  const addDistributionRule = () => {
+    const newRule = {
+      id: Date.now(),
+      name: `Rule ${autoDistributionRules.length + 1}`,
+      amount: '',
+      sourceBucket: '',
+      destBucket: ''
+    };
+    const updatedRules = [...autoDistributionRules, newRule];
+    setAutoDistributionRules(updatedRules);
+    // Save immediately
+    const settings = {
+      enabled: autoDistributionEnabled,
+      rules: updatedRules
+    };
+    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  };
+
+  // Remove a distribution rule
+  const removeDistributionRule = (id) => {
+    const updatedRules = autoDistributionRules.filter(rule => rule.id !== id);
+    setAutoDistributionRules(updatedRules);
+    // Save immediately
+    const settings = {
+      enabled: autoDistributionEnabled,
+      rules: updatedRules
+    };
+    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  };
+
+  // Update a distribution rule
+  const updateDistributionRule = (id, field, value) => {
+    const updatedRules = autoDistributionRules.map(rule => 
+      rule.id === id ? { ...rule, [field]: value } : rule
+    );
+    setAutoDistributionRules(updatedRules);
+    // Save immediately
+    const settings = {
+      enabled: autoDistributionEnabled,
+      rules: updatedRules
+    };
+    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
   };
 
   return (
@@ -1330,7 +1581,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       <div style={{ 
         marginBottom: '60px', 
         background: 'transparent',
-        padding: '24px', // Reduced from 32px
+        padding: '24px',
         position: 'relative',
       }}>
         {isTransactionsLoading ? (
@@ -1338,13 +1589,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         ) : (
           <div>
             <div style={{ 
-              marginBottom: '20px', // Reduced from 28px
+              marginBottom: '20px',
               textAlign: 'center',
               position: 'relative',
             }}>
               <h2 className="section-title">Savings Buckets</h2>
               
-              {/* Replace inline help text with HelpText component */}
               <div style={{ marginBottom: '6px', marginRight: '140px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   Drag category cards to reorder them. Your arrangement will be saved automatically. 
@@ -1354,6 +1604,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               <div style={{ marginBottom: '6px', marginRight: '140px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   Double-click on any category to show all transactions for that category across all months.
+                </HelpText>
+              </div>
+
+              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+                <HelpText isVisible={helpTextVisible}>
+                  When buckets go negative, they're excluded from Categories Sum calculation and their negative amounts are deducted from your selected offset bucket.
                 </HelpText>
               </div>
               
@@ -1367,6 +1623,42 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 gap: '8px',
                 alignItems: 'center'
               }}>
+                {/* Auto Distribution Info Button (if enabled) */}
+                {autoDistributionEnabled && autoDistributionRules.length > 0 && (
+                  <button
+                    onClick={() => setShowDistributionSummary(!showDistributionSummary)}
+                    style={{
+                      fontSize: '13px',
+                      padding: '6px 12px',
+                      backgroundColor: '#e0f2fe',
+                      color: '#0369a1',
+                      border: '1px solid #7dd3fc',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex', 
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.backgroundColor = '#bae6fd';
+                      e.currentTarget.style.borderColor = '#38bdf8';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.backgroundColor = '#e0f2fe';
+                      e.currentTarget.style.borderColor = '#7dd3fc';
+                    }}
+                    title="View auto distribution summary"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/>
+                      <circle cx="12" cy="12" r="8" strokeDasharray="3 3"/>
+                      <path d="M12 2v6m0 6v6m10-8h-6m-6 0H2"/>
+                    </svg>
+                    {autoDistributionRules.length} Auto Rule{autoDistributionRules.length > 1 ? 's' : ''}
+                  </button>
+                )}
+                
                 {/* Settings Button */}
                 <button
                   onClick={() => setShowSettings(true)}
@@ -1439,18 +1731,108 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </div>
             </div>
             
+            {/* Auto Distribution Summary Popup */}
+            {showDistributionSummary && autoDistributionRules.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '60px',
+                right: '0',
+                backgroundColor: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                width: '320px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px',
+                  borderBottom: '1px solid #f3f4f6',
+                  paddingBottom: '8px'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>Monthly Auto Distribution</h4>
+                  <button
+                    onClick={() => setShowDistributionSummary(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9ca3af'
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div style={{ fontSize: '13px' }}>
+                  {autoDistributionRules.map((rule, index) => (
+                    <div key={rule.id} style={{ 
+                      marginBottom: '8px',
+                      padding: '8px',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{ 
+                        color: '#374151', 
+                        marginBottom: '4px', 
+                        fontWeight: '500', 
+                        fontSize: '14px'
+                      }}>
+                        {rule.name || `Rule ${index + 1}`}
+                      </div>
+                      <div style={{ color: '#374151', marginBottom: '4px' }}>
+                        <strong>${rule.amount}</strong> per month
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                        From: <strong>{rule.sourceBucket || 'Not set'}</strong>
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                        To: <strong>{rule.destBucket || 'Not set'}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    performAutoDistribution();
+                    setShowDistributionSummary(false);
+                  }}
+                  disabled={isDistributing}
+                  style={{
+                    width: '100%',
+                    marginTop: '12px',
+                    padding: '8px',
+                    backgroundColor: isDistributing ? '#94a3b8' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: isDistributing ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  {isDistributing ? 'Distributing...' : 'Distribute Now'}
+                </button>
+              </div>
+            )}
+            
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', // Reduced from 240px
-              gap: '16px', // Reduced from 24px
-              marginBottom: '30px' // Reduced from 40px
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '30px'
             }}>
               {(() => {
                 try {
-                  // Calculate category totals and transaction counts
-                  const categoryData = transactions.reduce((acc, transaction) => {
+                  // Calculate raw category totals first
+                  const rawCategoryData = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    // Ensure amount is a number
                     const amount = typeof transaction.amount === 'number' ? 
                       transaction.amount : parseFloat(transaction.amount) || 0;
                     
@@ -1466,15 +1848,49 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     return acc;
                   }, {});
 
-                  // Calculate grand total with numeric safety
-                  const grandTotal = Object.values(categoryData)
-                    .reduce((sum, { total }) => {
-                      const numTotal = typeof total === 'number' ? 
-                        total : parseFloat(total) || 0;
+                  // New offsetting logic - keep negatives but adjust offset bucket
+                  const categoryData = { ...rawCategoryData };
+                  
+                  if (enableNegativeOffsetBucket && selectedNegativeOffsetBucket && categoryData[selectedNegativeOffsetBucket]) {
+                    // Find all negative buckets (excluding the offset bucket itself)
+                    const negativeBuckets = Object.entries(rawCategoryData).filter(([category, data]) => {
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      return numTotal < 0 && category !== selectedNegativeOffsetBucket;
+                    });
+
+                    // Calculate total negative amount
+                    const totalNegativeAmount = negativeBuckets.reduce((sum, [_, data]) => {
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      return sum + numTotal; // This will be negative
+                    }, 0);
+
+                    // Deduct the negative amounts from the selected bucket (subtract the negative = add positive, but we want to subtract)
+                    if (totalNegativeAmount < 0) {
+                      categoryData[selectedNegativeOffsetBucket] = {
+                        ...categoryData[selectedNegativeOffsetBucket],
+                        total: categoryData[selectedNegativeOffsetBucket].total + totalNegativeAmount // Adding negative = subtracting
+                      };
+                    }
+                  }
+
+                  // Calculate grand total excluding negative buckets from calculation
+                  const grandTotal = Object.entries(categoryData)
+                    .filter(([category, data]) => {
+                      // Exclude negative buckets that are not the offset bucket
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      const isNegative = numTotal < 0;
+                      const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket;
+                      
+                      // Include the bucket if it's not negative OR if it's the offset bucket
+                      return !isNegative || isOffsetBucket;
+                    })
+                    .reduce((sum, [category, data]) => {
+                      const numTotal = typeof data.total === 'number' ? 
+                        data.total : parseFloat(data.total) || 0;
                       return sum + numTotal;
                     }, 0);
 
-                  // Get latest closing balance with type safety - FIXING THE BUG
+                  // Get latest closing balance with type safety
                   const latestTransaction = transactions.length > 0 
                     ? transactions.reduce((latest, transaction) => {
                         return (latest.id > transaction.id) ? latest : transaction;
@@ -1495,7 +1911,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         maximumFractionDigits: 2
                       });
                     } catch (error) {
-                      // Fallback for non-numeric values
                       console.error("Error formatting number:", error);
                       return "0.00";
                     }
@@ -1546,11 +1961,35 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       {/* Display each category's total */}
                       {displayCategories.map((category, index) => {
                         const data = categoryData[category];
+                        const rawData = rawCategoryData[category];
                         const numTotal = typeof data.total === 'number' ? 
                           data.total : parseFloat(data.total) || 0;
-                        const percentage = grandTotal !== 0 ? 
-                          (numTotal / grandTotal) * 100 : 0;
+                        const rawTotal = typeof rawData?.total === 'number' ? 
+                          rawData.total : parseFloat(rawData?.total) || 0;
+                        
+                        // Calculate percentage based on categories that are included in sum
+                        const totalForPercentage = Object.entries(categoryData)
+                          .filter(([cat, catData]) => {
+                            const catTotal = typeof catData.total === 'number' ? catData.total : parseFloat(catData.total) || 0;
+                            const isNegative = catTotal < 0;
+                            const isOffsetBucket = enableNegativeOffsetBucket && cat === selectedNegativeOffsetBucket;
+                            return !isNegative || isOffsetBucket;
+                          })
+                          .reduce((sum, [cat, catData]) => {
+                            const catTotal = typeof catData.total === 'number' ? catData.total : parseFloat(catData.total) || 0;
+                            return sum + catTotal;
+                          }, 0);
+
+                        // Check if this bucket is included in the sum calculation
+                        const isIncludedInSum = numTotal >= 0 || (enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket);
+                        const percentage = isIncludedInSum && totalForPercentage !== 0 ? 
+                          (numTotal / totalForPercentage) * 100 : 0;
+                        
                         const color = getCategoryColor(category, index);
+                        
+                        // Check if this category has been affected by offsetting
+                        const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && rawTotal !== numTotal;
+                        const isExcludedNegative = rawTotal < 0 && (!enableNegativeOffsetBucket || category !== selectedNegativeOffsetBucket) && enableNegativeOffsetBucket;
                           
                         return (
                           <div 
@@ -1586,58 +2025,85 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                               top: 0,
                               left: 0,
                               right: 0,
-                              height: '4px', // Reduced from 6px
+                              height: '4px',
                               background: `linear-gradient(90deg, ${color.bg}, ${color.bg}dd)`,
                               borderRadius: '12px 12px 0 0',
                             }}/>
                             
-                            {/* Drag handle */}
-                            <div style={{ 
-                              position: 'absolute',
-                              top: '12px',
-                              right: '12px',
-                              padding: '4px',
-                              borderRadius: '6px',
-                              color: color.bg,
-                              cursor: 'move',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              </svg>
-                            </div>
+                            {/* UPDATED: "Was:" tag on the left */}
+                            {isOffsetBucket && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '8px',
+                                left: '8px',
+                                fontSize: '9px', 
+                                color: '#64748b', 
+                                backgroundColor: '#f1f5f9',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                border: '1px solid #e2e8f0',
+                                fontStyle: 'italic',
+                                zIndex: 1
+                              }}>
+                                Was: {rawTotal >= 0 ? `$${formatNumber(rawTotal)}` : `-$${formatNumber(Math.abs(rawTotal))}`}
+                              </div>
+                            )}
                             
+                            {/* UPDATED: Right-side indicators without "Was:" tag */}
+                            {(isOffsetBucket || isExcludedNegative) && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                padding: '2px 6px',
+                                backgroundColor: isOffsetBucket ? '#f0f9ff' : '#fef3c7',
+                                color: isOffsetBucket ? '#0369a1' : '#d97706',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                border: `1px solid ${isOffsetBucket ? '#93c5fd' : '#fcd34d'}`,
+                                zIndex: 1
+                              }}>
+                                {isOffsetBucket ? 'Offset Bucket' : 'Excluded'}
+                              </div>
+                            )}
+                            
+                            {/* UPDATED: Category name without left margin */}
                             <div style={{ 
-                              fontSize: '15px', // Reduced from 16px
+                              fontSize: '15px',
                               fontWeight: '600',
                               color: '#475569',
-                              marginBottom: '8px', // Reduced from 12px
-                              marginTop: '12px', // Reduced from 16px
+                              marginBottom: '8px',
+                              marginTop: '12px'  // Removed marginLeft
                             }}>
                               {category}
                             </div>
                             
+                            {/* UPDATED: Amount without left margin */}
                             <div style={{ 
-                              fontSize: '26px', // Reduced from 32px
+                              fontSize: '26px',
                               fontWeight: '700',
                               color: numTotal >= 0 ? '#059669' : '#dc2626',
                               lineHeight: '1',
-                              marginBottom: '12px', // Reduced from 16px
+                              marginBottom: '12px'  // Removed marginLeft
                             }}>
                               {numTotal >= 0 
                                 ? `$${formatNumber(numTotal)}` 
                                 : `-$${formatNumber(Math.abs(numTotal))}`}
                             </div>
                             
+                            {/* UPDATED: Bottom section without left margin */}
                             <div style={{ 
                               display: 'flex',
                               justifyContent: 'space-between',
-                              fontSize: '12px', // Reduced from 13px
-                              color: '#64748b',
+                              fontSize: '12px',
+                              color: '#64748b'  // Removed marginLeft
                             }}>
                               <span style={{ fontWeight: '500' }}>
-                                {percentage.toFixed(1)}% of total
+                                {isIncludedInSum 
+                                  ? `${percentage.toFixed(1)}% of total`
+                                  : 'Excluded from total'
+                                }
                               </span>
                               <span>
                                 {data.count} item{data.count !== 1 ? 's' : ''}
@@ -1652,7 +2118,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   console.error("Error rendering category data:", error);
                   return (
                     <div style={{ 
-                      padding: '24px', // Reduced from 32px
+                      padding: '24px',
                       textAlign: 'center', 
                       color: '#dc2626',
                       backgroundColor: '#fef2f2',
@@ -1668,21 +2134,21 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               })()}
             </div>
 
-            {/* Modern Balance Summary Section - Reduced sizing */}
+            {/* Modern Balance Summary Section with new calculation */}
             <div style={{
-              marginTop: '20px', // Reduced from 24px
-              padding: '16px', // Reduced from 20px
+              marginTop: '20px',
+              padding: '16px',
               background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '10px', // Reduced from 12px
+              borderRadius: '10px',
               border: '1px solid rgba(0,0,0,0.06)',
-              maxWidth: '560px', // Reduced from 600px
-              margin: '20px auto', // Reduced from 24px
-              boxShadow: '0 6px 28px rgba(0,0,0,0.05)', // Reduced shadow
+              maxWidth: '560px',
+              margin: '20px auto',
+              boxShadow: '0 6px 28px rgba(0,0,0,0.05)',
             }}>
               {(() => {
                 try {
-                  // Calculate again to ensure we have fresh values in this scope
-                  const categoryTotal = Object.values(transactions.reduce((acc, transaction) => {
+                  // Calculate category total with new offsetting approach
+                  const rawCategoryTotals = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
                     const amount = typeof transaction.amount === 'number' ? 
                       transaction.amount : parseFloat(transaction.amount) || 0;
@@ -1693,13 +2159,40 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     acc[category] += amount;
                     
                     return acc;
-                  }, {})).reduce((sum, amount) => {
-                    const numAmount = typeof amount === 'number' ? 
-                      amount : parseFloat(amount) || 0;
-                    return sum + numAmount;
+                  }, {});
+
+                  // Apply the new offsetting logic for balance summary
+                  let adjustedTotals = { ...rawCategoryTotals };
+                  
+                  if (enableNegativeOffsetBucket && selectedNegativeOffsetBucket && adjustedTotals[selectedNegativeOffsetBucket] !== undefined) {
+                    // Find negative buckets and sum them
+                    const negativeBuckets = Object.entries(rawCategoryTotals).filter(([category, total]) => {
+                      return total < 0 && category !== selectedNegativeOffsetBucket;
+                    });
+
+                    const totalNegativeAmount = negativeBuckets.reduce((sum, [_, total]) => sum + total, 0);
+                    
+                    // Deduct negative amounts from offset bucket
+                    if (totalNegativeAmount < 0) {
+                      adjustedTotals[selectedNegativeOffsetBucket] = adjustedTotals[selectedNegativeOffsetBucket] + totalNegativeAmount;
+                    }
+                  }
+
+                  // Calculate total excluding negative buckets (except offset bucket)
+                  const categoryTotal = Object.entries(adjustedTotals).reduce((sum, [category, total]) => {
+                    const numAmount = typeof total === 'number' ? total : parseFloat(total) || 0;
+                    
+                    // Include bucket if it's not negative OR if it's the offset bucket
+                    const isNegative = numAmount < 0;
+                    const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket;
+                    
+                    if (!isNegative || isOffsetBucket) {
+                      return sum + numAmount;
+                    }
+                    return sum;
                   }, 0);
                 
-                  // Get latest closing balance with type safety - FIXING THE BUG
+                  // Get latest closing balance with type safety
                   const latestTransaction = transactions.length > 0 
                     ? transactions.reduce((latest, transaction) => {
                         return (latest.id > transaction.id) ? latest : transaction;
@@ -1734,25 +2227,25 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '28px', // Reduced from 36px
+                        gap: '28px',
                       }}>
-                        {/* Balance information - Reduced sizing */}
+                        {/* Balance information */}
                         <div style={{
                           display: 'flex',
-                          gap: '28px', // Reduced from 32px
+                          gap: '28px',
                           alignItems: 'center',
                         }}>
                           <div style={{ 
                             textAlign: 'center',
-                            padding: '12px 20px', // Reduced from 16px 24px
+                            padding: '12px 20px',
                             backgroundColor: '#f0fdf4',
-                            borderRadius: '10px', // Reduced from 12px
+                            borderRadius: '10px',
                             border: '1px solid #bbf7d0',
                           }}>
                             <div style={{ 
-                              fontSize: '12px', // Reduced from 13px
+                              fontSize: '12px',
                               color: '#059669',
-                              marginBottom: '6px', // Reduced from 8px
+                              marginBottom: '6px',
                               fontWeight: '600',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -1760,7 +2253,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                               Current Balance
                             </div>
                             <div style={{ 
-                              fontSize: '22px', // Reduced from 24px
+                              fontSize: '22px',
                               fontWeight: '700',
                               color: '#047857',
                             }}>
@@ -1770,21 +2263,21 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           
                           <div style={{
                             width: '2px',
-                            height: '50px', // Reduced from 60px
+                            height: '50px',
                             background: 'linear-gradient(180deg, transparent, #e5e7eb, transparent)',
                           }}/>
                           
                           <div style={{ 
                             textAlign: 'center',
-                            padding: '12px 20px', // Reduced from 16px 24px
+                            padding: '12px 20px',
                             backgroundColor: '#f0f9ff',
-                            borderRadius: '10px', // Reduced from 12px
+                            borderRadius: '10px',
                             border: '1px solid #bae6fd',
                           }}>
                             <div style={{ 
-                              fontSize: '12px', // Reduced from 13px
+                              fontSize: '12px',
                               color: '#0369a1',
-                              marginBottom: '6px', // Reduced from 8px
+                              marginBottom: '6px',
                               fontWeight: '600',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -1792,7 +2285,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                               Categories Sum
                             </div>
                             <div style={{ 
-                              fontSize: '22px', // Reduced from 24px
+                              fontSize: '22px',
                               fontWeight: '700',
                               color: '#0c4a6e',
                             }}>
@@ -1801,17 +2294,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           </div>
                         </div>
                         
-                        {/* Modern Reconciliation Status - Reduced sizing */}
+                        {/* Modern Reconciliation Status */}
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '8px', // Reduced from 10px
-                          padding: '8px 16px', // Reduced from 10px 18px
+                          gap: '8px',
+                          padding: '8px 16px',
                           background: isReconciled 
                             ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
                             : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                          borderRadius: '20px', // Reduced from 24px
-                          fontSize: '13px', // Reduced from 14px
+                          borderRadius: '20px',
+                          fontSize: '13px',
                           fontWeight: '600',
                           color: isReconciled ? '#15803d' : '#b45309',
                           border: `1px solid ${isReconciled ? '#86efac' : '#fcd34d'}`,
@@ -1830,7 +2323,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                             <>
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+                              </svg>
                               Not Reconciled
                             </>
                           )}
@@ -2029,7 +2522,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </HelpText>
       </div>
       
-      {/* Settings Modal */}
+      {/* Settings Modal - includes negative offset bucket selection and multiple auto distributions */}
       {showSettings && (
         <div style={{
           position: 'fixed',
@@ -2048,7 +2541,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             padding: '24px',
             borderRadius: '12px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            width: '400px',
+            width: '600px',
             maxWidth: '90%',
             maxHeight: '80vh',
             overflowY: 'auto'
@@ -2096,6 +2589,309 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </button>
             </div>
             
+            {/* Auto Monthly Distribution Section */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                margin: '0 0 16px 0', 
+                color: '#374151',
+                fontSize: '16px',
+                fontWeight: '500'
+              }}>
+                Auto Monthly Distribution
+              </h3>
+              
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#e0f2fe',
+                borderRadius: '8px',
+                border: '1px solid #7dd3fc',
+                marginBottom: '16px'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start',
+                  cursor: 'pointer',
+                  gap: '12px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={autoDistributionEnabled}
+                    onChange={(e) => handleAutoDistributionEnabledChange(e.target.checked)}
+                    style={{ 
+                      marginTop: '2px',
+                      cursor: 'pointer',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                  <div>
+                    <div style={{ 
+                      fontSize: '14px',
+                      color: '#0369a1',
+                      fontWeight: '500',
+                      marginBottom: '4px'
+                    }}>
+                      Enable auto monthly budget distribution
+                    </div>
+                    <div style={{ 
+                      fontSize: '13px',
+                      color: '#0284c7',
+                      lineHeight: '1.4'
+                    }}>
+                      Automatically transfer funds between buckets when a new month begins (triggered on first login of the month).
+                    </div>
+                  </div>
+                </label>
+              </div>
+              
+              {autoDistributionEnabled && (
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', color: '#374151' }}>Distribution Rules</h4>
+                    <button
+                      onClick={addDistributionRule}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'background-color 0.2s'
+                      }}
+                    >
+                      Add Rule
+                    </button>
+                  </div>
+                  
+                  {autoDistributionRules.length === 0 ? (
+                    <div style={{
+                      padding: '20px',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '14px'
+                    }}>
+                      No distribution rules configured. Click "Add Rule" to create one.
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                      {autoDistributionRules.map((rule, index) => (
+                        <div key={rule.id} style={{
+                          padding: '12px',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '6px',
+                          marginBottom: '10px',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '10px'
+                          }}>
+                            <input
+                              type="text"
+                              value={rule.name || `Rule ${index + 1}`}
+                              onChange={(e) => {
+                                updateDistributionRule(rule.id, 'name', e.target.value || `Rule ${index + 1}`);
+                              }}
+                              placeholder={`Rule ${index + 1}`}
+                              style={{
+                                flex: '1',
+                                padding: '4px 8px',
+                                height: '30px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontWeight: '400',
+                                color: '#374151',
+                                maxWidth: '75%'
+                              }}
+                            />
+                            <button
+                              onClick={() => removeDistributionRule(rule.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#ef4444',
+                                padding: '3px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseOver={e => {
+                                e.currentTarget.style.backgroundColor = '#fee2e2';
+                              }}
+                              onMouseOut={e => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          </div>
+                          
+                          {/* Form Inputs with labels directly above them - more compact design */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gap: '8px',
+                            alignItems: 'start'
+                          }}>
+                            {/* Amount column */}
+                            <div>
+                              <label style={{ 
+                                fontSize: '12px',
+                                color: '#6b7280',
+                                fontWeight: '500',
+                                display: 'block',
+                                marginBottom: '2px'
+                              }}>Amount ($)</label>
+                              <input
+                                type="number"
+                                value={rule.amount}
+                                onChange={(e) => {
+                                  updateDistributionRule(rule.id, 'amount', e.target.value);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '36px',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #d1d5db',
+                                  fontSize: '13px',
+                                  textAlign: 'right',
+                                  boxSizing: 'border-box',
+                                  backgroundColor: 'white',
+                                  color: '#374151',
+                                  lineHeight: 'normal',
+                                  margin: 0,
+                                  appearance: 'textfield'
+                                }}
+                                placeholder="1000"
+                              />
+                            </div>
+                            
+                            {/* From Bucket column */}
+                            <div>
+                              <label style={{ 
+                                fontSize: '12px',
+                                color: '#6b7280',
+                                fontWeight: '500',
+                                display: 'block',
+                                marginBottom: '2px'
+                              }}>From Bucket</label>
+                              <select
+                                value={rule.sourceBucket}
+                                onChange={(e) => {
+                                  updateDistributionRule(rule.id, 'sourceBucket', e.target.value);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '36px',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #d1d5db',
+                                  fontSize: '13px',
+                                  backgroundColor: 'white',
+                                  color: '#374151',
+                                  boxSizing: 'border-box',
+                                  appearance: 'none',
+                                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 8px center',
+                                  backgroundSize: '16px',
+                                  lineHeight: 'normal',
+                                  margin: 0
+                                }}
+                              >
+                                <option value="">Select source</option>
+                                {availableCategories.map(category => (
+                                  <option key={category} value={category}>
+                                    {category}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            {/* To Bucket column */}
+                            <div>
+                              <label style={{ 
+                                fontSize: '12px',
+                                color: '#6b7280',
+                                fontWeight: '500',
+                                display: 'block',
+                                marginBottom: '2px'
+                              }}>To Bucket</label>
+                              <select
+                                value={rule.destBucket}
+                                onChange={(e) => {
+                                  updateDistributionRule(rule.id, 'destBucket', e.target.value);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '36px',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #d1d5db',
+                                  fontSize: '13px',
+                                  backgroundColor: 'white',
+                                  color: '#374151',
+                                  boxSizing: 'border-box',
+                                  appearance: 'none',
+                                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 8px center',
+                                  backgroundSize: '16px',
+                                  lineHeight: 'normal',
+                                  margin: 0
+                                }}
+                              >
+                                <option value="">Select destination</option>
+                                {availableCategories.map(category => (
+                                  <option key={category} value={category}>
+                                    {category}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        
+                          {rule.amount && rule.sourceBucket && rule.destBucket && (
+                            <div style={{
+                              marginTop: '6px',
+                              padding: '4px 8px',
+                              backgroundColor: '#e0f2fe',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              color: '#0369a1',
+                              textAlign: 'center'
+                            }}>
+                              ${rule.amount} from <strong>{rule.sourceBucket}</strong> → <strong>{rule.destBucket}</strong>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ 
                 margin: '0 0 16px 0', 
@@ -2110,7 +2906,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 padding: '16px',
                 backgroundColor: '#f9fafb',
                 borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                border: '1px solid #e5e7eb',
+                marginBottom: '16px'
               }}>
                 <label style={{ 
                   display: 'flex', 
@@ -2150,6 +2947,109 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </div>
             </div>
             
+            {/* Updated Negative Bucket Offsetting Settings */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                margin: '0 0 16px 0', 
+                color: '#374151',
+                fontSize: '16px',
+                fontWeight: '500'
+              }}>
+                Negative Bucket Offsetting
+              </h3>
+              
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#f0f9ff',
+                borderRadius: '8px',
+                border: '1px solid #bae6fd',
+                marginBottom: '12px'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start',
+                  cursor: 'pointer',
+                  gap: '12px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={enableNegativeOffsetBucket}
+                    onChange={(e) => handleEnableNegativeOffsetBucketChange(e.target.checked)}
+                    style={{ 
+                      marginTop: '2px',
+                      cursor: 'pointer',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                  <div>
+                    <div style={{ 
+                      fontSize: '14px',
+                      color: '#0369a1',
+                      fontWeight: '500',
+                      marginBottom: '4px'
+                    }}>
+                      Enable negative bucket offsetting
+                    </div>
+                    <div style={{ 
+                      fontSize: '13px',
+                      color: '#0284c7',
+                      lineHeight: '1.4'
+                    }}>
+                      When buckets go negative, they remain visible but are excluded from the Categories Sum calculation. Their negative amounts are deducted from your selected offset bucket to keep totals balanced.
+                    </div>
+                  </div>
+                </label>
+                
+                {enableNegativeOffsetBucket && (
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #bae6fd' }}>
+                    <label style={{ 
+                      display: 'block',
+                      fontSize: '13px',
+                      color: '#0369a1',
+                      fontWeight: '500',
+                      marginBottom: '6px'
+                    }}>
+                      Select Offset Bucket
+                    </label>
+                    <select
+                      value={selectedNegativeOffsetBucket}
+                      onChange={(e) => handleNegativeOffsetBucketChange(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '14px',
+                        backgroundColor: 'white',
+                        color: '#374151'
+                      }}
+                    >
+                      <option value="">Select a bucket</option>
+                      {availableCategories.map(category => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {selectedNegativeOffsetBucket && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px',
+                        backgroundColor: '#dcfce7',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: '#15803d'
+                      }}>
+                        ✓ Negative amounts will be deducted from <strong>{selectedNegativeOffsetBucket}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            
             <div style={{ 
               display: 'flex', 
               justifyContent: 'flex-end', 
@@ -2185,6 +3085,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </div>
       )}
 
+      {/* Other modals remain unchanged */}
       {/* Add Transaction Form Modal */}
       {isAddingTransaction && (
         <div style={{
@@ -2583,7 +3484,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </div>
       )}
       
-      {/* Transactions table */}
+      {/* Transactions table remains unchanged */}
       {isTransactionsLoading ? (
         <LoadingSpinner />
       ) : (
