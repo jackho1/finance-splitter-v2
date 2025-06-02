@@ -98,6 +98,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // Add settings states
   const [showSettings, setShowSettings] = useState(false);
   const [hideZeroBalanceBuckets, setHideZeroBalanceBuckets] = useState(false);
+  // Add state for negative bucket offset setting
+  const [selectedNegativeOffsetBucket, setSelectedNegativeOffsetBucket] = useState('');
 
   // Add date filter and active filter column states
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
@@ -131,6 +133,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       try {
         const parsedSettings = JSON.parse(savedSettings);
         setHideZeroBalanceBuckets(parsedSettings.hideZeroBalanceBuckets || false);
+        setSelectedNegativeOffsetBucket(parsedSettings.selectedNegativeOffsetBucket || '');
       } catch (error) {
         console.error('Error parsing saved settings:', error);
         localStorage.removeItem(SETTINGS_KEY);
@@ -1335,7 +1338,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // Function to save settings to localStorage
   const saveSettings = (newSettings) => {
     const settings = {
-      hideZeroBalanceBuckets: newSettings.hideZeroBalanceBuckets
+      hideZeroBalanceBuckets: newSettings.hideZeroBalanceBuckets,
+      selectedNegativeOffsetBucket: newSettings.selectedNegativeOffsetBucket
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   };
@@ -1343,7 +1347,19 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // Handle settings change
   const handleHideZeroBalanceBucketsChange = (checked) => {
     setHideZeroBalanceBuckets(checked);
-    saveSettings({ hideZeroBalanceBuckets: checked });
+    saveSettings({ 
+      hideZeroBalanceBuckets: checked, 
+      selectedNegativeOffsetBucket: selectedNegativeOffsetBucket 
+    });
+  };
+
+  // Handle negative offset bucket selection change
+  const handleNegativeOffsetBucketChange = (bucketName) => {
+    setSelectedNegativeOffsetBucket(bucketName);
+    saveSettings({ 
+      hideZeroBalanceBuckets: hideZeroBalanceBuckets, 
+      selectedNegativeOffsetBucket: bucketName 
+    });
   };
 
   return (
@@ -1460,6 +1476,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   Double-click on any category to show all transactions for that category across all months.
                 </HelpText>
               </div>
+
+              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+                <HelpText isVisible={helpTextVisible}>
+                  When buckets go negative, they're excluded from Categories Sum calculation and their negative amounts are deducted from your selected offset bucket.
+                </HelpText>
+              </div>
               
               {/* Settings and Reset Button Container */}
               <div style={{
@@ -1551,10 +1573,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             }}>
               {(() => {
                 try {
-                  // Calculate category totals and transaction counts
-                  const categoryData = transactions.reduce((acc, transaction) => {
+                  // Calculate raw category totals first
+                  const rawCategoryData = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    // Ensure amount is a number
                     const amount = typeof transaction.amount === 'number' ? 
                       transaction.amount : parseFloat(transaction.amount) || 0;
                     
@@ -1570,15 +1591,49 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     return acc;
                   }, {});
 
-                  // Calculate grand total with numeric safety
-                  const grandTotal = Object.values(categoryData)
-                    .reduce((sum, { total }) => {
-                      const numTotal = typeof total === 'number' ? 
-                        total : parseFloat(total) || 0;
+                  // New offsetting logic - keep negatives but adjust offset bucket
+                  const categoryData = { ...rawCategoryData };
+                  
+                  if (selectedNegativeOffsetBucket && categoryData[selectedNegativeOffsetBucket]) {
+                    // Find all negative buckets (excluding the offset bucket itself)
+                    const negativeBuckets = Object.entries(rawCategoryData).filter(([category, data]) => {
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      return numTotal < 0 && category !== selectedNegativeOffsetBucket;
+                    });
+
+                    // Calculate total negative amount
+                    const totalNegativeAmount = negativeBuckets.reduce((sum, [_, data]) => {
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      return sum + numTotal; // This will be negative
+                    }, 0);
+
+                    // Deduct the negative amounts from the selected bucket (subtract the negative = add positive, but we want to subtract)
+                    if (totalNegativeAmount < 0) {
+                      categoryData[selectedNegativeOffsetBucket] = {
+                        ...categoryData[selectedNegativeOffsetBucket],
+                        total: categoryData[selectedNegativeOffsetBucket].total + totalNegativeAmount // Adding negative = subtracting
+                      };
+                    }
+                  }
+
+                  // Calculate grand total excluding negative buckets from calculation
+                  const grandTotal = Object.entries(categoryData)
+                    .filter(([category, data]) => {
+                      // Exclude negative buckets that are not the offset bucket
+                      const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
+                      const isNegative = numTotal < 0;
+                      const isOffsetBucket = category === selectedNegativeOffsetBucket;
+                      
+                      // Include the bucket if it's not negative OR if it's the offset bucket
+                      return !isNegative || isOffsetBucket;
+                    })
+                    .reduce((sum, [category, data]) => {
+                      const numTotal = typeof data.total === 'number' ? 
+                        data.total : parseFloat(data.total) || 0;
                       return sum + numTotal;
                     }, 0);
 
-                  // Get latest closing balance with type safety - FIXING THE BUG
+                  // Get latest closing balance with type safety
                   const latestTransaction = transactions.length > 0 
                     ? transactions.reduce((latest, transaction) => {
                         return (latest.id > transaction.id) ? latest : transaction;
@@ -1650,11 +1705,35 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                       {/* Display each category's total */}
                       {displayCategories.map((category, index) => {
                         const data = categoryData[category];
+                        const rawData = rawCategoryData[category];
                         const numTotal = typeof data.total === 'number' ? 
                           data.total : parseFloat(data.total) || 0;
-                        const percentage = grandTotal !== 0 ? 
-                          (numTotal / grandTotal) * 100 : 0;
+                        const rawTotal = typeof rawData?.total === 'number' ? 
+                          rawData.total : parseFloat(rawData?.total) || 0;
+                        
+                        // Calculate percentage based on categories that are included in sum
+                        const totalForPercentage = Object.entries(categoryData)
+                          .filter(([cat, catData]) => {
+                            const catTotal = typeof catData.total === 'number' ? catData.total : parseFloat(catData.total) || 0;
+                            const isNegative = catTotal < 0;
+                            const isOffsetBucket = cat === selectedNegativeOffsetBucket;
+                            return !isNegative || isOffsetBucket;
+                          })
+                          .reduce((sum, [cat, catData]) => {
+                            const catTotal = typeof catData.total === 'number' ? catData.total : parseFloat(catData.total) || 0;
+                            return sum + catTotal;
+                          }, 0);
+
+                        // Check if this bucket is included in the sum calculation
+                        const isIncludedInSum = numTotal >= 0 || category === selectedNegativeOffsetBucket;
+                        const percentage = isIncludedInSum && totalForPercentage !== 0 ? 
+                          (numTotal / totalForPercentage) * 100 : 0;
+                        
                         const color = getCategoryColor(category, index);
+                        
+                        // Check if this category has been affected by offsetting
+                        const isOffsetBucket = category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && rawTotal !== numTotal;
+                        const isExcludedNegative = rawTotal < 0 && category !== selectedNegativeOffsetBucket && selectedNegativeOffsetBucket;
                           
                         return (
                           <div 
@@ -1690,58 +1769,85 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                               top: 0,
                               left: 0,
                               right: 0,
-                              height: '4px', // Reduced from 6px
+                              height: '4px',
                               background: `linear-gradient(90deg, ${color.bg}, ${color.bg}dd)`,
                               borderRadius: '12px 12px 0 0',
                             }}/>
                             
-                            {/* Drag handle */}
-                            <div style={{ 
-                              position: 'absolute',
-                              top: '12px',
-                              right: '12px',
-                              padding: '4px',
-                              borderRadius: '6px',
-                              color: color.bg,
-                              cursor: 'move',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              </svg>
-                            </div>
+                            {/* UPDATED: "Was:" tag on the left */}
+                            {isOffsetBucket && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '8px',
+                                left: '8px',
+                                fontSize: '9px', 
+                                color: '#64748b', 
+                                backgroundColor: '#f1f5f9',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                border: '1px solid #e2e8f0',
+                                fontStyle: 'italic',
+                                zIndex: 1
+                              }}>
+                                Was: {rawTotal >= 0 ? `$${formatNumber(rawTotal)}` : `-$${formatNumber(Math.abs(rawTotal))}`}
+                              </div>
+                            )}
                             
+                            {/* UPDATED: Right-side indicators without "Was:" tag */}
+                            {(isOffsetBucket || isExcludedNegative) && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                padding: '2px 6px',
+                                backgroundColor: isOffsetBucket ? '#f0f9ff' : '#fef3c7',
+                                color: isOffsetBucket ? '#0369a1' : '#d97706',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                border: `1px solid ${isOffsetBucket ? '#93c5fd' : '#fcd34d'}`,
+                                zIndex: 1
+                              }}>
+                                {isOffsetBucket ? 'Offset Bucket' : 'Excluded'}
+                              </div>
+                            )}
+                            
+                            {/* UPDATED: Category name without left margin */}
                             <div style={{ 
-                              fontSize: '15px', // Reduced from 16px
+                              fontSize: '15px',
                               fontWeight: '600',
                               color: '#475569',
-                              marginBottom: '8px', // Reduced from 12px
-                              marginTop: '12px', // Reduced from 16px
+                              marginBottom: '8px',
+                              marginTop: '12px'  // Removed marginLeft
                             }}>
                               {category}
                             </div>
                             
+                            {/* UPDATED: Amount without left margin */}
                             <div style={{ 
-                              fontSize: '26px', // Reduced from 32px
+                              fontSize: '26px',
                               fontWeight: '700',
                               color: numTotal >= 0 ? '#059669' : '#dc2626',
                               lineHeight: '1',
-                              marginBottom: '12px', // Reduced from 16px
+                              marginBottom: '12px'  // Removed marginLeft
                             }}>
                               {numTotal >= 0 
                                 ? `$${formatNumber(numTotal)}` 
                                 : `-$${formatNumber(Math.abs(numTotal))}`}
                             </div>
                             
+                            {/* UPDATED: Bottom section without left margin */}
                             <div style={{ 
                               display: 'flex',
                               justifyContent: 'space-between',
-                              fontSize: '12px', // Reduced from 13px
-                              color: '#64748b',
+                              fontSize: '12px',
+                              color: '#64748b'  // Removed marginLeft
                             }}>
                               <span style={{ fontWeight: '500' }}>
-                                {percentage.toFixed(1)}% of total
+                                {isIncludedInSum 
+                                  ? `${percentage.toFixed(1)}% of total`
+                                  : 'Excluded from total'
+                                }
                               </span>
                               <span>
                                 {data.count} item{data.count !== 1 ? 's' : ''}
@@ -1785,8 +1891,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             }}>
               {(() => {
                 try {
-                  // Calculate again to ensure we have fresh values in this scope
-                  const categoryTotal = Object.values(transactions.reduce((acc, transaction) => {
+                  // Calculate category total with new offsetting approach
+                  const rawCategoryTotals = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
                     const amount = typeof transaction.amount === 'number' ? 
                       transaction.amount : parseFloat(transaction.amount) || 0;
@@ -1797,10 +1903,37 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     acc[category] += amount;
                     
                     return acc;
-                  }, {})).reduce((sum, amount) => {
-                    const numAmount = typeof amount === 'number' ? 
-                      amount : parseFloat(amount) || 0;
-                    return sum + numAmount;
+                  }, {});
+
+                  // Apply the new offsetting logic for balance summary
+                  let adjustedTotals = { ...rawCategoryTotals };
+                  
+                  if (selectedNegativeOffsetBucket && adjustedTotals[selectedNegativeOffsetBucket] !== undefined) {
+                    // Find negative buckets and sum them
+                    const negativeBuckets = Object.entries(rawCategoryTotals).filter(([category, total]) => {
+                      return total < 0 && category !== selectedNegativeOffsetBucket;
+                    });
+
+                    const totalNegativeAmount = negativeBuckets.reduce((sum, [_, total]) => sum + total, 0);
+                    
+                    // Deduct negative amounts from offset bucket
+                    if (totalNegativeAmount < 0) {
+                      adjustedTotals[selectedNegativeOffsetBucket] = adjustedTotals[selectedNegativeOffsetBucket] + totalNegativeAmount;
+                    }
+                  }
+
+                  // Calculate total excluding negative buckets (except offset bucket)
+                  const categoryTotal = Object.entries(adjustedTotals).reduce((sum, [category, total]) => {
+                    const numAmount = typeof total === 'number' ? total : parseFloat(total) || 0;
+                    
+                    // Include bucket if it's not negative OR if it's the offset bucket
+                    const isNegative = numAmount < 0;
+                    const isOffsetBucket = category === selectedNegativeOffsetBucket;
+                    
+                    if (!isNegative || isOffsetBucket) {
+                      return sum + numAmount;
+                    }
+                    return sum;
                   }, 0);
                 
                   // Get latest closing balance with type safety - FIXING THE BUG
@@ -2152,7 +2285,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             padding: '24px',
             borderRadius: '12px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            width: '400px',
+            width: '500px',
             maxWidth: '90%',
             maxHeight: '80vh',
             overflowY: 'auto'
@@ -2214,7 +2347,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 padding: '16px',
                 backgroundColor: '#f9fafb',
                 borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                border: '1px solid #e5e7eb',
+                marginBottom: '16px'
               }}>
                 <label style={{ 
                   display: 'flex', 
@@ -2251,6 +2385,77 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     </div>
                   </div>
                 </label>
+              </div>
+            </div>
+            
+            {/* Negative Bucket Offsetting Settings */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                margin: '0 0 16px 0', 
+                color: '#374151',
+                fontSize: '16px',
+                fontWeight: '500'
+              }}>
+                Negative Bucket Offsetting
+              </h3>
+              
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#f0f9ff',
+                borderRadius: '8px',
+                border: '1px solid #bae6fd',
+                marginBottom: '12px'
+              }}>
+                <div style={{ 
+                  fontSize: '14px',
+                  color: '#0369a1',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Selected Offset Bucket
+                </div>
+                <div style={{ 
+                  fontSize: '13px',
+                  color: '#0284c7',
+                  lineHeight: '1.4',
+                  marginBottom: '12px'
+                }}>
+                  When buckets go negative, they remain visible but are excluded from the Categories Sum calculation. Their negative amounts are deducted from your selected offset bucket to keep totals balanced.
+                </div>
+                
+                <select
+                  value={selectedNegativeOffsetBucket}
+                  onChange={(e) => handleNegativeOffsetBucketChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    color: '#374151'
+                  }}
+                >
+                  <option value="">No offset bucket selected</option>
+                  {availableCategories.map(category => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                
+                {selectedNegativeOffsetBucket && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px',
+                    backgroundColor: '#dcfce7',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    color: '#15803d'
+                  }}>
+                    ✓ Negative amounts will be deducted from <strong>{selectedNegativeOffsetBucket}</strong>
+                  </div>
+                )}
               </div>
             </div>
             
