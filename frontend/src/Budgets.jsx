@@ -24,50 +24,8 @@ ChartJS.register(
   Legend
 );
 
-const defaultBudgets = {
-  Vehicle: 100.00,
-  Entertainment: 25.00,
-  Food: 500.00,
-  Home: 75.00,
-  Medical: 25.00,
-  "Personal Items": 107.50,
-  Travel: 50.00,
-  Other: 117.50,
-  Mortgage: 3000.00,
-  Bills: 1000.00,
-  Savings: 1000.00,
-  Gifts: 200.00,
-  Holidays: 400.00,
-};
-
-// Default order of categories
-const defaultCategoryOrder = [
-  'Vehicle', 
-  'Entertainment', 
-  'Food', 
-  'Home', 
-  'Medical', 
-  'Personal Items', 
-  'Travel', 
-  'Other',
-  'Mortgage',
-  'Bills',
-  'Savings',
-  'Gifts',
-  'Holidays'
-];
-
-// Categories for monthly spend calculation (Vehicle through Other)
-const monthlySpendCategories = [
-  'Vehicle', 
-  'Entertainment', 
-  'Food', 
-  'Home', 
-  'Medical', 
-  'Personal Items', 
-  'Travel', 
-  'Other'
-];
+// Categories for monthly spend calculation (will be populated from backend)
+let monthlySpendCategories = [];
 
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
@@ -100,32 +58,32 @@ const calculateCategorySpend = (spend, category) => {
 
 const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   const [transactions, setTransactions] = useState([]);
-  const [budgets, setBudgets] = useState(defaultBudgets);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [budgets, setBudgets] = useState({});
+  const [budgetCategories, setBudgetCategories] = useState([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth()); // 0-11 (JavaScript native)
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [categoryMappings, setCategoryMappings] = useState({});
   const [categoryOrder, setCategoryOrder] = useState(() => {
-    // Initialize from localStorage or use default
+    // Initialize from localStorage or use empty array
     const savedOrder = localStorage.getItem('categoryOrder');
-    return savedOrder ? JSON.parse(savedOrder) : defaultCategoryOrder;
+    return savedOrder ? JSON.parse(savedOrder) : [];
   });
+  const [loading, setLoading] = useState(true);
   
   // Get user labels from configuration
   const { PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
 
   const [chartData, setChartData] = useState({
-    labels: Object.keys(defaultBudgets).filter(cat => cat !== 'Mortgage'),
+    labels: [],
     datasets: [
       {
         label: 'Budget',
-        data: Object.entries(defaultBudgets)
-          .filter(([cat]) => cat !== 'Mortgage')
-          .map(([_, value]) => value),
+        data: [],
         backgroundColor: 'rgba(75, 192, 192, 0.6)',
       },
       {
         label: 'Spend',
-        data: Array(Object.keys(defaultBudgets).length - 1).fill(0),
+        data: [],
         backgroundColor: 'rgba(255, 99, 132, 0.6)',
       },
     ]
@@ -137,6 +95,36 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   
   // Reference to hold drag ghost element
   const dragGhostRef = useRef(null);
+
+  // Fetch budget categories from backend
+  useEffect(() => {
+    setLoading(true);
+    axios.get('http://localhost:5000/budget-categories')
+      .then(response => {
+        setBudgetCategories(response.data);
+        
+        // Convert to budgets object for easier access
+        const budgetsObj = {};
+        const categories = [];
+        response.data.forEach(item => {
+          budgetsObj[item.category] = item.budget;
+          categories.push(item.category);
+        });
+        setBudgets(budgetsObj);
+        
+        // Set up monthly spend categories (exclude Mortgage, Bills, Savings, Gifts, Holidays)
+        const monthlyCategories = categories.filter(cat => 
+          !['Mortgage', 'Bills', 'Savings', 'Gifts', 'Holidays'].includes(cat)
+        );
+        monthlySpendCategories = monthlyCategories;
+        
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching budget categories:', err);
+        setLoading(false);
+      });
+  }, []);
 
   // Fetch transactions
   useEffect(() => {
@@ -168,11 +156,39 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   };
 
   useEffect(() => {
-    if (transactions.length > 0) {
-    const monthlySpend = calculateMonthlySpend();
-    setChartData(createChartData(monthlySpend));
+    if (transactions.length > 0 && Object.keys(budgets).length > 0) {
+      const monthlySpend = calculateMonthlySpend();
+      setChartData(createChartData(monthlySpend));
     }
-  }, [transactions, budgets, currentMonth, currentYear, categoryMappings]);
+  }, [transactions, budgets, currentMonth, currentYear, categoryMappings, categoryOrder]);
+
+  // Update category order when budgets are loaded
+  useEffect(() => {
+    if (budgetCategories.length > 0 && categoryOrder.length === 0) {
+      const categories = budgetCategories.map(bc => bc.category);
+      const savedOrder = localStorage.getItem('categoryOrder');
+      
+      if (savedOrder) {
+        try {
+          const parsedOrder = JSON.parse(savedOrder);
+          // Validate that saved order contains valid categories
+          const validCategories = parsedOrder.filter(cat => categories.includes(cat));
+          // Add any new categories that aren't in saved order
+          const newCategories = categories.filter(cat => !validCategories.includes(cat));
+          const finalOrder = [...validCategories, ...newCategories];
+          setCategoryOrder(finalOrder);
+          localStorage.setItem('categoryOrder', JSON.stringify(finalOrder));
+        } catch (error) {
+          console.error('Error parsing saved category order:', error);
+          setCategoryOrder(categories);
+          localStorage.setItem('categoryOrder', JSON.stringify(categories));
+        }
+      } else {
+        setCategoryOrder(categories);
+        localStorage.setItem('categoryOrder', JSON.stringify(categories));
+      }
+    }
+  }, [budgetCategories, categoryOrder.length]);
 
   const calculateMonthlySpend = () => {
     const spend = {};
@@ -229,8 +245,37 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     };
   };
 
-  const handleBudgetChange = (category, value) => {
-    setBudgets(prev => ({ ...prev, [category]: parseFloat(value) }));
+  const handleBudgetChange = async (category, value) => {
+    // Find the budget category ID
+    const budgetCategory = budgetCategories.find(bc => bc.category === category);
+    if (!budgetCategory) {
+      console.error('Budget category not found:', category);
+      return;
+    }
+    
+    try {
+      const response = await axios.put(`http://localhost:5000/budget-categories/${budgetCategory.id}`, {
+        budget: parseFloat(value)
+      });
+      
+      if (response.data.success) {
+        // Update local state
+        setBudgets(prev => ({ ...prev, [category]: parseFloat(value) }));
+        
+        // Update the budgetCategories array as well
+        setBudgetCategories(prev => 
+          prev.map(bc => 
+            bc.id === budgetCategory.id 
+              ? { ...bc, budget: parseFloat(value) }
+              : bc
+          )
+        );
+      } else {
+        console.error('Failed to update budget:', response.data.error);
+      }
+    } catch (error) {
+      console.error('Error updating budget:', error);
+    }
   };
 
   const handlePrevMonth = () => {
@@ -245,18 +290,22 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   // Calculate summary data
   const calculateSummaryData = () => {
-    if (transactions.length === 0) return { monthlySpend: 0, totalSpend: 0, monthlyBudget: 0, totalBudget: 0 };
+    if (transactions.length === 0 || Object.keys(budgets).length === 0 || monthlySpendCategories.length === 0) {
+      return { monthlySpend: 0, totalSpend: 0, monthlyBudget: 0, totalBudget: 0 };
+    }
     
     const spend = calculateMonthlySpend();
     
-    // Calculate monthly spend total (Vehicle through Other)
+    // Calculate monthly spend total (exclude non-monthly categories)
     let monthlySpendTotal = 0;
     let monthlyBudgetTotal = 0;
     
     monthlySpendCategories.forEach(category => {
-      // Use helper function for consistent calculation
-      monthlySpendTotal += Math.abs(calculateCategorySpend(spend, category));
-      monthlyBudgetTotal += budgets[category] || 0;
+      if (budgets[category] !== undefined) {
+        // Use helper function for consistent calculation
+        monthlySpendTotal += Math.abs(calculateCategorySpend(spend, category));
+        monthlyBudgetTotal += parseFloat(budgets[category]) || 0;
+      }
     });
     
     // Calculate total spend (all categories including Mortgage)
@@ -264,17 +313,19 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     let totalBudgetAmount = 0;
     
     categoryOrder.forEach(category => {
-      if (category === 'Mortgage') {
-        totalSpendAmount += 3000;
-      } else {
-        totalSpendAmount += Math.abs(calculateCategorySpend(spend, category));
+      if (budgets[category] !== undefined) {
+        if (category === 'Mortgage') {
+          totalSpendAmount += 3000;
+        } else {
+          totalSpendAmount += Math.abs(calculateCategorySpend(spend, category));
+        }
+        totalBudgetAmount += parseFloat(budgets[category]) || 0;
       }
-      totalBudgetAmount += budgets[category] || 0;
     });
     
     return {
       monthlySpend: monthlySpendTotal,
-      totalSpend: totalSpendAmount, // No need to negate since we want positive numbers
+      totalSpend: totalSpendAmount,
       monthlyBudget: monthlyBudgetTotal,
       totalBudget: totalBudgetAmount
     };
@@ -511,8 +562,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           const categoryIndex = element.index;
           const category = chartData.labels[categoryIndex];
           
-          // Call the navigation function with category, month, and year
-          onChartClick(category, currentMonth, currentYear);
+          // Call the navigation function with category, month (convert to 1-12), and year
+          onChartClick(category, currentMonth + 1, currentYear);
         }
       }
     }
@@ -548,6 +599,16 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       setEditingBudget(null);
     }
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div style={{ padding: '15px', fontFamily: 'Arial, sans-serif', textAlign: 'center' }}>
+        <h2 className="section-title">Monthly Expenditure</h2>
+        <div style={{ padding: '50px' }}>Loading budget data...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '15px', fontFamily: 'Arial, sans-serif' }}>

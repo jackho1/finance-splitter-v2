@@ -33,3 +33,4 @@ prompt.txt
 *.log
 *.sql
 *.sqlite
+*.code-workspace

@@ -59,6 +59,7 @@ app.get('/transactions', async (req, res) => {
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
     const query = `SELECT ${fields} FROM shared_transactions ${whereClause}`;
+    
     const { rows } = await pool.query(query, values);
 
     res.json(rows);
@@ -291,7 +292,7 @@ app.post('/transactions', async (req, res) => {
     
     // Build query for inserting the new transaction
     const fields = Object.keys(validFields);
-    const placeholders = fields.map((_, index) => `$${index + 1}`);
+    const placeholders = fields.map((field, index) => `$${index + 1}`);
     const values = Object.values(validFields);
     
     const query = `
@@ -340,7 +341,11 @@ app.get('/labels', async (req, res) => {
 // GET /category-mappings - returns mappings between bank_category and category
 app.get('/category-mappings', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT bank_category, category FROM category_mapping');
+    const { rows } = await pool.query(`
+      SELECT cm.bank_category, bc.category 
+      FROM category_mapping cm
+      JOIN budget_category bc ON cm.category = bc.id
+    `);
     
     // Convert the rows to a mapping object for easier consumption by the frontend
     const mappings = {};
@@ -352,6 +357,61 @@ app.get('/category-mappings', async (req, res) => {
   } catch (err) {
     console.error('Error fetching category mappings:', err);
     res.status(500).send('Server error');
+  }
+});
+
+// GET /budget-categories - returns all budget categories with their budgets
+app.get('/budget-categories', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, category, budget FROM budget_category ORDER BY category');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching budget categories:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+// PUT /budget-categories/:id - updates a budget category's budget amount
+app.put('/budget-categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { budget } = req.body;
+    
+    // Validate budget is a number
+    if (budget === undefined || budget === null || isNaN(parseFloat(budget))) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Budget amount is required and must be a valid number' 
+      });
+    }
+    
+    const budgetValue = parseFloat(budget);
+    
+    // Update the budget amount
+    const { rows } = await pool.query(
+      'UPDATE budget_category SET budget = $1 WHERE id = $2 RETURNING id, category, budget',
+      [budgetValue, id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Budget category not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Budget updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating budget category:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
   }
 });
 
@@ -1079,6 +1139,292 @@ app.post('/offset-transactions/split', async (req, res) => {
     });
   } finally {
     client.release();
+  }
+});
+
+// ===== PERSONAL SETTINGS AND AUTO DISTRIBUTION ENDPOINTS =====
+
+/**
+ * GET /personal-settings/:userId - Get user's personal settings
+ */
+app.get('/personal-settings/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const query = 'SELECT * FROM personal_settings WHERE user_id = $1';
+    const { rows } = await pool.query(query, [userId]);
+    
+    if (rows.length === 0) {
+      // Return default settings if none exist
+      return res.json({
+        success: true,
+        data: {
+          user_id: userId,
+          hide_zero_balance_buckets: false,
+          enable_negative_offset_bucket: false,
+          selected_negative_offset_bucket: null,
+          category_order: [],
+          auto_distribution_enabled: false,
+          last_auto_distribution_month: null
+        }
+      });
+    }
+    
+    // Parse JSON fields back to objects/arrays
+    const settings = rows[0];
+    if (settings.category_order && typeof settings.category_order === 'string') {
+      try {
+        settings.category_order = JSON.parse(settings.category_order);
+      } catch (error) {
+        console.error('Error parsing category_order JSON:', error);
+        settings.category_order = [];
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (err) {
+    console.error('Error fetching personal settings:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * PUT /personal-settings/:userId - Update user's personal settings
+ */
+app.put('/personal-settings/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = [
+      'hide_zero_balance_buckets',
+      'enable_negative_offset_bucket', 
+      'selected_negative_offset_bucket',
+      'category_order',
+      'auto_distribution_enabled',
+      'last_auto_distribution_month'
+    ];
+    
+    const validUpdates = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        validUpdates[key] = value;
+      }
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    // Check if settings exist for this user
+    const checkQuery = 'SELECT id FROM personal_settings WHERE user_id = $1';
+    const checkResult = await pool.query(checkQuery, [userId]);
+    
+    let query, values;
+    
+    if (checkResult.rows.length === 0) {
+      // Insert new settings
+      const fields = ['user_id', ...Object.keys(validUpdates)];
+      const placeholders = fields.map((field, index) => `$${index + 1}`);
+      values = [userId, ...Object.values(validUpdates)];
+      
+      query = `
+        INSERT INTO personal_settings (${fields.join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+    } else {
+      // Update existing settings
+      const setClause = Object.entries(validUpdates).map(
+        ([key, _], index) => `${key} = $${index + 1}`
+      ).join(', ');
+      
+      values = [...Object.values(validUpdates), userId];
+      query = `
+        UPDATE personal_settings 
+        SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $${values.length} 
+        RETURNING *
+      `;
+    }
+    
+    const { rows } = await pool.query(query, values);
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Settings updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating personal settings:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * GET /auto-distribution-rules/:userId - Get user's auto distribution rules
+ */
+app.get('/auto-distribution-rules/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const query = 'SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id';
+    const { rows } = await pool.query(query, [userId]);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (err) {
+    console.error('Error fetching auto distribution rules:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * POST /auto-distribution-rules - Create a new auto distribution rule
+ */
+app.post('/auto-distribution-rules', async (req, res) => {
+  try {
+    const { user_id, rule_name, amount, source_bucket, dest_bucket } = req.body;
+    
+    if (!user_id || !rule_name) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID and rule name are required' 
+      });
+    }
+    
+    const query = `
+      INSERT INTO auto_distribution_rules (user_id, rule_name, amount, source_bucket, dest_bucket)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const { rows } = await pool.query(query, [user_id, rule_name, amount, source_bucket, dest_bucket]);
+    
+    res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: 'Auto distribution rule created successfully'
+    });
+  } catch (err) {
+    console.error('Error creating auto distribution rule:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * PUT /auto-distribution-rules/:id - Update an auto distribution rule
+ */
+app.put('/auto-distribution-rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = ['rule_name', 'amount', 'source_bucket', 'dest_bucket'];
+    
+    const validUpdates = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        validUpdates[key] = value;
+      }
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    const setClause = Object.entries(validUpdates).map(
+      ([key, _], index) => `${key} = $${index + 1}`
+    ).join(', ');
+    
+    const values = [...Object.values(validUpdates), id];
+    const query = `
+      UPDATE auto_distribution_rules 
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $${values.length} 
+      RETURNING *
+    `;
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Auto distribution rule not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Auto distribution rule updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating auto distribution rule:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * DELETE /auto-distribution-rules/:id - Delete an auto distribution rule
+ */
+app.delete('/auto-distribution-rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = 'DELETE FROM auto_distribution_rules WHERE id = $1 RETURNING *';
+    const { rows } = await pool.query(query, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Auto distribution rule not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Auto distribution rule deleted successfully'
+    });
+  } catch (err) {
+    console.error('Error deleting auto distribution rule:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
   }
 });
 

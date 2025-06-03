@@ -100,6 +100,53 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [isDistributing, setIsDistributing] = useState(false);
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
   
+  // Add user ID constant for database operations
+  const userId = 'default';
+  
+  // Database API functions for auto distribution rules
+  const loadAutoDistributionRules = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/auto-distribution-rules/${userId}`);
+      if (response.data.success) {
+        const rules = response.data.data.map(rule => ({
+          id: rule.id,
+          name: rule.rule_name,
+          amount: rule.amount,
+          sourceBucket: rule.source_bucket,
+          destBucket: rule.dest_bucket
+        }));
+        setAutoDistributionRules(rules);
+      }
+    } catch (error) {
+      console.error('Error loading auto distribution rules:', error);
+    }
+  };
+
+  const savePersonalSettings = async (settingsUpdate) => {
+    try {
+      await axios.put(`http://localhost:5000/personal-settings/${userId}`, settingsUpdate);
+    } catch (error) {
+      console.error('Error saving personal settings:', error);
+    }
+  };
+
+  const loadPersonalSettings = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/personal-settings/${userId}`);
+      if (response.data.success) {
+        const settings = response.data.data;
+        setHideZeroBalanceBuckets(settings.hide_zero_balance_buckets || false);
+        setEnableNegativeOffsetBucket(settings.enable_negative_offset_bucket || false);
+        setSelectedNegativeOffsetBucket(settings.selected_negative_offset_bucket || '');
+        setCategoryOrder(settings.category_order || []);
+        setAutoDistributionEnabled(settings.auto_distribution_enabled || false);
+        setLastAutoDistributionMonth(settings.last_auto_distribution_month || '');
+      }
+    } catch (error) {
+      console.error('Error loading personal settings:', error);
+    }
+  };
+  
   // Key for localStorage
   const CATEGORY_ORDER_KEY = 'personal_categories_order';
   const SETTINGS_KEY = 'personal_transactions_settings';
@@ -272,7 +319,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       // Update the last distribution month
       const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
       setLastAutoDistributionMonth(currentMonthKey);
-      localStorage.setItem(LAST_DISTRIBUTION_KEY, currentMonthKey);
+      savePersonalSettings({ last_auto_distribution_month: currentMonthKey });
       
       // Refresh transactions
       const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
@@ -371,7 +418,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         ];
         
         setCategoryOrder(updatedOrder);
-        localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(updatedOrder));
+        savePersonalSettings({ category_order: updatedOrder });
       } else if (existingOrder.length > 0 && categoryOrder.length === 0) {
         // Set the category order if it's empty but we have a saved order
         setCategoryOrder(existingOrder);
@@ -427,6 +474,16 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       .catch(err => {
         console.error('Error fetching personal categories:', err);
       });
+  }, []);
+
+  // Load auto distribution rules from database on mount
+  useEffect(() => {
+    loadAutoDistributionRules();
+  }, []);
+
+  // Load personal settings from database on mount
+  useEffect(() => {
+    loadPersonalSettings();
   }, []);
 
   // Close filter dropdown when clicking outside
@@ -1157,8 +1214,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     setDraggedCategory(null);
     setIsDragging(false);
     
-    // Persist the new order to localStorage
-    localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(categoryOrder));
+    // Persist the new order to database
+    savePersonalSettings({ category_order: categoryOrder });
     
     // Optional: Show a subtle notification that order was saved
     const notification = document.createElement('div');
@@ -1204,6 +1261,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       const defaultOrder = Object.keys(categoryData).sort();
       setCategoryOrder(defaultOrder);
+      savePersonalSettings({ category_order: defaultOrder });
       
       // Show notification
       const notification = document.createElement('div');
@@ -1412,90 +1470,89 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
   };
 
-  // Handle settings change
+  // Handle settings change - database version
   const handleHideZeroBalanceBucketsChange = (checked) => {
     setHideZeroBalanceBuckets(checked);
-    saveSettings({ 
-      hideZeroBalanceBuckets: checked, 
-      enableNegativeOffsetBucket: enableNegativeOffsetBucket,
-      selectedNegativeOffsetBucket: selectedNegativeOffsetBucket 
-    });
+    savePersonalSettings({ hide_zero_balance_buckets: checked });
   };
 
-  // Handle negative offset bucket checkbox change
+  // Handle negative offset bucket checkbox change - database version
   const handleEnableNegativeOffsetBucketChange = (checked) => {
     setEnableNegativeOffsetBucket(checked);
-    saveSettings({
-      hideZeroBalanceBuckets: hideZeroBalanceBuckets,
-      enableNegativeOffsetBucket: checked,
-      selectedNegativeOffsetBucket: checked ? selectedNegativeOffsetBucket : ''
+    const updatedSelectedBucket = checked ? selectedNegativeOffsetBucket : '';
+    setSelectedNegativeOffsetBucket(updatedSelectedBucket);
+    savePersonalSettings({ 
+      enable_negative_offset_bucket: checked,
+      selected_negative_offset_bucket: updatedSelectedBucket
     });
   };
 
-  // Handle negative offset bucket selection change
+  // Handle negative offset bucket selection change - database version
   const handleNegativeOffsetBucketChange = (bucketName) => {
     setSelectedNegativeOffsetBucket(bucketName);
-    saveSettings({ 
-      hideZeroBalanceBuckets: hideZeroBalanceBuckets, 
-      enableNegativeOffsetBucket: enableNegativeOffsetBucket,
-      selectedNegativeOffsetBucket: bucketName 
-    });
+    savePersonalSettings({ selected_negative_offset_bucket: bucketName });
   };
 
-  // Handle auto distribution settings changes - properly saves state
+  // Handle auto distribution settings changes - database version
   const handleAutoDistributionEnabledChange = (checked) => {
     setAutoDistributionEnabled(checked);
-    // Save immediately
-    const settings = {
-      enabled: checked,
-      rules: autoDistributionRules
-    };
-    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+    savePersonalSettings({ auto_distribution_enabled: checked });
   };
 
   // Add a new distribution rule
-  const addDistributionRule = () => {
-    const newRule = {
-      id: Date.now(),
-      name: `Rule ${autoDistributionRules.length + 1}`,
-      amount: '',
-      sourceBucket: '',
-      destBucket: ''
-    };
-    const updatedRules = [...autoDistributionRules, newRule];
-    setAutoDistributionRules(updatedRules);
-    // Save immediately
-    const settings = {
-      enabled: autoDistributionEnabled,
-      rules: updatedRules
-    };
-    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  const addDistributionRule = async () => {
+    try {
+      const newRule = {
+        user_id: userId,
+        rule_name: `Rule ${autoDistributionRules.length + 1}`,
+        amount: 0,
+        source_bucket: '',
+        dest_bucket: ''
+      };
+      
+      const response = await axios.post('http://localhost:5000/auto-distribution-rules', newRule);
+      if (response.data.success) {
+        await loadAutoDistributionRules(); // Reload to get updated rules with database IDs
+      }
+    } catch (error) {
+      console.error('Error adding distribution rule:', error);
+    }
   };
 
   // Remove a distribution rule
-  const removeDistributionRule = (id) => {
-    const updatedRules = autoDistributionRules.filter(rule => rule.id !== id);
-    setAutoDistributionRules(updatedRules);
-    // Save immediately
-    const settings = {
-      enabled: autoDistributionEnabled,
-      rules: updatedRules
-    };
-    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  const removeDistributionRule = async (id) => {
+    try {
+      const response = await axios.delete(`http://localhost:5000/auto-distribution-rules/${id}`);
+      if (response.data.success) {
+        await loadAutoDistributionRules(); // Reload to get updated rules
+      }
+    } catch (error) {
+      console.error('Error removing distribution rule:', error);
+    }
   };
 
   // Update a distribution rule
-  const updateDistributionRule = (id, field, value) => {
-    const updatedRules = autoDistributionRules.map(rule => 
-      rule.id === id ? { ...rule, [field]: value } : rule
-    );
-    setAutoDistributionRules(updatedRules);
-    // Save immediately
-    const settings = {
-      enabled: autoDistributionEnabled,
-      rules: updatedRules
-    };
-    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
+  const updateDistributionRule = async (id, field, value) => {
+    try {
+      // Convert frontend field names to database field names
+      const fieldMap = {
+        name: 'rule_name',
+        amount: 'amount',
+        sourceBucket: 'source_bucket',
+        destBucket: 'dest_bucket'
+      };
+      
+      const dbField = fieldMap[field] || field;
+      const response = await axios.put(`http://localhost:5000/auto-distribution-rules/${id}`, {
+        [dbField]: value
+      });
+      
+      if (response.data.success) {
+        await loadAutoDistributionRules(); // Reload to get updated rules
+      }
+    } catch (error) {
+      console.error('Error updating distribution rule:', error);
+    }
   };
 
   return (
@@ -1910,7 +1967,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       });
-                    } catch (error) {
+    } catch (error) {
                       console.error("Error formatting number:", error);
                       return "0.00";
                     }
@@ -2114,7 +2171,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       })}
                     </>
                   );
-                } catch (error) {
+    } catch (error) {
                   console.error("Error rendering category data:", error);
                   return (
                     <div style={{ 
@@ -2212,7 +2269,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       });
-                    } catch (error) {
+    } catch (error) {
                       console.error("Error formatting number:", error);
                       return "0.00";
                     }

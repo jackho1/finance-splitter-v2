@@ -176,3 +176,12 @@
 
 - [ ] **Replicate auto monthly distribution rules to offset page**:
    - low priority as not really required atm
+
+- [ ] **Abstract Dupe Front-End Functionality**:
+   - Functionality such as CSS, error handling, common components/utilities (help text, loading spinner), hooks directory, reusable UI components, API services, and notification systen can be abstracted into separate files for ease of use and readability.
+
+- [x] **Fix hardcoded budget amounts**:
+   - Currently hardcoded into this code. Fix this so a new table is created to store these budget amounts. New backend api endpoints would be required to update these values from the front-end by the user. 
+
+- [ ] **Different method to fetch closing balance**:
+   - Research pocketsmitsh API to find a way to fetch closing balance. Issue with current approach is it fetches closing balance from the latest transaction. The issue with this approach is that the closing balance may have changed since then and there are no new recent transactions to update this field e.g., in the event of a pending transaction being fulfilled fully. 
