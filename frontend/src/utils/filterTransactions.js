@@ -13,8 +13,13 @@ export const filterByDate = (transactions, dateFilter) => {
   
   if (dateFilter.startDate) {
     const startDate = new Date(dateFilter.startDate);
+    // Set to start of day to ensure we include the entire start date
+    startDate.setHours(0, 0, 0, 0);
+    
     filtered = filtered.filter(transaction => {
       const transactionDate = new Date(transaction.date);
+      // Set transaction date to start of day for fair comparison
+      transactionDate.setHours(0, 0, 0, 0);
       return transactionDate >= startDate;
     });
   }
@@ -30,6 +35,7 @@ export const filterByDate = (transactions, dateFilter) => {
   
   return filtered;
 };
+
 
 /**
  * Filter transactions based on bank categories

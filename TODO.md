@@ -46,7 +46,7 @@
    - Add the ability to click on a total spend column under Budgets and see what spend amount equates to that number.
 
 - [x] **Fix Bank Category Filtering**:
-   - When double-clicking on a bank_category cell, display all valid values, not just values valid in the past 30 days. Need to fetch from category_mapping table.
+   - When double-clicking on a bank_category cell, display all valid values, not just values valid in the past 30 days. Need to fetch from shared_category table.
 
 - [x] **Fix Total Calculations**:
    - Total calculation does not dynamically update based on table filters on the webpage.
@@ -57,10 +57,10 @@
 - [WIP] **Create Transaction Data**:
    - Add the ability to create transactional data.
 
-- [ ] **Add Jacks Buckets**:
+- [x] **Add Jacks Buckets**:
    - Add the Jacks Buckets section to this webpage.
 
-- [ ] **Add Total Balance**:
+- [x] **Add Total Balance**:
    - Add the Total Balance section to this webpage.
 
 - [x] **Sort By Fix**:
@@ -81,13 +81,13 @@
 - [x] **Test running shared_bank_feed.py**:
    - Run this python file to test.
 
-- [ ] **Rename category_mapping table to shared_category**:
+- [x] **Rename category_mapping table to shared_category**:
    - Rename it.
 
 - [ ] **Add foreign key to shared_transaction table for bank_category**:
-   - Link this to category_mapping table to ensure uniqueness. Errors exist today as it is currently not a F.K.
+   - Link this to shared_category table to ensure uniqueness. Errors exist today as it is currently not a F.K.
 
-- [ ] **Test Add Transaction Functionality**:
+- [x] **Test Add Transaction Functionality**:
    - Fully test this functionality and amend it if it is broken
 
 - [x] **Split Transactions Functionality**:
@@ -108,7 +108,7 @@
 - [ ] **Rename Tabbings**:
    - Transactions, Monthly Budget, Personal Savings
 
-- [ ] **Start Date Incorrect**:
+- [x] **Start Date Incorrect**:
    - When filtering transactions with start date, it does not include transactions on that exact start date itself.
 
 - [ ] **Consider alterantive to userConfig.js file**:
@@ -171,7 +171,7 @@
 - [x] **Add Settings option**:
    - Add a settings option to enable/disable various functionality
 
-- [ ] **Reduce whitespacing in settings**:
+- [x] **Reduce whitespacing in settings**:
    - Reduce whitespacing for each settings option
 
 - [ ] **Replicate auto monthly distribution rules to offset page**:
@@ -185,3 +185,9 @@
 
 - [ ] **Different method to fetch closing balance**:
    - Research pocketsmitsh API to find a way to fetch closing balance. Issue with current approach is it fetches closing balance from the latest transaction. The issue with this approach is that the closing balance may have changed since then and there are no new recent transactions to update this field e.g., in the event of a pending transaction being fulfilled fully. 
+
+- [ ] **Fix category order column**:
+   - Currently hardcoded to specific values. If users decide to change category name, this value is not updated in this column name under personal_settings table. 
+
+- [x] **Ensure manual label change is not overwritten automatically**:
+   - In the shared transactions webpage, ensure any manual label change is not overwritten by any automated scripts. 

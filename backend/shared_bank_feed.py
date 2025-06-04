@@ -68,7 +68,7 @@ def auto_label_bank_category(bank_category):
     
     Returns the appropriate person label from PEOPLE list or None for shared/unlabeled categories.
     """
-    no_label_categories = ["Dining", "Travel"]
+    no_label_categories = ["Dining", "Transfers", ]
     first_person_categories = ["Personal Items", "Personal Care", "Hobbies", 
                               "Entertainment/Recreation", "Vehicle", "Gym", "Fuel"]
     
@@ -83,12 +83,37 @@ def auto_label_bank_category(bank_category):
 def categorize_and_label_transactions(transactions):
     categorized_transactions = []
     
+    # First, get all existing transaction IDs and their labels from the database
+    existing_labels = {}
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        # Query to get existing transaction IDs and their labels
+        cursor.execute("SELECT id, label FROM shared_transactions")
+        for row in cursor.fetchall():
+            existing_labels[row[0]] = row[1]
+            
+    except Exception as e:
+        print(f"Error fetching existing transactions: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+    
     for tx in transactions:
         description = tx['description']
         amount = tx['amount']
         bank_category = tx['bank_category']
-
-        label = auto_label_bank_category(bank_category)
+        
+        # Check if this transaction already exists and has a label
+        if tx['id'] in existing_labels and existing_labels[tx['id']] is not None:
+            # Use the existing label
+            label = existing_labels[tx['id']]
+        else:
+            # Auto-assign a label for new transactions
+            label = auto_label_bank_category(bank_category)
 
         categorized_transactions.append({
             'id': tx['id'],

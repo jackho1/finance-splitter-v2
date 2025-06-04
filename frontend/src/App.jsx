@@ -113,6 +113,20 @@ const App = () => {
   // Add screen grab state
   const [isScreenGrabOpen, setIsScreenGrabOpen] = useState(false);
   const screenGrabRef = useRef(null);
+  
+  // Add split transaction states
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [transactionToSplit, setTransactionToSplit] = useState(null);
+  const [splitTransactions, setSplitTransactions] = useState([{
+    description: '',
+    amount: '',
+    bank_category: '',
+    label: ''
+  }]);
+  const [isSavingSplit, setIsSavingSplit] = useState(false);
+  
+  // Add expanded row state
+  const [expandedRow, setExpandedRow] = useState(null);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -1273,13 +1287,151 @@ const App = () => {
               </tr>
             ) : (
               filteredTransactions.map(transaction => (
-                <tr key={transaction.id} className={getRowLabelClass(transaction.label)}>
-                  <td>{renderCell(transaction, 'date')}</td>
-                  <td>{renderCell(transaction, 'description')}</td>
-                  <td>{renderCell(transaction, 'amount')}</td>
-                  <td>{renderCell(transaction, 'bank_category')}</td>
-                  <td>{renderCell(transaction, 'label')}</td>
-                </tr>
+                <React.Fragment key={transaction.id}>
+                  <tr className={getRowLabelClass(transaction.label)} style={{ 
+                    backgroundColor: expandedRow === transaction.id ? '#f8fafc' : undefined,
+                    transition: 'background-color 0.2s'
+                  }}>
+                    <td>{renderCell(transaction, 'date')}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                          {renderCell(transaction, 'description')}
+                          {transaction.has_split && (
+                            <span 
+                              title="This transaction has been split"
+                              style={{ 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '2px 6px',
+                                backgroundColor: '#e0f2fe',
+                                color: '#0369a1',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                border: '1px solid #bae6fd'
+                              }}
+                            >
+                              <svg 
+                                width="12" 
+                                height="12" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2"
+                                style={{ marginRight: '4px' }}
+                              >
+                                <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                              </svg>
+                              Split
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f0f0f0';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="Click to expand transaction options"
+                        >
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2"
+                            style={{ 
+                              transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s',
+                              opacity: 0.7
+                            }}
+                          >
+                            <path d="M6 9l6 6 6-6"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td>{renderCell(transaction, 'amount')}</td>
+                    <td>{renderCell(transaction, 'bank_category')}</td>
+                    <td>{renderCell(transaction, 'label')}</td>
+                  </tr>
+                  {expandedRow === transaction.id && (
+                    <tr>
+                      <td colSpan="5" style={{ 
+                        padding: '0',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ 
+                          padding: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div style={{ display: 'flex', gap: '20px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSplitTransaction(transaction);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s'
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                              </svg>
+                              Split Transaction
+                            </button>
+                            {/* Add other actions here if needed */}
+                          </div>
+                          {transaction.has_split && (
+                            <span style={{ 
+                              fontSize: '14px',
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                              </svg>
+                              This transaction has been split
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))
             )}
           </tbody>
@@ -1475,6 +1627,349 @@ const App = () => {
         </div>
       </div>
     );
+  };
+
+  // Split Transaction Handlers
+  const handleSplitTransaction = (transaction) => {
+    setTransactionToSplit(transaction);
+    setSplitTransactions([{
+      description: '',
+      amount: '',
+      bank_category: transaction.bank_category || '',
+      label: transaction.label || ''
+    }]);
+    setIsSplitting(true);
+  };
+
+  const handleSplitChange = (index, field, value) => {
+    setSplitTransactions(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  const addSplitTransaction = () => {
+    setSplitTransactions(prev => [...prev, {
+      description: '',
+      amount: '',
+      bank_category: transactionToSplit ? transactionToSplit.bank_category : '',
+      label: transactionToSplit ? transactionToSplit.label : ''
+    }]);
+  };
+
+  const removeSplitTransaction = (index) => {
+    if (splitTransactions.length > 1) {
+      setSplitTransactions(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const calculateRemainingAmount = () => {
+    if (!transactionToSplit) return 0;
+    
+    const originalAmount = parseFloat(transactionToSplit.amount) || 0;
+    const splitTotal = splitTransactions.reduce((sum, split) => {
+      return sum + (parseFloat(split.amount) || 0);
+    }, 0);
+    
+    return originalAmount - splitTotal;
+  };
+
+  const handleSaveSplit = async () => {
+    // Validate split transactions
+    const hasEmptyFields = splitTransactions.some(split => 
+      !split.description || !split.amount || split.amount === ''
+    );
+    
+    if (hasEmptyFields) {
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Please fill out all required fields for each split transaction';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+      return;
+    }
+    
+    const totalSplitAmount = splitTransactions.reduce((sum, split) => 
+      sum + parseFloat(split.amount || 0), 0
+    );
+    
+    const originalAmount = parseFloat(transactionToSplit.amount) || 0;
+    
+    // For negative transactions (expenses), ensure splits are also negative
+    if (originalAmount < 0) {
+      const hasPositiveSplit = splitTransactions.some(split => parseFloat(split.amount) > 0);
+      if (hasPositiveSplit) {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'For expense transactions, all split amounts must be negative';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+        return;
+      }
+    }
+    
+    // For positive transactions (income), ensure splits are also positive
+    if (originalAmount > 0) {
+      const hasNegativeSplit = splitTransactions.some(split => parseFloat(split.amount) < 0);
+      if (hasNegativeSplit) {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'For income transactions, all split amounts must be positive';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+        return;
+      }
+    }
+    
+    // Check if the total split amount exceeds the original (considering sign)
+    if (originalAmount < 0) {
+      // For expenses: total splits should not be less than original (more negative)
+      if (totalSplitAmount < originalAmount) {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Split amounts exceed the original transaction amount';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+        return;
+      }
+    } else {
+      // For income: total splits should not exceed original
+      if (totalSplitAmount > originalAmount) {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Split amounts exceed the original transaction amount';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+        return;
+      }
+    }
+    
+    try {
+      setIsSavingSplit(true);
+      
+      // Prepare the data for the API
+      const splitData = {
+        originalTransactionId: transactionToSplit.id,
+        remainingAmount: calculateRemainingAmount(),
+        splitTransactions: splitTransactions.map(split => ({
+          date: transactionToSplit.date, // Use the same date as original
+          description: split.description,
+          amount: parseFloat(split.amount),
+          bank_category: split.bank_category,
+          label: split.label
+        }))
+      };
+      
+      const response = await axios.post('http://localhost:5000/transactions/split', splitData);
+      
+      if (response.data.success) {
+        // Refresh the transactions
+        const transactionsResponse = await axios.get('http://localhost:5000/transactions');
+        setTransactions(transactionsResponse.data);
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Transaction split successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #c3e6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Close the modal
+        setIsSplitting(false);
+        setTransactionToSplit(null);
+        setSplitTransactions([{
+          description: '',
+          amount: '',
+          bank_category: '',
+          label: ''
+        }]);
+        
+        // Reapply filters to new data
+        let filtered = applyFilters(transactionsResponse.data, {
+          dateFilter,
+          bankCategoryFilter,
+          labelFilter,
+          sortBy: filters.sortBy
+        });
+
+        // Apply additional category filtering if needed
+        if (categoryFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            const category = getCategoryFromMapping(transaction.bank_category);
+            
+            // Check if we're filtering for null and the transaction category is null
+            if (categoryFilter.includes(null) && category === null) {
+              return true;
+            }
+            
+            // Check if the transaction category is in the filter
+            return categoryFilter.includes(category);
+          });
+        }
+        
+        // Store the filtered transactions without month filter for the chart
+        setAllFilteredTransactions(filtered);
+        
+        // Apply month filtering for the table view ONLY if no date filter is active
+        let tableFiltered = filtered;
+        
+        // Only apply month filter if there's no date range filter
+        if (!dateFilter.startDate && !dateFilter.endDate) {
+          tableFiltered = filtered.filter(transaction => {
+            const date = new Date(transaction.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          });
+        }
+
+        setFilteredTransactions(tableFiltered);
+
+        // Calculate totals using the utility function
+        const newTotals = calculateTotals(tableFiltered, labels);
+        setTotals(newTotals);
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = response.data.error || 'Failed to split transaction';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error splitting transaction:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Failed to split transaction. Please try again.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsSavingSplit(false);
+    }
+  };
+
+  const cancelSplit = () => {
+    setIsSplitting(false);
+    setTransactionToSplit(null);
+    setSplitTransactions([{
+      description: '',
+      amount: '',
+      bank_category: '',
+      label: ''
+    }]);
   };
 
   return (
@@ -2726,6 +3221,336 @@ const App = () => {
               </button>
             </div>
             {renderMobileTransactions()}
+          </div>
+        </div>
+      )}
+      
+      {/* Split Transaction Modal */}
+      {isSplitting && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            width: '700px',
+            maxWidth: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: '#333' }}>Split Transaction</h2>
+              <button
+                onClick={cancelSplit}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            
+            {transactionToSplit && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+                  <h3 style={{ fontSize: '16px', margin: '0 0 10px 0', color: '#495057' }}>Original Transaction</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Date:</div>
+                      <div style={{ fontSize: '14px', color: '#212529' }}>
+                        {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Amount:</div>
+                      <div style={{ 
+                        fontSize: '16px', 
+                        fontWeight: 'bold',
+                        color: parseFloat(transactionToSplit.amount) < 0 ? '#dc3545' : '#28a745'
+                      }}>
+                        {parseFloat(transactionToSplit.amount) < 0 
+                          ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
+                          : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
+                      </div>
+                    </div>
+                    <div style={{ gridColumn: '1 / span 2' }}>
+                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Description:</div>
+                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.description}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Bank Category:</div>
+                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.bank_category || 'None'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Label:</div>
+                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.label || 'None'}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  fontSize: '14px', 
+                  marginBottom: '20px', 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  padding: '10px 15px',
+                  backgroundColor: '#e9f7ef',
+                  borderRadius: '6px',
+                  border: '1px solid #d1e7dd',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <span style={{ fontWeight: 'bold', marginRight: '5px' }}>Remaining Amount:</span>
+                    <span style={{ 
+                      fontWeight: 'bold',
+                      color: calculateRemainingAmount() < 0 ? '#dc3545' : '#28a745'
+                    }}>
+                      {calculateRemainingAmount() < 0 
+                        ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}` 
+                        : `$${calculateRemainingAmount().toFixed(2)}`}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#198754' }}>
+                    {calculateRemainingAmount() === 0 
+                      ? 'Transaction fully split!' 
+                      : 'This amount will remain on the original transaction'}
+                  </div>
+                </div>
+                
+                <h3 style={{ fontSize: '16px', margin: '20px 0 15px 0', color: '#495057' }}>Split Into</h3>
+                
+                {splitTransactions.map((split, index) => (
+                  <div key={index} style={{ 
+                    marginBottom: '15px', 
+                    padding: '15px', 
+                    backgroundColor: '#f8f9fa', 
+                    borderRadius: '6px',
+                    border: '1px solid #e9ecef',
+                    position: 'relative'
+                  }}>
+                    {splitTransactions.length > 1 && (
+                      <button
+                        onClick={() => removeSplitTransaction(index)}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          padding: '2px',
+                          backgroundColor: '#f8d7da',
+                          border: 'none',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          width: '20px',
+                          height: '20px'
+                        }}
+                        title="Remove split"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                    )}
+                    
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
+                        Description
+                      </label>
+                      <input
+                        type="text"
+                        value={split.description}
+                        onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          border: '1px solid #ced4da',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                        placeholder="Enter split description"
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
+                          Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={split.amount}
+                          onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid #ced4da',
+                            fontSize: '14px',
+                            boxSizing: 'border-box'
+                          }}
+                          placeholder={parseFloat(transactionToSplit.amount) < 0 ? "Negative amount" : "Positive amount"}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
+                          Bank Category
+                        </label>
+                        <select
+                          value={split.bank_category}
+                          onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid #ced4da',
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <option value="">Select a category</option>
+                          {availableBankCategories
+                            .filter(category => category !== null && category !== undefined && category !== '')
+                            .map(category => (
+                              <option key={category} value={category}>{category}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
+                          Label
+                        </label>
+                        <select
+                          value={split.label}
+                          onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid #ced4da',
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <option value="">Select a label</option>
+                          {labels.map(label => (
+                            <option key={label} value={label}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                  <button
+                    onClick={addSplitTransaction}
+                    style={{
+                      backgroundColor: '#e9ecef',
+                      color: '#495057',
+                      border: '1px dashed #adb5bd',
+                      borderRadius: '4px',
+                      padding: '8px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Another Split
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                  <button
+                    onClick={cancelSplit}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#f8f9fa',
+                      color: '#495057',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSplit}
+                    disabled={isSavingSplit}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: isSavingSplit ? '#6c757d' : '#0d6efd',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isSavingSplit ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {isSavingSplit ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                          style={{ animation: 'spin 1s linear infinite' }}>
+                          <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                          <polyline points="17 21 17 13 7 13 7 21" />
+                          <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                        Save Splits
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
