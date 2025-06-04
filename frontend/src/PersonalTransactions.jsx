@@ -138,7 +138,25 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         setHideZeroBalanceBuckets(settings.hide_zero_balance_buckets || false);
         setEnableNegativeOffsetBucket(settings.enable_negative_offset_bucket || false);
         setSelectedNegativeOffsetBucket(settings.selected_negative_offset_bucket || '');
-        setCategoryOrder(settings.category_order || []);
+        
+        // Make sure category_order is handled correctly if it's a string
+        if (settings.category_order) {
+          if (typeof settings.category_order === 'string') {
+            try {
+              setCategoryOrder(JSON.parse(settings.category_order));
+            } catch (error) {
+              console.error('Error parsing category_order from settings:', error);
+              setCategoryOrder([]);
+            }
+          } else if (Array.isArray(settings.category_order)) {
+            setCategoryOrder(settings.category_order);
+          } else {
+            setCategoryOrder([]);
+          }
+        } else {
+          setCategoryOrder([]);
+        }
+        
         setAutoDistributionEnabled(settings.auto_distribution_enabled || false);
         setLastAutoDistributionMonth(settings.last_auto_distribution_month || '');
       }
@@ -1451,25 +1469,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }]);
   };
 
-  // Function to save settings to localStorage
-  const saveSettings = (newSettings) => {
-    const settings = {
-      hideZeroBalanceBuckets: newSettings.hideZeroBalanceBuckets,
-      enableNegativeOffsetBucket: newSettings.enableNegativeOffsetBucket,
-      selectedNegativeOffsetBucket: newSettings.selectedNegativeOffsetBucket
-    };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  };
-
-  // Updated function to save auto distribution settings - now properly saves
-  const saveAutoDistributionSettings = () => {
-    const settings = {
-      enabled: autoDistributionEnabled,
-      rules: autoDistributionRules
-    };
-    localStorage.setItem(AUTO_DISTRIBUTION_KEY, JSON.stringify(settings));
-  };
-
   // Handle settings change - database version
   const handleHideZeroBalanceBucketsChange = (checked) => {
     setHideZeroBalanceBuckets(checked);
@@ -1652,22 +1651,23 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             }}>
               <h2 className="section-title">Savings Buckets</h2>
               
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
-                <HelpText isVisible={helpTextVisible}>
-                  Drag category cards to reorder them. Your arrangement will be saved automatically. 
-                </HelpText>
-              </div>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'flex-start',
+                maxWidth: 'calc(100% - 360px)' // Leave space for buttons
+              }}>
+                <div style={{ marginBottom: '6px', alignSelf: 'flex-start' }}>
+                  <HelpText isVisible={helpTextVisible}>
+                    Drag category cards to reorder them. Your arrangement will be saved automatically. 
+                  </HelpText>
+                </div>
 
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
-                <HelpText isVisible={helpTextVisible}>
-                  Double-click on any category to show all transactions for that category across all months.
-                </HelpText>
-              </div>
-
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
-                <HelpText isVisible={helpTextVisible}>
-                  When buckets go negative, they're excluded from Categories Sum calculation and their negative amounts are deducted from your selected offset bucket.
-                </HelpText>
+                <div style={{ marginBottom: '6px', alignSelf: 'flex-start' }}>
+                  <HelpText isVisible={helpTextVisible}>
+                    Double-click on any category to show all transactions for that category across all months.
+                  </HelpText>
+                </div>
               </div>
               
               {/* Settings and Reset Button Container */}
@@ -2579,7 +2579,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </HelpText>
       </div>
       
-      {/* Settings Modal - includes negative offset bucket selection and multiple auto distributions */}
+      {/* Settings Modal - CONDENSED VERSION with reduced padding/whitespace */}
       {showSettings && (
         <div style={{
           position: 'fixed',
@@ -2595,7 +2595,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }}>
           <div style={{
             backgroundColor: 'white',
-            padding: '24px',
+            padding: '16px', // Reduced from 24px
             borderRadius: '12px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
             width: '600px',
@@ -2607,9 +2607,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               display: 'flex', 
               justifyContent: 'space-between', 
               alignItems: 'center',
-              marginBottom: '20px',
+              marginBottom: '12px', // Reduced from 20px
               borderBottom: '1px solid #e5e7eb',
-              paddingBottom: '16px'
+              paddingBottom: '8px' // Reduced from 16px
             }}>
               <h2 style={{ 
                 margin: 0, 
@@ -2647,9 +2647,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             </div>
             
             {/* Auto Monthly Distribution Section */}
-            <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '16px' }}> {/* Reduced from 24px */}
               <h3 style={{ 
-                margin: '0 0 16px 0', 
+                margin: '0 0 8px 0', // Reduced from 16px
                 color: '#374151',
                 fontSize: '16px',
                 fontWeight: '500'
@@ -2658,24 +2658,24 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </h3>
               
               <div style={{
-                padding: '16px',
+                padding: '12px', // Reduced from 16px
                 backgroundColor: '#e0f2fe',
                 borderRadius: '8px',
                 border: '1px solid #7dd3fc',
-                marginBottom: '16px'
+                marginBottom: '12px' // Reduced from 16px
               }}>
                 <label style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start',
                   cursor: 'pointer',
-                  gap: '12px'
+                  gap: '8px' // Reduced from 12px
                 }}>
                   <input 
                     type="checkbox" 
                     checked={autoDistributionEnabled}
                     onChange={(e) => handleAutoDistributionEnabledChange(e.target.checked)}
                     style={{ 
-                      marginTop: '2px',
+                      marginTop: '1px', // Reduced from 2px
                       cursor: 'pointer',
                       width: '16px',
                       height: '16px'
@@ -2686,14 +2686,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       fontSize: '14px',
                       color: '#0369a1',
                       fontWeight: '500',
-                      marginBottom: '4px'
+                      marginBottom: '2px' // Reduced from 4px
                     }}>
                       Enable auto monthly budget distribution
                     </div>
                     <div style={{ 
                       fontSize: '13px',
                       color: '#0284c7',
-                      lineHeight: '1.4'
+                      lineHeight: '1.3' // Reduced from 1.4
                     }}>
                       Automatically transfer funds between buckets when a new month begins (triggered on first login of the month).
                     </div>
@@ -2707,13 +2707,13 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '12px'
+                    marginBottom: '8px' // Reduced from 12px
                   }}>
                     <h4 style={{ margin: 0, fontSize: '14px', color: '#374151' }}>Distribution Rules</h4>
                     <button
                       onClick={addDistributionRule}
                       style={{
-                        padding: '6px 12px',
+                        padding: '4px 10px', // Reduced from 6px 12px
                         backgroundColor: '#3b82f6',
                         color: 'white',
                         border: 'none',
@@ -2730,7 +2730,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   
                   {autoDistributionRules.length === 0 ? (
                     <div style={{
-                      padding: '20px',
+                      padding: '14px', // Reduced from 20px
                       backgroundColor: '#f9fafb',
                       borderRadius: '6px',
                       textAlign: 'center',
@@ -2740,20 +2740,20 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       No distribution rules configured. Click "Add Rule" to create one.
                     </div>
                   ) : (
-                    <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}> {/* Reduced height from 350px */}
                       {autoDistributionRules.map((rule, index) => (
                         <div key={rule.id} style={{
-                          padding: '12px',
+                          padding: '10px', // Reduced from 12px
                           backgroundColor: '#f9fafb',
                           borderRadius: '6px',
-                          marginBottom: '10px',
+                          marginBottom: '8px', // Reduced from 10px
                           border: '1px solid #e5e7eb'
                         }}>
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            marginBottom: '10px'
+                            marginBottom: '6px' // Reduced from 10px
                           }}>
                             <input
                               type="text"
@@ -2764,14 +2764,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                               placeholder={`Rule ${index + 1}`}
                               style={{
                                 flex: '1',
-                                padding: '4px 8px',
-                                height: '30px',
+                                padding: '3px 6px', // Reduced from 4px 8px
+                                height: '26px', // Reduced from 30px
                                 border: '1px solid #e5e7eb',
                                 borderRadius: '4px',
                                 fontSize: '13px',
                                 fontWeight: '400',
                                 color: '#374151',
-                                maxWidth: '75%'
+                                maxWidth: '40%' // Reduced from 75% to make the rule name input shorter
                               }}
                             />
                             <button
@@ -2781,7 +2781,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 border: 'none',
                                 cursor: 'pointer',
                                 color: '#ef4444',
-                                padding: '3px',
+                                padding: '2px', // Reduced from 3px
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2806,17 +2806,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr 1fr',
-                            gap: '8px',
+                            gap: '6px', // Reduced from 8px
                             alignItems: 'start'
                           }}>
                             {/* Amount column */}
                             <div>
                               <label style={{ 
-                                fontSize: '12px',
+                                fontSize: '11px', // Reduced from 12px
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
-                                marginBottom: '2px'
+                                marginBottom: '1px' // Reduced from 2px
                               }}>Amount ($)</label>
                               <input
                                 type="number"
@@ -2826,8 +2826,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 }}
                                 style={{
                                   width: '100%',
-                                  height: '36px',
-                                  padding: '6px 12px',
+                                  height: '30px', // Reduced from 36px
+                                  padding: '4px 8px', // Reduced from 6px 12px
                                   borderRadius: '4px',
                                   border: '1px solid #d1d5db',
                                   fontSize: '13px',
@@ -2846,11 +2846,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                             {/* From Bucket column */}
                             <div>
                               <label style={{ 
-                                fontSize: '12px',
+                                fontSize: '11px', // Reduced from 12px
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
-                                marginBottom: '2px'
+                                marginBottom: '1px' // Reduced from 2px
                               }}>From Bucket</label>
                               <select
                                 value={rule.sourceBucket}
@@ -2859,8 +2859,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 }}
                                 style={{
                                   width: '100%',
-                                  height: '36px',
-                                  padding: '6px 12px',
+                                  height: '30px', // Reduced from 36px
+                                  padding: '4px 8px', // Reduced from 6px 12px
                                   borderRadius: '4px',
                                   border: '1px solid #d1d5db',
                                   fontSize: '13px',
@@ -2888,11 +2888,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                             {/* To Bucket column */}
                             <div>
                               <label style={{ 
-                                fontSize: '12px',
+                                fontSize: '11px', // Reduced from 12px
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
-                                marginBottom: '2px'
+                                marginBottom: '1px' // Reduced from 2px
                               }}>To Bucket</label>
                               <select
                                 value={rule.destBucket}
@@ -2901,8 +2901,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 }}
                                 style={{
                                   width: '100%',
-                                  height: '36px',
-                                  padding: '6px 12px',
+                                  height: '30px', // Reduced from 36px
+                                  padding: '4px 8px', // Reduced from 6px 12px
                                   borderRadius: '4px',
                                   border: '1px solid #d1d5db',
                                   fontSize: '13px',
@@ -2930,8 +2930,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         
                           {rule.amount && rule.sourceBucket && rule.destBucket && (
                             <div style={{
-                              marginTop: '6px',
-                              padding: '4px 8px',
+                              marginTop: '4px', // Reduced from 6px
+                              padding: '3px 6px', // Reduced from 4px 8px
                               backgroundColor: '#e0f2fe',
                               borderRadius: '4px',
                               fontSize: '11px',
@@ -2949,9 +2949,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               )}
             </div>
             
-            <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '16px' }}> {/* Reduced from 24px */}
               <h3 style={{ 
-                margin: '0 0 16px 0', 
+                margin: '0 0 8px 0', // Reduced from 16px
                 color: '#374151',
                 fontSize: '16px',
                 fontWeight: '500'
@@ -2960,24 +2960,24 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </h3>
               
               <div style={{
-                padding: '16px',
+                padding: '12px', // Reduced from 16px
                 backgroundColor: '#f9fafb',
                 borderRadius: '8px',
                 border: '1px solid #e5e7eb',
-                marginBottom: '16px'
+                marginBottom: '12px' // Reduced from 16px
               }}>
                 <label style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start',
                   cursor: 'pointer',
-                  gap: '12px'
+                  gap: '8px' // Reduced from 12px
                 }}>
                   <input 
                     type="checkbox" 
                     checked={hideZeroBalanceBuckets}
                     onChange={(e) => handleHideZeroBalanceBucketsChange(e.target.checked)}
                     style={{ 
-                      marginTop: '2px',
+                      marginTop: '1px', // Reduced from 2px
                       cursor: 'pointer',
                       width: '16px',
                       height: '16px'
@@ -2988,14 +2988,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       fontSize: '14px',
                       color: '#374151',
                       fontWeight: '500',
-                      marginBottom: '4px'
+                      marginBottom: '2px' // Reduced from 4px
                     }}>
                       Hide buckets with zero balance
                     </div>
                     <div style={{ 
                       fontSize: '13px',
                       color: '#6b7280',
-                      lineHeight: '1.4'
+                      lineHeight: '1.3' // Reduced from 1.4
                     }}>
                       When enabled, savings buckets with a balance of zero (or less than 1 cent) will be hidden from the display.
                     </div>
@@ -3005,9 +3005,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             </div>
             
             {/* Updated Negative Bucket Offsetting Settings */}
-            <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '16px' }}> {/* Reduced from 24px */}
               <h3 style={{ 
-                margin: '0 0 16px 0', 
+                margin: '0 0 8px 0', // Reduced from 16px
                 color: '#374151',
                 fontSize: '16px',
                 fontWeight: '500'
@@ -3016,24 +3016,24 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </h3>
               
               <div style={{
-                padding: '16px',
+                padding: '12px', // Reduced from 16px
                 backgroundColor: '#f0f9ff',
                 borderRadius: '8px',
                 border: '1px solid #bae6fd',
-                marginBottom: '12px'
+                marginBottom: '8px' // Reduced from 12px
               }}>
                 <label style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start',
                   cursor: 'pointer',
-                  gap: '12px'
+                  gap: '8px' // Reduced from 12px
                 }}>
                   <input 
                     type="checkbox" 
                     checked={enableNegativeOffsetBucket}
                     onChange={(e) => handleEnableNegativeOffsetBucketChange(e.target.checked)}
                     style={{ 
-                      marginTop: '2px',
+                      marginTop: '1px', // Reduced from 2px
                       cursor: 'pointer',
                       width: '16px',
                       height: '16px'
@@ -3044,14 +3044,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       fontSize: '14px',
                       color: '#0369a1',
                       fontWeight: '500',
-                      marginBottom: '4px'
+                      marginBottom: '2px' // Reduced from 4px
                     }}>
                       Enable negative bucket offsetting
                     </div>
                     <div style={{ 
                       fontSize: '13px',
                       color: '#0284c7',
-                      lineHeight: '1.4'
+                      lineHeight: '1.3' // Reduced from 1.4
                     }}>
                       When buckets go negative, they remain visible but are excluded from the Categories Sum calculation. Their negative amounts are deducted from your selected offset bucket to keep totals balanced.
                     </div>
@@ -3059,13 +3059,13 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 </label>
                 
                 {enableNegativeOffsetBucket && (
-                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #bae6fd' }}>
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #bae6fd' }}> {/* Reduced margins from 16px */}
                     <label style={{ 
                       display: 'block',
                       fontSize: '13px',
                       color: '#0369a1',
                       fontWeight: '500',
-                      marginBottom: '6px'
+                      marginBottom: '4px' // Reduced from 6px
                     }}>
                       Select Offset Bucket
                     </label>
@@ -3074,7 +3074,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       onChange={(e) => handleNegativeOffsetBucketChange(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '10px',
+                        padding: '8px', // Reduced from 10px
                         borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         fontSize: '14px',
@@ -3092,8 +3092,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     
                     {selectedNegativeOffsetBucket && (
                       <div style={{
-                        marginTop: '8px',
-                        padding: '8px',
+                        marginTop: '6px', // Reduced from 8px
+                        padding: '6px', // Reduced from 8px
                         backgroundColor: '#dcfce7',
                         borderRadius: '4px',
                         fontSize: '12px',
@@ -3111,14 +3111,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               display: 'flex', 
               justifyContent: 'flex-end', 
               gap: '12px',
-              marginTop: '24px',
-              paddingTop: '16px',
+              marginTop: '16px', // Reduced from 24px
+              paddingTop: '12px', // Reduced from 16px
               borderTop: '1px solid #e5e7eb'
             }}>
               <button
                 onClick={() => setShowSettings(false)}
                 style={{
-                  padding: '10px 20px',
+                  padding: '8px 16px', // Reduced from 10px 20px
                   backgroundColor: '#4f46e5',
                   color: 'white',
                   border: 'none',

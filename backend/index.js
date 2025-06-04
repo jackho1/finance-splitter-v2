@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json()); // For parsing JSON request bodies
 
 // Allowed columns for filtering and field selection
-const allowedFields = ['id', 'date', 'description', 'amount', 'category', 'bank_category', 'label'];
+const allowedFields = ['id', 'date', 'description', 'amount', 'category', 'bank_category', 'label', 'has_split', 'split_from_id'];
 
 /**
  * GET /transactions - Retrieves transactions with optional filters
@@ -342,9 +342,9 @@ app.get('/labels', async (req, res) => {
 app.get('/category-mappings', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT cm.bank_category, bc.category 
-      FROM category_mapping cm
-      JOIN budget_category bc ON cm.category = bc.id
+      SELECT sc.bank_category, bc.category 
+      FROM shared_category sc
+      JOIN budget_category bc ON sc.category = bc.id
     `);
     
     // Convert the rows to a mapping object for easier consumption by the frontend
@@ -415,10 +415,10 @@ app.put('/budget-categories/:id', async (req, res) => {
   }
 });
 
-// GET /bank-categories - returns all bank categories from the category_mapping table
+// GET /bank-categories - returns all bank categories from the shared_category table
 app.get('/bank-categories', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT DISTINCT bank_category FROM category_mapping');
+    const { rows } = await pool.query('SELECT DISTINCT bank_category FROM shared_category');
     const bankCategories = rows.map(row => row.bank_category).filter(category => category !== null);
     
     // Add null as a valid option
@@ -1215,7 +1215,12 @@ app.put('/personal-settings/:userId', async (req, res) => {
     const validUpdates = {};
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
-        validUpdates[key] = value;
+        // Special handling for category_order to ensure it's properly stored as JSON
+        if (key === 'category_order' && Array.isArray(value)) {
+          validUpdates[key] = JSON.stringify(value);
+        } else {
+          validUpdates[key] = value;
+        }
       }
     }
     
@@ -1260,9 +1265,20 @@ app.put('/personal-settings/:userId', async (req, res) => {
     
     const { rows } = await pool.query(query, values);
     
+    // Parse category_order back to an array for the response
+    const responseData = rows[0];
+    if (responseData.category_order && typeof responseData.category_order === 'string') {
+      try {
+        responseData.category_order = JSON.parse(responseData.category_order);
+      } catch (error) {
+        console.error('Error parsing category_order for response:', error);
+        responseData.category_order = [];
+      }
+    }
+    
     res.json({
       success: true,
-      data: rows[0],
+      data: responseData,
       message: 'Settings updated successfully'
     });
   } catch (err) {
@@ -1425,6 +1441,171 @@ app.delete('/auto-distribution-rules/:id', async (req, res) => {
       error: 'Server error', 
       details: err.message 
     });
+  }
+});
+
+/**
+ * POST /transactions/split - Splits a shared transaction into multiple transactions
+ */
+app.post('/transactions/split', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
+    
+    // Validate input data
+    if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
+      });
+    }
+    
+    // Get the original transaction to verify it exists and extract data
+    const originalTransactionResult = await client.query(
+      'SELECT * FROM shared_transactions WHERE id = $1',
+      [originalTransactionId]
+    );
+    
+    if (originalTransactionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Original transaction not found'
+      });
+    }
+    
+    const originalTransaction = originalTransactionResult.rows[0];
+    const originalAmount = parseFloat(originalTransaction.amount);
+    const isNegative = originalAmount < 0; // Track if original amount is negative
+    
+    // Validate split transactions
+    let splitTotal = 0;
+    const errors = [];
+    
+    for (const split of splitTransactions) {
+      if (!split.description || !split.amount) {
+        errors.push('All split transactions must have a description and amount');
+      }
+      
+      const splitAmount = parseFloat(split.amount);
+      if (isNaN(splitAmount)) {
+        errors.push('All split amounts must be valid numbers');
+      } else {
+        splitTotal += Math.abs(splitAmount);
+      }
+    }
+    
+    if (errors.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        errors: errors
+      });
+    }
+    
+    // Check that split total doesn't exceed original amount
+    if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Split amounts exceed the original transaction amount'
+      });
+    }
+    
+    // Before we start, let's try to update the trigger function if needed
+    try {
+      await client.query(`
+        CREATE OR REPLACE FUNCTION set_transaction_category()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.category := (
+            SELECT category 
+            FROM shared_category 
+            WHERE bank_category = NEW.bank_category
+          );
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+    } catch (triggerErr) {
+      console.log('Note: Could not update trigger function:', triggerErr.message);
+      // Continue anyway, this is just a precaution
+    }
+    
+    // Check if has_split column exists, add it if it doesn't
+    try {
+      const checkColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'shared_transactions' 
+        AND column_name = 'has_split'
+      `);
+      
+      if (checkColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE shared_transactions 
+          ADD COLUMN has_split BOOLEAN DEFAULT FALSE
+        `);
+      }
+      
+      const checkSplitFromColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'shared_transactions' 
+        AND column_name = 'split_from_id'
+      `);
+      
+      if (checkSplitFromColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE shared_transactions 
+          ADD COLUMN split_from_id INTEGER REFERENCES shared_transactions(id) ON DELETE SET NULL
+        `);
+      }
+    } catch (columnErr) {
+      console.log('Note: Could not check/add columns:', columnErr.message);
+      // Continue anyway, this is just a precaution
+    }
+    
+    // Update the original transaction with the remaining amount and mark it as split
+    await client.query(
+      'UPDATE shared_transactions SET amount = $1, has_split = TRUE WHERE id = $2',
+      [remainingAmount, originalTransactionId]
+    );
+    
+    // Insert split transactions
+    for (const splitTransaction of splitTransactions) {
+      await client.query(
+        'INSERT INTO shared_transactions (date, description, amount, bank_category, label, split_from_id) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          originalTransaction.date,
+          splitTransaction.description,
+          splitTransaction.amount,
+          splitTransaction.bank_category || originalTransaction.bank_category,
+          splitTransaction.label || originalTransaction.label,
+          originalTransactionId
+        ]
+      );
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Transaction split successfully'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error splitting transaction:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to split transaction',
+      details: err.message
+    });
+  } finally {
+    client.release();
   }
 });
 
