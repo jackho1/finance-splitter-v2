@@ -4,6 +4,7 @@ import axios from 'axios';
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
 
 // Add help-text styles for consistent appearance (copied from Budgets.jsx)
 const helpTextStyle = `
@@ -765,96 +766,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   };
 
   const handleUpdate = async (transactionId, field) => {
-    try {
-      // Validate category field before submission
-      if (field === 'category' && (!editValue || editValue === '')) {
-        // Show friendly notification for missing category
-        const notification = document.createElement('div');
-        notification.textContent = 'Please select a category before saving. Category is required.';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#fff3cd';
-        notification.style.color = '#856404';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #ffeaa7';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 4000);
-        
-        // Don't reset edit state so user can continue editing
-        return;
-      }
-      
-      setIsUpdating(true);
-      
-      const response = await axios.put(`http://localhost:5000/personal-transactions/${transactionId}`, { 
-        [field]: editValue 
-      });
-      
-      if (response.data.success) {
-        const updatedTransaction = response.data.data;
-        
-        setTransactions(prevTransactions => 
-          prevTransactions.map(t => t.id === transactionId ? updatedTransaction : t)
-        );
-        
-        setFilteredTransactions(prevFiltered => 
-          prevFiltered.map(t => t.id === transactionId ? updatedTransaction : t)
-        );
-        
-        const notification = document.createElement('div');
-        notification.textContent = response.data.message || 'Transaction updated successfully!';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#d4edda';
-        notification.style.color = '#155724';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 3000);
-        
-        setEditCell(null);
-      } else {
-        const errorMessage = response.data.error || response.data.errors?.join(', ') || 'Update failed';
-        showErrorNotification(errorMessage);
-      }
-    } catch (err) {
-      console.error('Error updating transaction:', err);
-      let errorMessage = 'Failed to update transaction. Please try again.';
-      
-      if (err.response && err.response.data) {
-        // Check for foreign key constraint error specifically
-        if (err.response.data.details && err.response.data.details.includes('foreign key constraint')) {
-          errorMessage = 'Category is required. Please select a valid category from the list.';
-        } else {
-          errorMessage = err.response.data.error || 
-                         (err.response.data.errors && err.response.data.errors.join(', ')) || 
-                         errorMessage;
-        }
-      }
-      
-      showErrorNotification(errorMessage);
-    } finally {
-      setIsUpdating(false);
-      // Only reset edit cell if update was successful or a critical error occurred
-      if (field !== 'category' || editValue) {
-        setEditCell(null);
-      }
-    }
+    await optimizedHandlePersonalUpdate(
+      transactionId, 
+      field, 
+      editValue, 
+      transactions, 
+      setTransactions, 
+      filteredTransactions.length ? setFilteredTransactions : null, 
+      setEditCell, 
+      setIsUpdating,
+      showErrorNotification
+    );
   };
 
   const renderCell = (transaction, field) => {

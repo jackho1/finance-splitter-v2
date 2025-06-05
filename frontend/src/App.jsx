@@ -18,6 +18,12 @@ import {
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import { 
+  optimizedHandleUpdate, 
+  normalizeValue, 
+  valuesAreEqual, 
+  getFieldType 
+} from './utils/updateHandlers';
 import './ModernTables.css';
 
 ChartJS.register(
@@ -64,7 +70,7 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const [allFilteredTransactions, setAllFilteredTransactions] = useState([]); // New state for all months but filtered
+  const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
   const [filters, setFilters] = useState({ sortBy: 'date-desc' });
   const [totals, setTotals] = useState({});
   const [labels, setLabels] = useState([]);
@@ -659,71 +665,16 @@ const App = () => {
   };
 
   const handleUpdate = async (transactionId, field) => {
-    try {
-      // Show update indicator
-      setIsUpdating(true);
-      
-      // Send update to backend first
-      const response = await axios.put(`http://localhost:5000/transactions/${transactionId}`, { 
-        [field]: editValue 
-      });
-      
-      // Check if the update was successful
-      if (response.data.success) {
-        // Get the successfully updated transaction from server response
-        const updatedTransaction = response.data.data;
-        
-        // Update both transactions and filteredTransactions states
-        setTransactions(prevTransactions => 
-          prevTransactions.map(t => t.id === transactionId ? updatedTransaction : t)
-        );
-        
-        setFilteredTransactions(prevFiltered => 
-          prevFiltered.map(t => t.id === transactionId ? updatedTransaction : t)
-        );
-        
-        // Add temporary success notification
-        const notification = document.createElement('div');
-        notification.textContent = response.data.message || 'Transaction updated successfully!';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#d4edda';
-        notification.style.color = '#155724';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        
-        document.body.appendChild(notification);
-        
-        // Remove notification after 3 seconds
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 3000);
-      } else {
-        // Handle case where server returned error in a structured way
-        const errorMessage = response.data.error || response.data.errors?.join(', ') || 'Update failed';
-        alert(errorMessage);
-      }
-    } catch (err) {
-      console.error('Error updating transaction:', err);
-      let errorMessage = 'Failed to update transaction. Please try again.';
-      
-      // Try to extract more specific error from response if available
-      if (err.response && err.response.data) {
-        errorMessage = err.response.data.error || 
-                       (err.response.data.errors && err.response.data.errors.join(', ')) || 
-                       errorMessage;
-      }
-      
-      alert(errorMessage);
-    } finally {
-      // Hide update indicator regardless of outcome
-      setIsUpdating(false);
-      // Reset edit state
-      setEditCell(null);
-    }
+    await optimizedHandleUpdate(
+      transactionId, 
+      field, 
+      editValue, 
+      transactions, 
+      setTransactions, 
+      setFilteredTransactions, 
+      setEditCell, 
+      setIsUpdating
+    );
   };
 
   // Modernized renderCell function
