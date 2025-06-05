@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { USER_CONFIG } from './config/userConfig';
+import { valuesAreEqual } from './utils/updateHandlers';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -254,22 +255,87 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     }
     
     try {
+      // Get current budget value for comparison
+      const currentBudget = budgets[category];
+      const newBudget = parseFloat(value);
+      
+      // OPTIMIZATION: Check if the budget value has actually changed before sending request
+      if (valuesAreEqual(currentBudget, newBudget, 'number')) {
+        console.log(`🔍 No changes detected for budget category ${budgetCategory.id}: ${currentBudget} === ${newBudget} (skipping API call)`);
+        
+        // Show a subtle notification that no changes were made
+        const notification = document.createElement('div');
+        notification.textContent = 'No changes detected - budget value already matches current data';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#e3f2fd';
+        notification.style.color = '#1976d2';
+        notification.style.padding = '8px 16px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.fontSize = '14px';
+        notification.style.opacity = '0.9';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 2 seconds
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 2000);
+
+        return; // Don't make API call
+      }
+
+      console.log(`💰 Budget value changed for category ${budgetCategory.id}: ${currentBudget} -> ${newBudget} (making API call)`);
+      
       const response = await axios.put(`http://localhost:5000/budget-categories/${budgetCategory.id}`, {
-        budget: parseFloat(value)
+        budget: newBudget
       });
       
       if (response.data.success) {
         // Update local state
-        setBudgets(prev => ({ ...prev, [category]: parseFloat(value) }));
+        setBudgets(prev => ({ ...prev, [category]: newBudget }));
         
         // Update the budgetCategories array as well
         setBudgetCategories(prev => 
           prev.map(bc => 
             bc.id === budgetCategory.id 
-              ? { ...bc, budget: parseFloat(value) }
+              ? { ...bc, budget: newBudget }
               : bc
           )
         );
+        
+        // Show appropriate notification based on whether this was an optimized response
+        const notification = document.createElement('div');
+        if (response.data.optimized) {
+          notification.textContent = 'No database update required - budget already matches in database';
+          notification.style.backgroundColor = '#fff3e0';
+          notification.style.color = '#f57c00';
+        } else {
+          notification.textContent = 'Budget updated successfully!';
+          notification.style.backgroundColor = '#d4edda';
+          notification.style.color = '#155724';
+        }
+        
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 3000);
       } else {
         console.error('Failed to update budget:', response.data.error);
       }

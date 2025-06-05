@@ -31,6 +31,75 @@ app.use(express.json()); // For parsing JSON request bodies
 const allowedFields = ['id', 'date', 'description', 'amount', 'category', 'bank_category', 'label', 'has_split', 'split_from_id'];
 
 /**
+ * Helper function to normalize values for comparison
+ * Handles null, undefined, empty string normalization
+ */
+const normalizeValue = (value, fieldType = 'string') => {
+  // Handle null/undefined cases
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
+  // Handle empty string cases
+  if (value === '') {
+    return null;
+  }
+  
+  // Handle specific field types
+  switch (fieldType) {
+    case 'number':
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num;
+    case 'date':
+      if (!value) return null;
+      try {
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+      } catch (e) {
+        return null;
+      }
+    default:
+      return typeof value === 'string' ? value.trim() || null : value;
+  }
+};
+
+/**
+ * Helper function to check if values are effectively equal
+ * Takes into account null/undefined/empty string equivalence
+ */
+const valuesAreEqual = (oldValue, newValue, fieldType = 'string') => {
+  const normalizedOld = normalizeValue(oldValue, fieldType);
+  const normalizedNew = normalizeValue(newValue, fieldType);
+  
+  // Both are null/undefined/empty - considered equal
+  if (normalizedOld === null && normalizedNew === null) {
+    return true;
+  }
+  
+  // One is null, other is not - not equal
+  if ((normalizedOld === null) !== (normalizedNew === null)) {
+    return false;
+  }
+  
+  // Both have values - compare them
+  return normalizedOld === normalizedNew;
+};
+
+/**
+ * Helper function to get field type for proper comparison
+ */
+const getFieldType = (fieldName) => {
+  switch (fieldName) {
+    case 'amount':
+      return 'number';
+    case 'date':
+      return 'date';
+    default:
+      return 'string';
+  }
+};
+
+/**
  * GET /transactions - Retrieves transactions with optional filters
  */
 app.get('/transactions', async (req, res) => {
@@ -70,14 +139,14 @@ app.get('/transactions', async (req, res) => {
 });
 
 /**
- * PUT /transactions/:id - Updates a transaction by ID
+ * PUT /transactions/:id - Updates a transaction by ID (OPTIMIZED)
  */
 app.put('/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
     
-    // Validate the transaction exists first
+    // Validate the transaction exists first and get current values
     const checkResult = await pool.query('SELECT * FROM shared_transactions WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ 
@@ -86,9 +155,12 @@ app.put('/transactions/:id', async (req, res) => {
       });
     }
     
+    const currentTransaction = checkResult.rows[0];
+    
     // Process and validate field updates
     const validUpdates = {};
     const errors = [];
+    let hasChanges = false;
     
     for (const [key, value] of Object.entries(updates)) {
       // Only process allowed fields
@@ -97,19 +169,23 @@ app.put('/transactions/:id', async (req, res) => {
         continue;
       }
       
+      const fieldType = getFieldType(key);
+      let processedValue = value;
+      
       // Type validation and conversions based on field type
       switch (key) {
         case 'amount':
           // Handle empty values
           if (value === null || value === undefined || value === '') {
-            validUpdates[key] = null;
+            processedValue = null;
           } else {
             // Ensure amount is a valid number
             const numValue = parseFloat(value);
             if (isNaN(numValue)) {
               errors.push('Amount must be a valid number');
+              continue;
             } else {
-              validUpdates[key] = numValue;
+              processedValue = numValue;
             }
           }
           break;
@@ -117,35 +193,46 @@ app.put('/transactions/:id', async (req, res) => {
         case 'date':
           // Handle empty values
           if (value === null || value === undefined || value === '') {
-            validUpdates[key] = null;
+            processedValue = null;
           } else {
             // Validate date format
             try {
               const dateObj = new Date(value);
               if (isNaN(dateObj.getTime())) {
                 errors.push('Invalid date format');
+                continue;
               } else {
-                validUpdates[key] = dateObj.toISOString().split('T')[0]; // Store as YYYY-MM-DD
+                processedValue = dateObj.toISOString().split('T')[0]; // Store as YYYY-MM-DD
               }
             } catch (e) {
               errors.push('Invalid date format');
+              continue;
             }
           }
           break;
           
         case 'label':
           // Allow empty labels (null), which can be edited later
-          validUpdates[key] = value === '' ? null : value;
+          processedValue = value === '' ? null : value;
           break;
           
         default:
           // Basic validation for other fields
           if (typeof value === 'string') {
             // Convert empty strings to null for database consistency
-            validUpdates[key] = value.trim() === '' ? null : value.trim();
+            processedValue = value.trim() === '' ? null : value.trim();
           } else {
-            validUpdates[key] = value;
+            processedValue = value;
           }
+      }
+      
+      // OPTIMIZATION: Check if the value has actually changed
+      if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
+        validUpdates[key] = processedValue;
+        hasChanges = true;
+        console.log(`Field '${key}' changed: '${currentTransaction[key]}' -> '${processedValue}'`);
+      } else {
+        console.log(`Field '${key}' unchanged: '${currentTransaction[key]}' (skipping update)`);
       }
     }
     
@@ -154,6 +241,17 @@ app.put('/transactions/:id', async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         errors: errors 
+      });
+    }
+    
+    // OPTIMIZATION: If no fields actually changed, return early without database operation
+    if (!hasChanges) {
+      console.log(`No changes detected for transaction ${id}, skipping database update`);
+      return res.json({
+        success: true,
+        data: currentTransaction,
+        message: 'No changes detected - transaction not updated',
+        optimized: true // Flag to indicate this was an optimized response
       });
     }
     
@@ -173,6 +271,8 @@ app.put('/transactions/:id', async (req, res) => {
     const values = [...Object.values(validUpdates), id];
     const query = `UPDATE shared_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
     
+    console.log(`Executing database update for transaction ${id} with changes:`, validUpdates);
+    
     // Execute the update
     const { rows } = await pool.query(query, values);
     
@@ -187,7 +287,8 @@ app.put('/transactions/:id', async (req, res) => {
     res.json({
       success: true,
       data: rows[0],
-      message: 'Transaction updated successfully'
+      message: 'Transaction updated successfully',
+      changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
     console.error('Error updating transaction:', err);
@@ -198,6 +299,442 @@ app.put('/transactions/:id', async (req, res) => {
     });
   }
 });
+
+/**
+ * PUT /personal-transactions/:id - Updates a personal transaction (OPTIMIZED)
+ */
+app.put('/personal-transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = ['date', 'description', 'amount', 'category'];
+    
+    // Get current transaction for comparison
+    const checkResult = await pool.query('SELECT * FROM personal_transactions WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    const currentTransaction = checkResult.rows[0];
+    const validUpdates = {};
+    let hasChanges = false;
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        const fieldType = getFieldType(key);
+        let processedValue = value;
+        
+        // Process the value based on field type
+        if (fieldType === 'number') {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : parseFloat(value);
+        } else if (fieldType === 'date') {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : new Date(value).toISOString().split('T')[0];
+        } else {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : (typeof value === 'string' ? value.trim() || null : value);
+        }
+        
+        // OPTIMIZATION: Check if the value has actually changed
+        if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
+          validUpdates[key] = processedValue;
+          hasChanges = true;
+          console.log(`Personal transaction field '${key}' changed: '${currentTransaction[key]}' -> '${processedValue}'`);
+        }
+      }
+    }
+    
+    // OPTIMIZATION: If no fields actually changed, return early
+    if (!hasChanges) {
+      console.log(`No changes detected for personal transaction ${id}, skipping database update`);
+      return res.json({
+        success: true,
+        data: currentTransaction,
+        message: 'No changes detected - transaction not updated',
+        optimized: true
+      });
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    const setClause = Object.entries(validUpdates).map(
+      ([key, _], index) => `${key} = $${index + 1}`
+    ).join(', ');
+    
+    const values = [...Object.values(validUpdates), id];
+    const query = `UPDATE personal_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
+    
+    console.log(`Executing database update for personal transaction ${id} with changes:`, validUpdates);
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction updated successfully',
+      changedFields: Object.keys(validUpdates)
+    });
+  } catch (err) {
+    console.error('Error updating personal transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * PUT /offset-transactions/:id - Updates an offset transaction (OPTIMIZED)
+ */
+app.put('/offset-transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
+    
+    // Get current transaction for comparison
+    const checkResult = await pool.query('SELECT * FROM offset_transactions WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    const currentTransaction = checkResult.rows[0];
+    const validUpdates = {};
+    let hasChanges = false;
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        const fieldType = getFieldType(key);
+        let processedValue = value;
+        
+        // Process the value based on field type
+        if (fieldType === 'number') {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : parseFloat(value);
+        } else if (fieldType === 'date') {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : new Date(value).toISOString().split('T')[0];
+        } else {
+          processedValue = value === null || value === undefined || value === '' 
+            ? null 
+            : (typeof value === 'string' ? value.trim() || null : value);
+        }
+        
+        // OPTIMIZATION: Check if the value has actually changed
+        if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
+          validUpdates[key] = processedValue;
+          hasChanges = true;
+          console.log(`Offset transaction field '${key}' changed: '${currentTransaction[key]}' -> '${processedValue}'`);
+        }
+      }
+    }
+    
+    // OPTIMIZATION: If no fields actually changed, return early
+    if (!hasChanges) {
+      console.log(`No changes detected for offset transaction ${id}, skipping database update`);
+      return res.json({
+        success: true,
+        data: currentTransaction,
+        message: 'No changes detected - transaction not updated',
+        optimized: true
+      });
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    const setClause = Object.entries(validUpdates).map(
+      ([key, _], index) => `${key} = $${index + 1}`
+    ).join(', ');
+    
+    const values = [...Object.values(validUpdates), id];
+    const query = `UPDATE offset_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
+    
+    console.log(`Executing database update for offset transaction ${id} with changes:`, validUpdates);
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Transaction updated successfully',
+      changedFields: Object.keys(validUpdates)
+    });
+  } catch (err) {
+    console.error('Error updating offset transaction:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * PUT /budget-categories/:id - Updates a budget category's budget amount (OPTIMIZED)
+ */
+app.put('/budget-categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { budget } = req.body;
+    
+    // Validate budget is a number
+    if (budget === undefined || budget === null || isNaN(parseFloat(budget))) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Budget amount is required and must be a valid number' 
+      });
+    }
+    
+    const budgetValue = parseFloat(budget);
+    
+    // Get current budget for comparison
+    const checkResult = await pool.query('SELECT * FROM budget_category WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Budget category not found' 
+      });
+    }
+    
+    const currentBudget = checkResult.rows[0];
+    
+    // OPTIMIZATION: Check if the budget value has actually changed
+    if (valuesAreEqual(currentBudget.budget, budgetValue, 'number')) {
+      console.log(`No changes detected for budget category ${id} (${budgetValue}), skipping database update`);
+      return res.json({
+        success: true,
+        data: currentBudget,
+        message: 'No changes detected - budget not updated',
+        optimized: true
+      });
+    }
+    
+    console.log(`Budget category ${id} changed: ${currentBudget.budget} -> ${budgetValue}`);
+    
+    // Update the budget amount
+    const { rows } = await pool.query(
+      'UPDATE budget_category SET budget = $1 WHERE id = $2 RETURNING id, category, budget',
+      [budgetValue, id]
+    );
+    
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Budget updated successfully'
+    });
+  } catch (err) {
+    console.error('Error updating budget category:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * PUT /personal-settings/:userId - Update user's personal settings (OPTIMIZED)
+ */
+app.put('/personal-settings/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updates = req.body;
+    
+    const allowedFields = [
+      'hide_zero_balance_buckets',
+      'enable_negative_offset_bucket', 
+      'selected_negative_offset_bucket',
+      'category_order',
+      'auto_distribution_enabled',
+      'last_auto_distribution_month'
+    ];
+    
+    // Check if settings exist for this user and get current values
+    const checkQuery = 'SELECT * FROM personal_settings WHERE user_id = $1';
+    const checkResult = await pool.query(checkQuery, [userId]);
+    
+    let currentSettings = null;
+    if (checkResult.rows.length > 0) {
+      currentSettings = checkResult.rows[0];
+      // Parse JSON fields for comparison
+      if (currentSettings.category_order && typeof currentSettings.category_order === 'string') {
+        try {
+          currentSettings.category_order = JSON.parse(currentSettings.category_order);
+        } catch (error) {
+          currentSettings.category_order = [];
+        }
+      }
+    }
+    
+    const validUpdates = {};
+    let hasChanges = false;
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        let processedValue = value;
+        
+        // Special handling for category_order to ensure it's properly stored as JSON
+        if (key === 'category_order' && Array.isArray(value)) {
+          processedValue = JSON.stringify(value);
+          
+          // For comparison, we need to compare the actual arrays
+          const currentArrayValue = currentSettings ? currentSettings.category_order : [];
+          if (!arraysAreEqual(currentArrayValue, value)) {
+            validUpdates[key] = processedValue;
+            hasChanges = true;
+            console.log(`Settings field '${key}' changed`);
+          }
+        } else {
+          // For other fields, do a simple comparison
+          const currentValue = currentSettings ? currentSettings[key] : null;
+          if (!valuesAreEqual(currentValue, value)) {
+            validUpdates[key] = processedValue;
+            hasChanges = true;
+            console.log(`Settings field '${key}' changed: '${currentValue}' -> '${value}'`);
+          }
+        }
+      }
+    }
+    
+    // OPTIMIZATION: If no fields actually changed, return early
+    if (!hasChanges) {
+      console.log(`No changes detected for user settings ${userId}, skipping database update`);
+      
+      let responseData = currentSettings || {
+        user_id: userId,
+        hide_zero_balance_buckets: false,
+        enable_negative_offset_bucket: false,
+        selected_negative_offset_bucket: null,
+        category_order: [],
+        auto_distribution_enabled: false,
+        last_auto_distribution_month: null
+      };
+      
+      return res.json({
+        success: true,
+        data: responseData,
+        message: 'No changes detected - settings not updated',
+        optimized: true
+      });
+    }
+    
+    if (Object.keys(validUpdates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update' 
+      });
+    }
+    
+    let query, values;
+    
+    if (checkResult.rows.length === 0) {
+      // Insert new settings
+      const fields = ['user_id', ...Object.keys(validUpdates)];
+      const placeholders = fields.map((field, index) => `$${index + 1}`);
+      values = [userId, ...Object.values(validUpdates)];
+      
+      query = `
+        INSERT INTO personal_settings (${fields.join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *
+      `;
+      
+      console.log(`Creating new personal settings for user ${userId} with:`, validUpdates);
+    } else {
+      // Update existing settings
+      const setClause = Object.entries(validUpdates).map(
+        ([key, _], index) => `${key} = $${index + 1}`
+      ).join(', ');
+      
+      values = [...Object.values(validUpdates), userId];
+      query = `
+        UPDATE personal_settings 
+        SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $${values.length} 
+        RETURNING *
+      `;
+      
+      console.log(`Updating personal settings for user ${userId} with:`, validUpdates);
+    }
+    
+    const { rows } = await pool.query(query, values);
+    
+    // Parse category_order back to an array for the response
+    const responseData = rows[0];
+    if (responseData.category_order && typeof responseData.category_order === 'string') {
+      try {
+        responseData.category_order = JSON.parse(responseData.category_order);
+      } catch (error) {
+        console.error('Error parsing category_order for response:', error);
+        responseData.category_order = [];
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: responseData,
+      message: 'Settings updated successfully',
+      changedFields: Object.keys(validUpdates)
+    });
+  } catch (err) {
+    console.error('Error updating personal settings:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * Helper function to compare arrays deeply
+ */
+const arraysAreEqual = (arr1, arr2) => {
+  if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
+  if (arr1.length !== arr2.length) return false;
+  return arr1.every((val, idx) => val === arr2[idx]);
+};
+
+// Keep all other endpoints from the original file unchanged...
 
 /**
  * POST /transactions - Creates a new transaction with auto-generated ID
@@ -371,50 +908,6 @@ app.get('/budget-categories', async (req, res) => {
   }
 });
 
-// PUT /budget-categories/:id - updates a budget category's budget amount
-app.put('/budget-categories/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { budget } = req.body;
-    
-    // Validate budget is a number
-    if (budget === undefined || budget === null || isNaN(parseFloat(budget))) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Budget amount is required and must be a valid number' 
-      });
-    }
-    
-    const budgetValue = parseFloat(budget);
-    
-    // Update the budget amount
-    const { rows } = await pool.query(
-      'UPDATE budget_category SET budget = $1 WHERE id = $2 RETURNING id, category, budget',
-      [budgetValue, id]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Budget category not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: rows[0],
-      message: 'Budget updated successfully'
-    });
-  } catch (err) {
-    console.error('Error updating budget category:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
-    });
-  }
-});
-
 // GET /bank-categories - returns all bank categories from the shared_category table
 app.get('/bank-categories', async (req, res) => {
   try {
@@ -546,59 +1039,6 @@ app.get('/personal-categories', async (req, res) => {
   } catch (err) {
     console.error('Error fetching personal categories:', err);
     res.status(500).send('Server error');
-  }
-});
-
-// PUT /personal-transactions/:id - Updates a personal transaction
-app.put('/personal-transactions/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-    
-    const allowedFields = ['date', 'description', 'amount', 'category'];
-    
-    const validUpdates = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.includes(key)) {
-        validUpdates[key] = value;
-      }
-    }
-    
-    if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
-      });
-    }
-    
-    const setClause = Object.entries(validUpdates).map(
-      ([key, _], index) => `${key} = $${index + 1}`
-    ).join(', ');
-    
-    const values = [...Object.values(validUpdates), id];
-    const query = `UPDATE personal_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
-    
-    const { rows } = await pool.query(query, values);
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: rows[0],
-      message: 'Transaction updated successfully'
-    });
-  } catch (err) {
-    console.error('Error updating personal transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
-    });
   }
 });
 
@@ -882,59 +1322,6 @@ app.get('/offset-categories', async (req, res) => {
   }
 });
 
-// PUT /offset-transactions/:id - Updates an offset transaction
-app.put('/offset-transactions/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-    
-    const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
-    
-    const validUpdates = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.includes(key)) {
-        validUpdates[key] = value;
-      }
-    }
-    
-    if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
-      });
-    }
-    
-    const setClause = Object.entries(validUpdates).map(
-      ([key, _], index) => `${key} = $${index + 1}`
-    ).join(', ');
-    
-    const values = [...Object.values(validUpdates), id];
-    const query = `UPDATE offset_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
-    
-    const { rows } = await pool.query(query, values);
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: rows[0],
-      message: 'Transaction updated successfully'
-    });
-  } catch (err) {
-    console.error('Error updating offset transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
-    });
-  }
-});
-
 // POST /offset-transactions - Creates a new offset transaction
 app.post('/offset-transactions', async (req, res) => {
   try {
@@ -1196,102 +1583,6 @@ app.get('/personal-settings/:userId', async (req, res) => {
 });
 
 /**
- * PUT /personal-settings/:userId - Update user's personal settings
- */
-app.put('/personal-settings/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const updates = req.body;
-    
-    const allowedFields = [
-      'hide_zero_balance_buckets',
-      'enable_negative_offset_bucket', 
-      'selected_negative_offset_bucket',
-      'category_order',
-      'auto_distribution_enabled',
-      'last_auto_distribution_month'
-    ];
-    
-    const validUpdates = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.includes(key)) {
-        // Special handling for category_order to ensure it's properly stored as JSON
-        if (key === 'category_order' && Array.isArray(value)) {
-          validUpdates[key] = JSON.stringify(value);
-        } else {
-          validUpdates[key] = value;
-        }
-      }
-    }
-    
-    if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
-      });
-    }
-    
-    // Check if settings exist for this user
-    const checkQuery = 'SELECT id FROM personal_settings WHERE user_id = $1';
-    const checkResult = await pool.query(checkQuery, [userId]);
-    
-    let query, values;
-    
-    if (checkResult.rows.length === 0) {
-      // Insert new settings
-      const fields = ['user_id', ...Object.keys(validUpdates)];
-      const placeholders = fields.map((field, index) => `$${index + 1}`);
-      values = [userId, ...Object.values(validUpdates)];
-      
-      query = `
-        INSERT INTO personal_settings (${fields.join(', ')})
-        VALUES (${placeholders.join(', ')})
-        RETURNING *
-      `;
-    } else {
-      // Update existing settings
-      const setClause = Object.entries(validUpdates).map(
-        ([key, _], index) => `${key} = $${index + 1}`
-      ).join(', ');
-      
-      values = [...Object.values(validUpdates), userId];
-      query = `
-        UPDATE personal_settings 
-        SET ${setClause}, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $${values.length} 
-        RETURNING *
-      `;
-    }
-    
-    const { rows } = await pool.query(query, values);
-    
-    // Parse category_order back to an array for the response
-    const responseData = rows[0];
-    if (responseData.category_order && typeof responseData.category_order === 'string') {
-      try {
-        responseData.category_order = JSON.parse(responseData.category_order);
-      } catch (error) {
-        console.error('Error parsing category_order for response:', error);
-        responseData.category_order = [];
-      }
-    }
-    
-    res.json({
-      success: true,
-      data: responseData,
-      message: 'Settings updated successfully'
-    });
-  } catch (err) {
-    console.error('Error updating personal settings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
-    });
-  }
-});
-
-/**
  * GET /auto-distribution-rules/:userId - Get user's auto distribution rules
  */
 app.get('/auto-distribution-rules/:userId', async (req, res) => {
@@ -1353,7 +1644,7 @@ app.post('/auto-distribution-rules', async (req, res) => {
 });
 
 /**
- * PUT /auto-distribution-rules/:id - Update an auto distribution rule
+ * PUT /auto-distribution-rules/:id - Update an auto distribution rule (OPTIMIZED)
  */
 app.put('/auto-distribution-rules/:id', async (req, res) => {
   try {
@@ -1362,11 +1653,41 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
     
     const allowedFields = ['rule_name', 'amount', 'source_bucket', 'dest_bucket'];
     
+    // Get current rule for comparison
+    const checkResult = await pool.query('SELECT * FROM auto_distribution_rules WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Auto distribution rule not found' 
+      });
+    }
+    
+    const currentRule = checkResult.rows[0];
     const validUpdates = {};
+    let hasChanges = false;
+    
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
-        validUpdates[key] = value;
+        const fieldType = getFieldType(key);
+        
+        // OPTIMIZATION: Check if the value has actually changed
+        if (!valuesAreEqual(currentRule[key], value, fieldType)) {
+          validUpdates[key] = value;
+          hasChanges = true;
+          console.log(`Auto distribution rule field '${key}' changed: '${currentRule[key]}' -> '${value}'`);
+        }
       }
+    }
+    
+    // OPTIMIZATION: If no fields actually changed, return early
+    if (!hasChanges) {
+      console.log(`No changes detected for auto distribution rule ${id}, skipping database update`);
+      return res.json({
+        success: true,
+        data: currentRule,
+        message: 'No changes detected - rule not updated',
+        optimized: true
+      });
     }
     
     if (Object.keys(validUpdates).length === 0) {
@@ -1388,19 +1709,15 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
       RETURNING *
     `;
     
-    const { rows } = await pool.query(query, values);
+    console.log(`Executing database update for auto distribution rule ${id} with changes:`, validUpdates);
     
-    if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Auto distribution rule not found' 
-      });
-    }
+    const { rows } = await pool.query(query, values);
     
     res.json({
       success: true,
       data: rows[0],
-      message: 'Auto distribution rule updated successfully'
+      message: 'Auto distribution rule updated successfully',
+      changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
     console.error('Error updating auto distribution rule:', err);
@@ -1616,4 +1933,9 @@ app.get('/', (req, res) => {
 
 app.listen(port, () => {
   console.log(`✅ Server running on http://localhost:${port}`);
+  console.log('📊 Database optimization features enabled:');
+  console.log('  - Value comparison before database updates');
+  console.log('  - Skips unnecessary database operations');
+  console.log('  - Detailed logging of changes vs. no-changes');
+  console.log('  - Optimized responses for unchanged data');
 });
