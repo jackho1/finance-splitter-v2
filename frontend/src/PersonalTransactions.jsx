@@ -789,6 +789,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: '200px',
                 maxWidth: '100%',
@@ -820,6 +826,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: '200px',
                 maxWidth: '100%',
@@ -852,6 +864,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 e.target.style.borderColor = editValue === '' ? '#ffc107' : '#e2e8f0';
                 e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                 handleUpdate(transaction.id, field);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.target.style.borderColor = editValue === '' ? '#ffc107' : '#e2e8f0';
+                  e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                  handleUpdate(transaction.id, field);
+                }
               }}
               style={{ 
                 width: '200px',
@@ -895,6 +915,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: field === 'description' ? '400px' : '200px',
                 maxWidth: '100%',
@@ -1474,6 +1500,72 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     } catch (error) {
       console.error('Error updating distribution rule:', error);
     }
+  };
+
+  const getRelatedTransactions = (transaction) => {
+    // If this is an original transaction that's been split
+    if (transaction.has_split) {
+      return transactions.filter(t => t.split_from_id === transaction.id);
+    }
+    // If this is a split transaction
+    else if (transaction.split_from_id) {
+      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
+      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
+      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
+    }
+    return [];
+  };
+
+  // Render the related transactions indicator as an inline element
+  const renderRelatedTransactionIndicator = (transaction) => {
+    const relatedTransactions = getRelatedTransactions(transaction);
+    
+    if (relatedTransactions.length === 0) return null;
+    
+    if (transaction.has_split) {
+      return (
+        <span style={{
+          backgroundColor: '#e0f2fe',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0369a1',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px solid #bae6fd',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+          </svg>
+          <span>Split ({relatedTransactions.length})</span>
+        </span>
+      );
+    } else if (transaction.split_from_id) {
+      return (
+        <span style={{
+          backgroundColor: '#f0f9ff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0284c7',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px dashed #7dd3fc',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+          </svg>
+          <span>Split from</span>
+        </span>
+      );
+    }
+    return null;
   };
 
   return (
@@ -3658,35 +3750,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                         {renderCell(transaction, 'description')}
-                        {transaction.has_split && (
-                          <span 
-                            title="This transaction has been split"
-                            style={{ 
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 6px',
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              border: '1px solid #bae6fd'
-                            }}
-                          >
-                            <svg 
-                              width="12" 
-                              height="12" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2"
-                              style={{ marginRight: '4px' }}
-                            >
-                              <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
-                            </svg>
-                            Split
-                          </span>
-                        )}
+                        {renderRelatedTransactionIndicator(transaction)}
                       </div>
                       <button
                         onClick={(e) => {
@@ -3777,20 +3841,61 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           </button>
                           {/* Add other actions here if needed */}
                         </div>
-                        {transaction.has_split && (
-                          <span style={{ 
-                            fontSize: '14px',
-                            color: '#64748b',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
-                            </svg>
-                            This transaction has been split
-                          </span>
-                        )}
+                        
+                        {/* Show related transaction details when expanded */}
+                        <div>
+                          
+                          {/* Show related transactions when expanded */}
+                          {getRelatedTransactions(transaction).length > 0 && (
+                            <div style={{ 
+                              marginTop: '12px', 
+                              borderTop: '1px dashed #cbd5e1',
+                              paddingTop: '12px'
+                            }}>
+                              <div style={{ 
+                                fontSize: '14px', 
+                                fontWeight: '500', 
+                                marginBottom: '8px',
+                                color: '#475569'
+                              }}>
+                                {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {getRelatedTransactions(transaction).map(related => (
+                                  <div key={related.id} style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    padding: '8px',
+                                    backgroundColor: 'white',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      gap: '12px', 
+                                      alignItems: 'center',
+                                      fontSize: '13px',
+                                      flex: 1,
+                                      marginRight: '16px'
+                                    }}>
+                                      <div>{new Date(related.date).toLocaleDateString()}</div>
+                                      <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                    </div>
+                                    <div style={{ 
+                                      fontWeight: '500',
+                                      fontSize: '13px',
+                                      color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                    }}>
+                                      {parseFloat(related.amount) < 0 ? 
+                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                        `$${parseFloat(related.amount).toFixed(2)}`}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
