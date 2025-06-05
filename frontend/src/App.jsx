@@ -689,6 +689,12 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ textAlign: 'center' }}
               autoFocus
             />
@@ -702,6 +708,12 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ textAlign: 'center' }}
               autoFocus
             />
@@ -713,6 +725,12 @@ const App = () => {
               value={editValue === null ? 'null' : (editValue || '')}
               onChange={handleInputChange} 
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ textAlign: 'center' }}
               autoFocus
             >
@@ -733,6 +751,12 @@ const App = () => {
               value={editValue || ''} 
               onChange={handleInputChange} 
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ textAlign: 'center' }}
               autoFocus
             >
@@ -750,6 +774,12 @@ const App = () => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ width: field === 'description' ? '400px' : '200px', textAlign: 'center' }}
               autoFocus
             />
@@ -1059,7 +1089,75 @@ const App = () => {
     }, 100);
   };
 
-  // Transactions table modernized render
+  // Add this function before the renderTransactionsTable function to group related split transactions
+  const getRelatedTransactions = (transaction) => {
+    // If this is an original transaction that's been split
+    if (transaction.has_split) {
+      return transactions.filter(t => t.split_from_id === transaction.id);
+    }
+    // If this is a split transaction
+    else if (transaction.split_from_id) {
+      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
+      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
+      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
+    }
+    return [];
+  };
+
+  // Modify the function to render the related transactions indicator as an inline element
+  const renderRelatedTransactionIndicator = (transaction) => {
+    const relatedTransactions = getRelatedTransactions(transaction);
+    
+    if (relatedTransactions.length === 0) return null;
+    
+    if (transaction.has_split) {
+      return (
+        <span style={{
+          backgroundColor: '#e0f2fe',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0369a1',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px solid #bae6fd',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+          </svg>
+          <span>Split ({relatedTransactions.length})</span>
+        </span>
+      );
+    } else if (transaction.split_from_id) {
+      const originalTransaction = relatedTransactions[0];
+      return (
+        <span style={{
+          backgroundColor: '#f0f9ff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0284c7',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px dashed #7dd3fc',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+          </svg>
+          <span>Split from</span>
+        </span>
+      );
+    }
+    return null;
+  };
+
+  // Transactions table modernized render - update the renderCell for the description field
   const renderTransactionsTable = () => (
     <div className="modern-table-container fade-in">
       {isTransactionsLoading || isLabelsLoading ? (
@@ -1239,44 +1337,42 @@ const App = () => {
             ) : (
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
-                  <tr className={getRowLabelClass(transaction.label)} style={{ 
-                    backgroundColor: expandedRow === transaction.id ? '#f8fafc' : undefined,
-                    transition: 'background-color 0.2s'
-                  }}>
+                  <tr 
+                    className={getRowLabelClass(transaction.label)} 
+                    style={{ 
+                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
+                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                      transition: 'background-color 0.2s',
+                      borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
+                    }}
+                  >
                     <td>{renderCell(transaction, 'date')}</td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                          {renderCell(transaction, 'description')}
-                          {transaction.has_split && (
-                            <span 
-                              title="This transaction has been split"
-                              style={{ 
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '2px 6px',
-                                backgroundColor: '#e0f2fe',
-                                color: '#0369a1',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                border: '1px solid #bae6fd'
-                              }}
-                            >
-                              <svg 
-                                width="12" 
-                                height="12" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                strokeWidth="2"
-                                style={{ marginRight: '4px' }}
-                              >
-                                <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
+                          {transaction.split_from_id && (
+                            <span style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              marginRight: '6px',
+                              color: '#3b82f6',
+                              flexShrink: 0
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M7 17l-5-5 5-5"/>
                               </svg>
-                              Split
                             </span>
                           )}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {renderCell(transaction, 'description')}
+                            {renderRelatedTransactionIndicator(transaction)}
+                          </div>
                         </div>
                         <button
                           onClick={(e) => {
@@ -1292,7 +1388,8 @@ const App = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderRadius: '4px',
-                            transition: 'background-color 0.2s'
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.backgroundColor = '#f0f0f0';
@@ -1364,20 +1461,61 @@ const App = () => {
                             </button>
                             {/* Add other actions here if needed */}
                           </div>
-                          {transaction.has_split && (
-                            <span style={{ 
-                              fontSize: '14px',
-                              color: '#64748b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
-                              </svg>
-                              This transaction has been split
-                            </span>
-                          )}
+                          
+                          {/* Show related transaction details when expanded */}
+                          <div>
+                            
+                            {/* Show related transactions when expanded */}
+                            {getRelatedTransactions(transaction).length > 0 && (
+                              <div style={{ 
+                                marginTop: '12px', 
+                                borderTop: '1px dashed #cbd5e1',
+                                paddingTop: '12px'
+                              }}>
+                                <div style={{ 
+                                  fontSize: '14px', 
+                                  fontWeight: '500', 
+                                  marginBottom: '8px',
+                                  color: '#475569'
+                                }}>
+                                  {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {getRelatedTransactions(transaction).map(related => (
+                                    <div key={related.id} style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between',
+                                      padding: '8px',
+                                      backgroundColor: 'white',
+                                      borderRadius: '4px',
+                                      border: '1px solid #e2e8f0'
+                                    }}>
+                                      <div style={{ 
+                                        display: 'flex', 
+                                        gap: '12px', 
+                                        alignItems: 'center',
+                                        fontSize: '13px',
+                                        flex: 1,
+                                        marginRight: '16px'
+                                      }}>
+                                        <div>{new Date(related.date).toLocaleDateString()}</div>
+                                        <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                      </div>
+                                      <div style={{ 
+                                        fontWeight: '500',
+                                        fontSize: '13px',
+                                        color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                      }}>
+                                        {parseFloat(related.amount) < 0 ? 
+                                          `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                          `$${parseFloat(related.amount).toFixed(2)}`}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -2225,14 +2363,10 @@ const App = () => {
           border-left: 4px solid rgba(75, 192, 95, 0.8);
         }
         
-        /* Add striping for unlabeled rows */
+        /* Styling for unlabeled rows */
         .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-both) {
-          background-color: #f7f7f7;
+          background-color: white;
           border-left: 4px solid #d1d1d1;
-        }
-        
-        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-both):nth-child(odd) {
-          background-color: #eaeaea;
         }
         
         .empty-value {

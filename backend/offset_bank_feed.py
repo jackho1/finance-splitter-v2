@@ -65,8 +65,8 @@ def insert_transactions(transactions):
 
         for tx in transactions:
             insert_query = sql.SQL("""
-                INSERT INTO offset_transactions (id, date, description, amount, category, label, closing_balance)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO offset_transactions (id, date, description, amount, category, label, closing_balance, has_split, split_from_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
             """)
             cursor.execute(insert_query, (
@@ -76,7 +76,9 @@ def insert_transactions(transactions):
                 tx['amount'],
                 None,  # Category will be manually populated later
                 None,  # Label will be manually populated later
-                tx['closing_balance']  # New field
+                tx['closing_balance'],  # New field
+                False,  # has_split default
+                None    # split_from_id default
             ))
 
         conn.commit()

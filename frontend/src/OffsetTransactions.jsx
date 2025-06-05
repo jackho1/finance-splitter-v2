@@ -217,6 +217,22 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     
     axios.get('http://localhost:5000/offset-transactions')
       .then(response => {
+        console.log('Offset transactions loaded:', response.data.length);
+        
+        // Check for transactions with split properties
+        const hasSplitTransactions = response.data.filter(t => t.has_split);
+        const splitFromTransactions = response.data.filter(t => t.split_from_id);
+        
+        console.log('Transactions with has_split:', hasSplitTransactions.length);
+        if (hasSplitTransactions.length > 0) {
+          console.log('Sample has_split transaction:', hasSplitTransactions[0]);
+        }
+        
+        console.log('Transactions with split_from_id:', splitFromTransactions.length);
+        if (splitFromTransactions.length > 0) {
+          console.log('Sample split_from_id transaction:', splitFromTransactions[0]);
+        }
+        
         setTransactions(response.data);
         setFilteredTransactions(response.data);
         setAllFilteredTransactions(response.data);
@@ -603,6 +619,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: '200px',
                 maxWidth: '100%',
@@ -634,6 +656,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: '200px',
                 maxWidth: '100%',
@@ -666,6 +694,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 e.target.style.borderColor = editValue === '' ? '#ffc107' : '#e2e8f0';
                 e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                 handleUpdate(transaction.id, field);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
               }}
               style={{ 
                 width: '200px',
@@ -708,6 +742,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange} 
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: '200px',
                 maxWidth: '100%',
@@ -750,6 +790,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
               style={{ 
                 width: field === 'description' ? '400px' : '200px',
                 maxWidth: '100%',
@@ -1282,6 +1328,381 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       hideZeroBalanceBuckets: hideZeroBalanceBuckets, 
       selectedNegativeOffsetBucket: bucketName 
     });
+  };
+
+  // Add this function before the renderTransactionsTable function to group related split transactions
+  const getRelatedTransactions = (transaction) => {
+    console.log('getRelatedTransactions called for transaction:', transaction.id, 
+                'has_split:', transaction.has_split, 
+                'split_from_id:', transaction.split_from_id);
+    
+    // If this is an original transaction that's been split
+    if (transaction.has_split) {
+      return transactions.filter(t => t.split_from_id === transaction.id);
+    }
+    // If this is a split transaction
+    else if (transaction.split_from_id) {
+      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
+      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
+      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
+    }
+    return [];
+  };
+
+  // Add a function to render the related transactions indicator
+  const renderRelatedTransactionIndicator = (transaction) => {
+    console.log('renderRelatedTransactionIndicator called for transaction:', transaction.id, 
+                'has_split:', transaction.has_split, 
+                'split_from_id:', transaction.split_from_id);
+    
+    const relatedTransactions = getRelatedTransactions(transaction);
+    
+    if (relatedTransactions.length === 0) return null;
+    
+    if (transaction.has_split) {
+      console.log('Rendering split-into indicator for transaction:', transaction.id, 
+                  'related count:', relatedTransactions.length);
+      return (
+        <span style={{
+          backgroundColor: '#e0f2fe',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0369a1',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px solid #bae6fd',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+          </svg>
+          <span style={{ fontWeight: '500' }}>Split ({relatedTransactions.length})</span>
+        </span>
+      );
+    } else if (transaction.split_from_id) {
+      const originalTransaction = relatedTransactions[0];
+      console.log('Rendering split-from indicator for transaction:', transaction.id, 
+                  'original transaction:', originalTransaction ? originalTransaction.id : 'unknown');
+      return (
+        <span style={{
+          backgroundColor: '#f0f9ff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0284c7',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px dashed #7dd3fc',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          zIndex: 5,
+          position: 'relative'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+          </svg>
+          <span style={{ fontWeight: '500' }}>Split from</span>
+        </span>
+      );
+    }
+    return null;
+  };
+
+  // Update the renderTransactionsTable function to include the visual elements for split transactions
+  const renderTransactionsTable = () => {
+    return (
+      <div className="modern-table-container">
+        {isTransactionsLoading ? (
+          <LoadingSpinner />
+        ) : (
+          <table className="modern-table">
+            <thead>
+              <tr>
+                <th>
+                  <div className="modern-filter-header">
+                    <span>Date</span>
+                    <button 
+                      className={`filter-button ${activeFilterColumn === 'date' ? 'active' : ''}`}
+                      onClick={() => toggleColumnFilter('date')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                      </svg>
+                    </button>
+                  </div>
+                  {activeFilterColumn === 'date' && (
+                    <div className="filter-dropdown">
+                      <div className="filter-group">
+                        <label>From:</label>
+                        <input 
+                          type="date" 
+                          name="startDate"
+                          value={dateFilter.startDate}
+                          onChange={handleDateFilterChange}
+                          min={dateRange.min}
+                          max={dateRange.max}
+                        />
+                      </div>
+                      <div className="filter-group">
+                        <label>To:</label>
+                        <input 
+                          type="date" 
+                          name="endDate"
+                          value={dateFilter.endDate}
+                          onChange={handleDateFilterChange}
+                          min={dateRange.min}
+                          max={dateRange.max}
+                        />
+                      </div>
+                      <div className="filter-actions">
+                        <button onClick={clearFilters}>Clear</button>
+                        <button onClick={() => setActiveFilterColumn(null)}>Apply</button>
+                      </div>
+                    </div>
+                  )}
+                </th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>
+                  <div className="modern-filter-header">
+                    <span>Category</span>
+                    <button 
+                      className={`filter-button ${activeFilterColumn === 'category' ? 'active' : ''}`}
+                      onClick={() => toggleColumnFilter('category')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                      </svg>
+                    </button>
+                  </div>
+                  {activeFilterColumn === 'category' && (
+                    <div className="filter-dropdown">
+                      <div className="filter-options">
+                        {availableCategories.map(category => (
+                          <label key={category} className="filter-checkbox">
+                            <input 
+                              type="checkbox"
+                              checked={categoryFilter.includes(category)}
+                              onChange={(e) => handleCategoryFilterChange(category, e)}
+                            />
+                            <span>{category}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="filter-actions">
+                        <button onClick={() => setCategoryFilter([])}>Clear</button>
+                        <button onClick={() => setActiveFilterColumn(null)}>Apply</button>
+                      </div>
+                    </div>
+                  )}
+                </th>
+                <th>Label</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTransactions.map(transaction => (
+                <React.Fragment key={transaction.id}>
+                  <tr 
+                    style={{ 
+                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
+                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                      transition: 'background-color 0.2s',
+                      borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
+                    }}
+                  >
+                    <td>{renderCell(transaction, 'date')}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {transaction.split_from_id && (
+                              <div style={{ 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '2px 4px',
+                                backgroundColor: '#e6f2ff',
+                                color: '#3b82f6',
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                                fontSize: '12px',
+                                border: '1px solid #93c5fd'
+                              }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M7 17l-5-5 5-5"/>
+                                </svg>
+                                <span style={{ marginLeft: '4px' }}>Split</span>
+                              </div>
+                            )}
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {renderCell(transaction, 'description')}
+                              {renderRelatedTransactionIndicator(transaction)}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              transition: 'background-color 0.2s',
+                              flexShrink: 0
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f0f0f0';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            title="Click to expand transaction options"
+                          >
+                            <svg 
+                              width="16" 
+                              height="16" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2"
+                              style={{ 
+                                transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s',
+                                opacity: 0.7
+                              }}
+                            >
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{renderCell(transaction, 'amount')}</td>
+                    <td>{renderCell(transaction, 'category')}</td>
+                    <td>{renderCell(transaction, 'label')}</td>
+                  </tr>
+                  {expandedRow === transaction.id && (
+                    <tr>
+                      <td colSpan="5" style={{ 
+                        padding: '0',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ 
+                          padding: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
+                        }}>
+                          <div style={{ display: 'flex', gap: '20px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSplitTransaction(transaction);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s'
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                              </svg>
+                              Split Transaction
+                            </button>
+                          </div>
+                          
+                          {/* Show related transaction details when expanded */}
+                          <div>
+                            
+                            {/* Show related transactions when expanded */}
+                            {getRelatedTransactions(transaction).length > 0 && (
+                              <div style={{ 
+                                marginTop: '12px', 
+                                borderTop: '1px dashed #cbd5e1',
+                                paddingTop: '12px'
+                              }}>
+                                <div style={{ 
+                                  fontSize: '14px', 
+                                  fontWeight: '500', 
+                                  marginBottom: '8px',
+                                  color: '#475569'
+                                }}>
+                                  {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {getRelatedTransactions(transaction).map(related => (
+                                    <div key={related.id} style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between',
+                                      padding: '8px',
+                                      backgroundColor: 'white',
+                                      borderRadius: '4px',
+                                      border: '1px solid #e2e8f0'
+                                    }}>
+                                      <div style={{ 
+                                        display: 'flex', 
+                                        gap: '12px', 
+                                        alignItems: 'center',
+                                        fontSize: '13px',
+                                        flex: 1,
+                                        marginRight: '16px'
+                                      }}>
+                                        <div>{new Date(related.date).toLocaleDateString()}</div>
+                                        <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                      </div>
+                                      <div style={{ 
+                                        fontWeight: '500',
+                                        fontSize: '13px',
+                                        color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                      }}>
+                                        {parseFloat(related.amount) < 0 ? 
+                                          `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                          `$${parseFloat(related.amount).toFixed(2)}`}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -3092,38 +3513,31 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     {renderCell(transaction, 'date')}
                   </td>
                   <td style={{ border: '1px solid black', padding: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                        {renderCell(transaction, 'description')}
-                        {transaction.has_split && (
-                          <span 
-                            title="This transaction has been split"
-                            style={{ 
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 6px',
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              border: '1px solid #bae6fd'
-                            }}
-                          >
-                            <svg 
-                              width="12" 
-                              height="12" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2"
-                              style={{ marginRight: '4px' }}
-                            >
-                              <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
+                        {transaction.split_from_id && (
+                          <span style={{ 
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            marginRight: '6px',
+                            color: '#3b82f6',
+                            flexShrink: 0
+                          }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M7 17l-5-5 5-5"/>
                             </svg>
-                            Split
                           </span>
                         )}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {renderCell(transaction, 'description')}
+                          {renderRelatedTransactionIndicator(transaction)}
+                        </div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -3139,7 +3553,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderRadius: '4px',
-                          transition: 'background-color 0.2s'
+                          transition: 'background-color 0.2s',
+                          flexShrink: 0
                         }}
                         onMouseOver={(e) => {
                           e.currentTarget.style.backgroundColor = '#f0f0f0';
@@ -3188,7 +3603,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                         padding: '12px',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center'
+                        alignItems: 'flex-start'
                       }}>
                         <div style={{ display: 'flex', gap: '20px' }}>
                           <button
@@ -3215,22 +3630,62 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                             </svg>
                             Split Transaction
                           </button>
-                          {/* Add other actions here if needed */}
                         </div>
-                        {transaction.has_split && (
-                          <span style={{ 
-                            fontSize: '14px',
-                            color: '#64748b',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
-                            </svg>
-                            This transaction has been split
-                          </span>
-                        )}
+                        
+                        {/* Show related transaction details when expanded */}
+                        <div>
+                          
+                          {/* Show related transactions when expanded */}
+                          {getRelatedTransactions(transaction).length > 0 && (
+                            <div style={{ 
+                              marginTop: '12px', 
+                              borderTop: '1px dashed #cbd5e1',
+                              paddingTop: '12px'
+                            }}>
+                              <div style={{ 
+                                fontSize: '14px', 
+                                fontWeight: '500', 
+                                marginBottom: '8px',
+                                color: '#475569'
+                              }}>
+                                {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {getRelatedTransactions(transaction).map(related => (
+                                  <div key={related.id} style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    padding: '8px',
+                                    backgroundColor: 'white',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      gap: '12px', 
+                                      alignItems: 'center',
+                                      fontSize: '13px',
+                                      flex: 1,
+                                      marginRight: '16px'
+                                    }}>
+                                      <div>{new Date(related.date).toLocaleDateString()}</div>
+                                      <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                    </div>
+                                    <div style={{ 
+                                      fontWeight: '500',
+                                      fontSize: '13px',
+                                      color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                    }}>
+                                      {parseFloat(related.amount) < 0 ? 
+                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                        `$${parseFloat(related.amount).toFixed(2)}`}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

@@ -23,6 +23,124 @@ const dbConfig = {
 // Database connection setup
 const pool = new Pool(dbConfig);
 
+// Check and add split transaction columns to tables if they don't exist
+const ensureSplitColumnsExist = async () => {
+  const client = await pool.connect();
+  try {
+    // Check and add columns for shared_transactions
+    try {
+      const checkSharedHasSplitColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'shared_transactions' 
+        AND column_name = 'has_split'
+      `);
+      
+      if (checkSharedHasSplitColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE shared_transactions 
+          ADD COLUMN has_split BOOLEAN DEFAULT FALSE
+        `);
+        console.log("Added has_split column to shared_transactions table");
+      }
+      
+      const checkSharedSplitFromColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'shared_transactions' 
+        AND column_name = 'split_from_id'
+      `);
+      
+      if (checkSharedSplitFromColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE shared_transactions 
+          ADD COLUMN split_from_id INTEGER REFERENCES shared_transactions(id) ON DELETE SET NULL
+        `);
+        console.log("Added split_from_id column to shared_transactions table");
+      }
+    } catch (err) {
+      console.error("Error checking/adding columns to shared_transactions:", err);
+    }
+    
+    // Check and add columns for personal_transactions
+    try {
+      const checkPersonalHasSplitColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'personal_transactions' 
+        AND column_name = 'has_split'
+      `);
+      
+      if (checkPersonalHasSplitColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE personal_transactions 
+          ADD COLUMN has_split BOOLEAN DEFAULT FALSE
+        `);
+        console.log("Added has_split column to personal_transactions table");
+      }
+      
+      const checkPersonalSplitFromColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'personal_transactions' 
+        AND column_name = 'split_from_id'
+      `);
+      
+      if (checkPersonalSplitFromColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE personal_transactions 
+          ADD COLUMN split_from_id INTEGER REFERENCES personal_transactions(id) ON DELETE SET NULL
+        `);
+        console.log("Added split_from_id column to personal_transactions table");
+      }
+    } catch (err) {
+      console.error("Error checking/adding columns to personal_transactions:", err);
+    }
+    
+    // Check and add columns for offset_transactions
+    try {
+      const checkOffsetHasSplitColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'offset_transactions' 
+        AND column_name = 'has_split'
+      `);
+      
+      if (checkOffsetHasSplitColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE offset_transactions 
+          ADD COLUMN has_split BOOLEAN DEFAULT FALSE
+        `);
+        console.log("Added has_split column to offset_transactions table");
+      }
+      
+      const checkOffsetSplitFromColumn = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'offset_transactions' 
+        AND column_name = 'split_from_id'
+      `);
+      
+      if (checkOffsetSplitFromColumn.rows.length === 0) {
+        await client.query(`
+          ALTER TABLE offset_transactions 
+          ADD COLUMN split_from_id INTEGER REFERENCES offset_transactions(id) ON DELETE SET NULL
+        `);
+        console.log("Added split_from_id column to offset_transactions table");
+      }
+    } catch (err) {
+      console.error("Error checking/adding columns to offset_transactions:", err);
+    }
+  } finally {
+    client.release();
+  }
+};
+
+// Run the check when the server starts
+ensureSplitColumnsExist().catch(err => {
+  console.error("Error ensuring split columns exist:", err);
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json()); // For parsing JSON request bodies
@@ -1132,6 +1250,7 @@ app.post('/personal-transactions/split', async (req, res) => {
       }
     });
     
+    // Check if there are validation errors
     if (errors.length > 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -1140,58 +1259,54 @@ app.post('/personal-transactions/split', async (req, res) => {
       });
     }
     
-    // Validate that split amounts don't exceed original
-    const absOriginalAmount = Math.abs(originalAmount);
-    const absRemainingAmount = Math.abs(parseFloat(remainingAmount));
+    // Calculate the total of splits + remaining amount
+    const totalSplitAndRemaining = Math.abs(remainingAmount) + splitTotal;
     
-    if (originalAmount < 0) {
-      // For expenses: check absolute values
-      if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          error: 'Split amounts exceed the original transaction amount'
-        });
-      }
-    } else {
-      // For income: total splits should not exceed original
-      if (splitTotal > originalAmount) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          error: 'Split amounts exceed the original transaction amount'
-        });
-      }
+    // Verify that the splits + remaining amount match the original transaction amount (within a small tolerance)
+    const tolerance = 0.01; // 1 cent tolerance for floating-point issues
+    const absOriginalAmount = Math.abs(originalAmount);
+    
+    if (Math.abs(totalSplitAndRemaining - absOriginalAmount) > tolerance) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: `The total of splits and remaining amount (${totalSplitAndRemaining.toFixed(2)}) does not match the original transaction amount (${absOriginalAmount.toFixed(2)})`
+      });
     }
     
-    // Create split transactions
+    // Create the split transactions
     const createdTransactions = [];
     
     for (const split of splitTransactions) {
-      // Ensure the split amount has the same sign as the original transaction
-      const splitAmount = isNegative ? 
-        -Math.abs(parseFloat(split.amount)) : 
-        Math.abs(parseFloat(split.amount));
-
+      const splitAmount = parseFloat(split.amount);
+      // Ensure the split amount has the correct sign
+      const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
+      
       const insertResult = await client.query(
-        `INSERT INTO personal_transactions (date, description, amount, category, is_split)
+        `INSERT INTO personal_transactions 
+         (date, description, amount, category, split_from_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [
           originalTransaction.date,
           split.description,
-          splitAmount,
+          adjustedAmount,
           split.category,
-          true
+          originalTransactionId // Set the split_from_id to the original transaction id
         ]
       );
+      
+      if (insertResult.rows.length === 0) {
+        throw new Error(`Failed to create split transaction #${createdTransactions.length + 1}`);
+      }
+      
       createdTransactions.push(insertResult.rows[0]);
     }
     
     // Update the original transaction amount if there's a remaining amount
-    if (absRemainingAmount > 0) {
+    if (Math.abs(remainingAmount) > 0) {
       // Ensure the remaining amount has the same sign as the original transaction
-      const newAmount = isNegative ? -absRemainingAmount : absRemainingAmount;
+      const newAmount = isNegative ? -Math.abs(remainingAmount) : Math.abs(remainingAmount);
       
       const updateResult = await client.query(
         `UPDATE personal_transactions 
@@ -1231,7 +1346,7 @@ app.post('/personal-transactions/split', async (req, res) => {
         originalTransactionId: originalTransactionId,
         originalAmount: originalAmount, // Include original amount in response
         splitTransactions: createdTransactions,
-        remainingAmount: isNegative ? -absRemainingAmount : absRemainingAmount // Ensure remaining amount has correct sign
+        remainingAmount: isNegative ? -Math.abs(remainingAmount) : Math.abs(remainingAmount) // Ensure remaining amount has correct sign
       }
     });
     
@@ -1412,6 +1527,7 @@ app.post('/offset-transactions/split', async (req, res) => {
       }
     });
     
+    // Check if there are validation errors
     if (errors.length > 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -1420,52 +1536,51 @@ app.post('/offset-transactions/split', async (req, res) => {
       });
     }
     
-    // Validate that split amounts don't exceed original
-    const absOriginalAmount = Math.abs(originalAmount);
+    // Convert remaining amount to absolute value for comparison
     const absRemainingAmount = Math.abs(parseFloat(remainingAmount));
     
-    if (originalAmount < 0) {
-      // For expenses: check absolute values
-      if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          error: 'Split amounts exceed the original transaction amount'
-        });
-      }
-    } else {
-      // For income: total splits should not exceed original
-      if (splitTotal > originalAmount) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          error: 'Split amounts exceed the original transaction amount'
-        });
-      }
+    // Calculate the total of splits + remaining amount
+    const totalSplitAndRemaining = absRemainingAmount + splitTotal;
+    
+    // Verify that the splits + remaining amount match the original transaction amount (within a small tolerance)
+    const tolerance = 0.01; // 1 cent tolerance for floating-point issues
+    const absOriginalAmount = Math.abs(originalAmount);
+    
+    if (Math.abs(totalSplitAndRemaining - absOriginalAmount) > tolerance) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: `The total of splits and remaining amount (${totalSplitAndRemaining.toFixed(2)}) does not match the original transaction amount (${absOriginalAmount.toFixed(2)})`
+      });
     }
     
-    // Create split transactions
+    // Create the split transactions
     const createdTransactions = [];
     
     for (const split of splitTransactions) {
-      // Ensure the split amount has the same sign as the original transaction
-      const splitAmount = isNegative ? 
-        -Math.abs(parseFloat(split.amount)) : 
-        Math.abs(parseFloat(split.amount));
-
+      const splitAmount = parseFloat(split.amount);
+      // Ensure the split amount has the correct sign
+      const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
+      
       const insertResult = await client.query(
-        `INSERT INTO offset_transactions (date, description, amount, category, label, is_split)
+        `INSERT INTO offset_transactions 
+         (date, description, amount, category, label, split_from_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [
           originalTransaction.date,
           split.description,
-          splitAmount,
+          adjustedAmount,
           split.category,
-          split.label || originalTransaction.label, // Use split label or inherit from original
-          true
+          split.label || originalTransaction.label,
+          originalTransactionId // Set the split_from_id to the original transaction id
         ]
       );
+      
+      if (insertResult.rows.length === 0) {
+        throw new Error(`Failed to create split transaction #${createdTransactions.length + 1}`);
+      }
+      
       createdTransactions.push(insertResult.rows[0]);
     }
     
