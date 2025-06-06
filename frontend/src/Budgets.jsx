@@ -1,5 +1,5 @@
 // Budgets.jsx
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { USER_CONFIG } from './config/userConfig';
@@ -24,9 +24,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
-// Categories for monthly spend calculation (will be populated from backend)
-let monthlySpendCategories = [];
 
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
@@ -61,6 +58,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState({});
   const [budgetCategories, setBudgetCategories] = useState([]);
+  const [monthlySpendCategories, setMonthlySpendCategories] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth()); // 0-11 (JavaScript native)
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [categoryMappings, setCategoryMappings] = useState({});
@@ -97,64 +95,62 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   // Reference to hold drag ghost element
   const dragGhostRef = useRef(null);
 
-  // Fetch budget categories from backend
-  useEffect(() => {
-    setLoading(true);
-    axios.get('http://localhost:5000/budget-categories')
-      .then(response => {
-        setBudgetCategories(response.data);
-        
-        // Convert to budgets object for easier access
-        const budgetsObj = {};
-        const categories = [];
-        response.data.forEach(item => {
-          budgetsObj[item.category] = item.budget;
-          categories.push(item.category);
-        });
-        setBudgets(budgetsObj);
-        
-        // Set up monthly spend categories (exclude Mortgage, Bills, Savings, Gifts, Holidays)
-        const monthlyCategories = categories.filter(cat => 
-          !['Mortgage', 'Bills', 'Savings', 'Gifts', 'Holidays'].includes(cat)
-        );
-        monthlySpendCategories = monthlyCategories;
-        
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching budget categories:', err);
-        setLoading(false);
-      });
-  }, []);
-
-  // Fetch transactions
-  useEffect(() => {
-    axios.get('http://localhost:5000/transactions')
-      .then(response => {
-        setTransactions(response.data);
-      })
-      .catch(err => {
-        console.error('Error fetching transactions:', err);
-      });
-  }, []);
-
-  // Fetch category mappings
-  useEffect(() => {
-    axios.get('http://localhost:5000/category-mappings')
-      .then(response => {
-        setCategoryMappings(response.data);
-      })
-      .catch(err => {
-        console.error('Error fetching category mappings:', err);
-      });
-  }, []);
-
   // Function to get category from bank_category using mappings
   const getCategoryFromMapping = (bankCategory) => {
     if (!bankCategory) return null;
     // Only return a value if it exists in the mappings
     return categoryMappings[bankCategory] || null;
   };
+
+  // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setLoading(true);
+      
+      try {
+        console.log('Fetching budgets data using optimized endpoint...');
+        
+        // Single API call to get all budget initial data
+        const response = await axios.get('http://localhost:5000/budget-initial-data');
+        
+        if (response.data.success) {
+          const { budgetCategories, transactions, categoryMappings } = response.data.data;
+          
+          // Set budget categories
+          setBudgetCategories(budgetCategories);
+          
+          // Convert to budgets object for easier access
+          const budgetsObj = {};
+          const categories = [];
+          budgetCategories.forEach(item => {
+            budgetsObj[item.category] = item.budget;
+            categories.push(item.category);
+          });
+          setBudgets(budgetsObj);
+          
+          // Set up monthly spend categories (exclude Mortgage, Bills, Savings, Gifts, Holidays)
+          const monthlyCategories = categories.filter(cat => 
+            !['Mortgage', 'Bills', 'Savings', 'Gifts', 'Holidays'].includes(cat)
+          );
+          setMonthlySpendCategories(monthlyCategories);
+          
+          // Set transactions and category mappings
+          setTransactions(transactions);
+          setCategoryMappings(categoryMappings);
+          
+          setLoading(false);
+          console.log('All budgets data loaded successfully using optimized endpoint');
+        } else {
+          throw new Error(response.data.error || 'Failed to fetch budget initial data');
+        }
+      } catch (error) {
+        console.error('Error fetching budget initial data:', error);
+        setLoading(false);
+      }
+    };
+    
+    fetchInitialData();
+  }, []);
 
   useEffect(() => {
     if (transactions.length > 0 && Object.keys(budgets).length > 0) {
@@ -200,21 +196,50 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
     });
 
+    console.log('=== BUDGET SPEND CALCULATION DEBUG ===');
+    console.log('Budget categories:', Object.keys(budgets));
+    console.log('Category mappings:', categoryMappings);
+    console.log('Current month/year:', currentMonth, currentYear);
+    
+    let processedTransactions = 0;
+    let mappedTransactions = 0;
+    let unmappedTransactions = [];
+
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-        const category = getCategoryFromMapping(transaction.bank_category);
+        processedTransactions++;
+        // Use the category field directly from the transaction instead of mapping from bank_category
+        const category = transaction.category;
         const amount = parseFloat(transaction.amount) || 0;
 
-        if (!spend[category]) {
-          spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
-        }
+        console.log(`Transaction: ${transaction.description} | Category: ${category} | Amount: ${amount} | Label: ${transaction.label}`);
 
-        if (labels.includes(transaction.label)) {
-          spend[category][transaction.label] += amount;
+        // Only process if we have a valid category AND it exists in our budgets
+        if (category && spend[category]) {
+          mappedTransactions++;
+          if (labels.includes(transaction.label)) {
+            spend[category][transaction.label] += amount;
+            console.log(`  -> Added ${amount} to ${category}[${transaction.label}]`);
+          } else {
+            console.log(`  -> Skipped: Label "${transaction.label}" not in allowed labels`);
+          }
+        } else {
+          unmappedTransactions.push({
+            description: transaction.description,
+            category: category,
+            amount: amount,
+            reason: !category ? 'No category found' : `Category "${category}" not in budgets`
+          });
         }
       }
     });
+
+    console.log(`Processed ${processedTransactions} transactions for current month`);
+    console.log(`Successfully mapped ${mappedTransactions} transactions`);
+    console.log(`Unmapped transactions (${unmappedTransactions.length}):`, unmappedTransactions);
+    console.log('Final spend object:', spend);
+    console.log('=== END DEBUG ===');
 
     return spend;
   };
@@ -397,7 +422,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     };
   };
   
-  const summaryData = calculateSummaryData();
+  const summaryData = useMemo(() => {
+    return calculateSummaryData();
+  }, [transactions, budgets, monthlySpendCategories, currentMonth, currentYear, categoryOrder, categoryMappings]);
 
   // Enhanced drag and drop handling functions
   const handleDragStart = (e, category, rowElement) => {
@@ -628,8 +655,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           const categoryIndex = element.index;
           const category = chartData.labels[categoryIndex];
           
-          // Call the navigation function with category, month (convert to 1-12), and year
-          onChartClick(category, currentMonth + 1, currentYear);
+          // Call the navigation function with category, month (keep in 0-11 format), and year
+          onChartClick(category, currentMonth, currentYear);
         }
       }
     }

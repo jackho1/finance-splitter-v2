@@ -18,6 +18,15 @@ const dbConfig = {
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  // Optimized connection pool configuration for scalability
+  max: 10, // Reduced but sufficient pool size
+  min: 2, // Keep minimum connections alive
+  idleTimeoutMillis: 10000, // Shorter idle timeout for faster connection recycling
+  connectionTimeoutMillis: 3000, // Reasonable connection timeout
+  acquireTimeoutMillis: 30000, // How long to wait for connection acquisition
+  createTimeoutMillis: 15000, // How long to wait when creating a new client
+  reapIntervalMillis: 1000, // Check for idle connections every second
+  createRetryIntervalMillis: 200, // Retry connection creation quickly
 };
 
 // Database connection setup
@@ -217,6 +226,183 @@ const getFieldType = (fieldName) => {
   }
 };
 
+// OPTIMIZED COMBINED ENDPOINTS - Reduces database connections by fetching related data in single transactions
+
+// Combined initial data endpoint to reduce database connections
+app.get('/initial-data', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('Fetching all initial data in single transaction...');
+    
+    // Execute all queries in parallel using the same connection
+    const [
+      categoryMappingsResult,
+      transactionsResult,
+      labelsResult,
+      bankCategoriesResult
+    ] = await Promise.all([
+      client.query('SELECT * FROM shared_category ORDER BY bank_category'),
+      client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
+      client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC'),
+      client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category')
+    ]);
+    
+    // Process the results
+    const categoryMappings = {};
+    categoryMappingsResult.rows.forEach(row => {
+      categoryMappings[row.bank_category] = row.category;
+    });
+    
+    const bankCategories = bankCategoriesResult.rows.map(row => row.bank_category);
+    bankCategories.push(null); // Add null as a valid option
+    
+    const labels = labelsResult.rows.map(row => row.label);
+    
+    console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories`);
+    
+    res.json({
+      success: true,
+      data: {
+        transactions: transactionsResult.rows,
+        categoryMappings,
+        labels,
+        bankCategories
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching initial data:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Combined personal data endpoint
+app.get('/personal-initial-data', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('Fetching all personal initial data in single transaction...');
+    
+    const [
+      personalTransactionsResult,
+      personalCategoriesResult,
+      autoDistributionRulesResult,
+      personalSettingsResult
+    ] = await Promise.all([
+      client.query('SELECT * FROM personal_transactions ORDER BY date DESC'),
+      client.query('SELECT * FROM personal_category ORDER BY category'),
+      client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', ['default']),
+      client.query('SELECT * FROM personal_settings WHERE user_id = $1', ['default'])
+    ]);
+    
+    console.log(`Successfully fetched personal data: ${personalTransactionsResult.rows.length} transactions, ${personalCategoriesResult.rows.length} categories, ${autoDistributionRulesResult.rows.length} rules`);
+    
+    res.json({
+      success: true,
+      data: {
+        personalTransactions: personalTransactionsResult.rows,
+        personalCategories: personalCategoriesResult.rows,
+        autoDistributionRules: autoDistributionRulesResult.rows,
+        personalSettings: personalSettingsResult.rows[0] || {}
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching personal initial data:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Combined offset data endpoint
+app.get('/offset-initial-data', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('Fetching all offset initial data in single transaction...');
+    
+    const [
+      offsetTransactionsResult,
+      offsetCategoriesResult,
+      labelsResult
+    ] = await Promise.all([
+      client.query('SELECT * FROM offset_transactions ORDER BY date DESC'),
+      client.query('SELECT * FROM offset_category ORDER BY category'),
+      client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC')
+    ]);
+    console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories`);
+    
+    res.json({
+      success: true,
+      data: {
+        offsetTransactions: offsetTransactionsResult.rows,
+        offsetCategories: offsetCategoriesResult.rows.map(item => item.category),
+        labels: labelsResult.rows.map(row => row.label)
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching offset initial data:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Combined budget data endpoint
+app.get('/budget-initial-data', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('Fetching all budget initial data in single transaction...');
+    
+    const [
+      budgetCategoriesResult,
+      transactionsResult,
+      categoryMappingsResult
+    ] = await Promise.all([
+      client.query('SELECT * FROM budget_category ORDER BY category'),
+      client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
+      client.query('SELECT * FROM shared_category ORDER BY bank_category')
+    ]);
+    
+    // Process category mappings
+    const categoryMappings = {};
+    categoryMappingsResult.rows.forEach(row => {
+      categoryMappings[row.bank_category] = row.category;
+    });
+    
+    console.log(`Successfully fetched budget data: ${budgetCategoriesResult.rows.length} budget categories, ${transactionsResult.rows.length} transactions`);
+    
+    res.json({
+      success: true,
+      data: {
+        budgetCategories: budgetCategoriesResult.rows,
+        transactions: transactionsResult.rows,
+        categoryMappings
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching budget initial data:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
 /**
  * GET /transactions - Retrieves transactions with optional filters
  */
@@ -245,7 +431,7 @@ app.get('/transactions', async (req, res) => {
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-    const query = `SELECT ${fields} FROM shared_transactions ${whereClause}`;
+    const query = `SELECT ${fields} FROM shared_transactions_generalized ${whereClause}`;
     
     const { rows } = await pool.query(query, values);
 
@@ -264,8 +450,8 @@ app.put('/transactions/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    // Validate the transaction exists first and get current values
-    const checkResult = await pool.query('SELECT * FROM shared_transactions WHERE id = $1', [id]);
+    // Validate the transaction exists first and get current values from the generalized view
+    const checkResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
@@ -381,7 +567,7 @@ app.put('/transactions/:id', async (req, res) => {
       });
     }
     
-    // Build query for database update
+    // Build query for database update (update the base table)
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
@@ -401,10 +587,13 @@ app.put('/transactions/:id', async (req, res) => {
       });
     }
     
-    // Return success with updated transaction data
+    // Get the updated transaction from the generalized view to return complete data
+    const updatedResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [id]);
+    
+    // Return success with updated transaction data from generalized view
     res.json({
       success: true,
-      data: rows[0],
+      data: updatedResult.rows[0],
       message: 'Transaction updated successfully',
       changedFields: Object.keys(validUpdates)
     });
@@ -852,8 +1041,6 @@ const arraysAreEqual = (arr1, arr2) => {
   return arr1.every((val, idx) => val === arr2[idx]);
 };
 
-// Keep all other endpoints from the original file unchanged...
-
 /**
  * POST /transactions - Creates a new transaction with auto-generated ID
  */
@@ -945,7 +1132,7 @@ app.post('/transactions', async (req, res) => {
       });
     }
     
-    // Build query for inserting the new transaction
+    // Build query for inserting the new transaction (insert into base table)
     const fields = Object.keys(validFields);
     const placeholders = fields.map((field, index) => `$${index + 1}`);
     const values = Object.values(validFields);
@@ -966,10 +1153,14 @@ app.post('/transactions', async (req, res) => {
       });
     }
     
-    // Return success with new transaction data
+    // Get the complete transaction data from the generalized view
+    const newTransactionId = rows[0].id;
+    const completeResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [newTransactionId]);
+    
+    // Return success with new transaction data from generalized view
     res.status(201).json({
       success: true,
-      data: rows[0],
+      data: completeResult.rows[0],
       message: 'Transaction created successfully'
     });
   } catch (err) {
@@ -985,7 +1176,13 @@ app.post('/transactions', async (req, res) => {
 // GET /labels — returns distinct labels for dropdown filter
 app.get('/labels', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT DISTINCT label FROM shared_transactions ORDER BY label DESC');
+    const { rows } = await pool.query(`SELECT DISTINCT label FROM shared_transactions_generalized 
+                                      ORDER BY CASE 
+                                        WHEN label = 'Ruby' THEN 1 
+                                        WHEN label = 'Jack' THEN 2 
+                                        WHEN label = 'Both' THEN 3 
+                                        ELSE 4 
+                                      END`);
     res.json(rows.map(row => row.label).filter(label => label != null));
   } catch (err) {
     console.error('Error fetching labels:', err);
@@ -997,9 +1194,10 @@ app.get('/labels', async (req, res) => {
 app.get('/category-mappings', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT sc.bank_category, bc.category 
-      FROM shared_category sc
-      JOIN budget_category bc ON sc.category = bc.id
+      SELECT DISTINCT bank_category, category 
+      FROM shared_transactions_generalized 
+      WHERE bank_category IS NOT NULL AND category IS NOT NULL
+      ORDER BY bank_category
     `);
     
     // Convert the rows to a mapping object for easier consumption by the frontend
@@ -1026,19 +1224,25 @@ app.get('/budget-categories', async (req, res) => {
   }
 });
 
-// GET /bank-categories - returns all bank categories from the shared_category table
+// GET /bank-categories - returns all bank categories from the shared_transactions_generalized view
 app.get('/bank-categories', async (req, res) => {
+  console.log('Fetching bank categories...');
   try {
-    const { rows } = await pool.query('SELECT DISTINCT bank_category FROM shared_category');
-    const bankCategories = rows.map(row => row.bank_category).filter(category => category !== null);
+    const { rows } = await pool.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category');
+    const bankCategories = rows.map(row => row.bank_category);
     
     // Add null as a valid option
     bankCategories.push(null);
     
+    console.log(`Successfully fetched ${bankCategories.length} bank categories`);
     res.json(bankCategories);
   } catch (err) {
     console.error('Error fetching bank categories:', err);
-    res.status(500).send('Server error');
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
   }
 });
 
@@ -1895,9 +2099,9 @@ app.post('/transactions/split', async (req, res) => {
       });
     }
     
-    // Get the original transaction to verify it exists and extract data
+    // Get the original transaction from the generalized view to verify it exists and extract data
     const originalTransactionResult = await client.query(
-      'SELECT * FROM shared_transactions WHERE id = $1',
+      'SELECT * FROM shared_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
     
@@ -1947,26 +2151,6 @@ app.post('/transactions/split', async (req, res) => {
       });
     }
     
-    // Before we start, let's try to update the trigger function if needed
-    try {
-      await client.query(`
-        CREATE OR REPLACE FUNCTION set_transaction_category()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.category := (
-            SELECT category 
-            FROM shared_category 
-            WHERE bank_category = NEW.bank_category
-          );
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-    } catch (triggerErr) {
-      console.log('Note: Could not update trigger function:', triggerErr.message);
-      // Continue anyway, this is just a precaution
-    }
-    
     // Check if has_split column exists, add it if it doesn't
     try {
       const checkColumn = await client.query(`
@@ -2001,13 +2185,13 @@ app.post('/transactions/split', async (req, res) => {
       // Continue anyway, this is just a precaution
     }
     
-    // Update the original transaction with the remaining amount and mark it as split
+    // Update the original transaction with the remaining amount and mark it as split (update base table)
     await client.query(
       'UPDATE shared_transactions SET amount = $1, has_split = TRUE WHERE id = $2',
       [remainingAmount, originalTransactionId]
     );
     
-    // Insert split transactions
+    // Insert split transactions (insert into base table)
     for (const splitTransaction of splitTransactions) {
       await client.query(
         'INSERT INTO shared_transactions (date, description, amount, bank_category, label, split_from_id) VALUES ($1, $2, $3, $4, $5, $6)',

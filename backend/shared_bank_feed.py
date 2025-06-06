@@ -120,7 +120,6 @@ def categorize_and_label_transactions(transactions):
             'date': tx['date'],
             'description': description,
             'amount': amount,
-            'category': None,
             'bank_category': bank_category,
             'label': label
         })
@@ -135,8 +134,8 @@ def insert_transactions(transactions):
 
         for tx in transactions:
             insert_query = sql.SQL("""
-                INSERT INTO shared_transactions (id, date, description, amount, category, bank_category, label)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO shared_transactions (id, date, description, amount, bank_category, label)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
             """)
             cursor.execute(insert_query, (
@@ -144,7 +143,6 @@ def insert_transactions(transactions):
                 tx['date'],
                 tx['description'],
                 tx['amount'],
-                tx['category'],
                 tx['bank_category'],
                 tx['label']
             ))

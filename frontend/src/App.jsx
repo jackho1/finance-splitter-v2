@@ -144,19 +144,48 @@ const App = () => {
     return color;
   };
   
-  // Fetch category mappings from the backend
+  // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
-    setIsCategoryMappingsLoading(true);
+    const fetchInitialData = async () => {
+      setIsTransactionsLoading(true);
+      setIsLabelsLoading(true);
+      setIsCategoryMappingsLoading(true);
+      
+      try {
+        console.log('Fetching initial data using optimized endpoint...');
+        
+        // Single API call to get all initial data
+        const response = await axios.get('http://localhost:5000/initial-data');
+        
+        if (response.data.success) {
+          const { transactions, categoryMappings, labels, bankCategories } = response.data.data;
+          
+          // Set all data from the combined response
+          setCategoryMappings(categoryMappings);
+          setTransactions(transactions || []);
+          setFilteredTransactions(transactions);
+          setAllFilteredTransactions(transactions);
+          setLabels(labels);
+          setAvailableBankCategories(bankCategories);
+          
+          // Update loading states
+          setIsCategoryMappingsLoading(false);
+          setIsTransactionsLoading(false);
+          setIsLabelsLoading(false);
+          
+          console.log('All initial data loaded successfully using optimized endpoint');
+        } else {
+          throw new Error(response.data.error || 'Failed to fetch initial data');
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        setIsTransactionsLoading(false);
+        setIsLabelsLoading(false);
+        setIsCategoryMappingsLoading(false);
+      }
+    };
     
-    axios.get('http://localhost:5000/category-mappings')
-      .then(response => {
-        setCategoryMappings(response.data);
-        setIsCategoryMappingsLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching category mappings:', err);
-        setIsCategoryMappingsLoading(false);
-      });
+    fetchInitialData();
   }, []);
   
   // Function to get category from bank_category using mappings
@@ -165,72 +194,25 @@ const App = () => {
     // Only return a value if it exists in the mappings
     return categoryMappings[bankCategory] || null;
   };
-  
-  useEffect(() => {
-    // Set loading state to true before fetching data
-    setIsTransactionsLoading(true);
-    
-    axios.get('http://localhost:5000/transactions')
-      .then(response => {
-        setTransactions(response.data);
-        setFilteredTransactions(response.data);
-        setAllFilteredTransactions(response.data);
-        setIsTransactionsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        // Set loading state to false even if there's an error
-        setIsTransactionsLoading(false);
-      });
-  }, []);
 
   // Extract available categories when transactions and mappings are loaded
   useEffect(() => {
-    if (transactions.length && Object.keys(categoryMappings).length) {
-      // Get unique categories from transactions using the mapping
+    if (transactions.length) {
+      // Get unique categories directly from transactions' category field
       const categories = [...new Set(
         transactions
-          .map(t => getCategoryFromMapping(t.bank_category))
+          .map(t => t.category)  // Use direct category field instead of mapping from bank_category
           .filter(category => category !== null && category !== undefined && category !== '')
       )].sort();
       
       // Add null/empty as the last option if they exist in the data
-      if (transactions.some(t => !getCategoryFromMapping(t.bank_category))) {
+      if (transactions.some(t => !t.category)) {
         categories.push(null);
       }
       
       setAvailableCategories(categories);
     }
-  }, [transactions, categoryMappings]);
-
-  // Fetch labels from the backend
-  useEffect(() => {
-    // Set loading state to true before fetching labels
-    setIsLabelsLoading(true);
-    
-    axios.get('http://localhost:5000/labels')
-      .then(response => {
-        setLabels(response.data);
-        // Set loading state to false after successfully fetching labels
-        setIsLabelsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        // Set loading state to false even if there's an error
-        setIsLabelsLoading(false);
-      });
-  }, []);
-
-  // Fetch bank categories for filters and editing from the backend
-  useEffect(() => {
-    axios.get('http://localhost:5000/bank-categories')
-      .then(response => {
-        setAvailableBankCategories(response.data);
-      })
-      .catch(err => {
-        console.error('Error fetching bank categories:', err);
-      });
-  }, []);
+  }, [transactions]); // Remove categoryMappings dependency since we're not using it
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -343,7 +325,7 @@ const App = () => {
         
         if (categoryFilter.length > 0) {
           filtered = filtered.filter(transaction => {
-            const category = getCategoryFromMapping(transaction.bank_category);
+            const category = transaction.category;  // Use direct category field
             if (categoryFilter.includes(null) && category === null) {
               return true;
             }
@@ -429,7 +411,7 @@ const App = () => {
     // Apply additional category filtering if needed
     if (categoryFilter.length > 0) {
       filtered = filtered.filter(transaction => {
-        const category = getCategoryFromMapping(transaction.bank_category);
+        const category = transaction.category;  // Use direct category field
         
         // Check if we're filtering for null and the transaction category is null
         if (categoryFilter.includes(null) && category === null) {
@@ -468,7 +450,6 @@ const App = () => {
     labelFilter, 
     categoryFilter, 
     labels, 
-    categoryMappings,
     currentMonth,
     currentYear
   ]);
@@ -481,7 +462,7 @@ const App = () => {
   // Create datasets for each category (instead of bank category)
   const uniqueCategories = [...new Set(
     allFilteredTransactions
-      .map(transaction => getCategoryFromMapping(transaction.bank_category))
+      .map(transaction => transaction.category)  // Use direct category field
       .filter(category => category !== null && category !== undefined && category !== '')
   )].sort();
 
@@ -531,7 +512,7 @@ const App = () => {
     
     chartFilteredTransactions.forEach(transaction => {
       const month = new Date(transaction.date).getMonth();
-      const transactionCategory = getCategoryFromMapping(transaction.bank_category);
+      const transactionCategory = transaction.category;  // Use direct category field
       
       if (transactionCategory === category) {
         let amount = parseFloat(transaction.amount) || 0;
@@ -934,7 +915,7 @@ const App = () => {
           
           // Check category filter
           if (categoryFilter.length > 0) {
-            const category = getCategoryFromMapping(addedTransaction.bank_category);
+            const category = addedTransaction.category;  // Use direct category field
             if (!categoryFilter.includes(category) && 
                 !(categoryFilter.includes(null) && category === null)) {
               shouldAdd = false;
@@ -1028,13 +1009,8 @@ const App = () => {
     setBankCategoryFilter([]);
     setLabelFilter([]);
     
-    // Find all bank categories that map to this category
-    const matchingBankCategories = Object.entries(categoryMappings)
-      .filter(([bankCat, cat]) => cat === category)
-      .map(([bankCat, _]) => bankCat);
-    
-    // Set the bank category filter to include all matching categories
-    setBankCategoryFilter(matchingBankCategories);
+    // Set the category filter directly to the clicked category
+    setCategoryFilter([category]);
     
     // Scroll to top to show the transactions table
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1971,14 +1947,10 @@ const App = () => {
         // Apply additional category filtering if needed
         if (categoryFilter.length > 0) {
           filtered = filtered.filter(transaction => {
-            const category = getCategoryFromMapping(transaction.bank_category);
-            
-            // Check if we're filtering for null and the transaction category is null
+            const category = transaction.category;  // Use direct category field
             if (categoryFilter.includes(null) && category === null) {
               return true;
             }
-            
-            // Check if the transaction category is in the filter
             return categoryFilter.includes(category);
           });
         }
