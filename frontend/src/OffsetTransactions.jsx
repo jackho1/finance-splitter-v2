@@ -5,38 +5,7 @@ import axios from 'axios';
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
-
-// Add help-text styles for consistent appearance (copied from Budgets.jsx)
-const helpTextStyle = `
-  .help-text {
-    display: flex;
-    align-items: flex-start;
-    background-color: #f8f9fa;
-    padding: 6px 10px;
-    border-radius: 4px;
-    border-left: 3px solid #4a90e2;
-    margin-bottom: 8px;
-    font-size: 11px;
-    color: #505050;
-    font-family: 'Inter', sans-serif;
-    line-height: 1.3;
-  }
-  .help-text-icon {
-    color: #4a90e2;
-    margin-right: 8px;
-    margin-top: 1px;
-    flex-shrink: 0;
-  }
-  .help-text-content {
-    flex: 1;
-  }
-`;
-if (typeof document !== 'undefined' && !document.getElementById('help-text-style')) {
-  const style = document.createElement('style');
-  style.id = 'help-text-style';
-  style.innerHTML = helpTextStyle;
-  document.head.appendChild(style);
-}
+import './ModernTables.css';
 
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
@@ -45,7 +14,7 @@ const HelpText = ({ children, isVisible }) => {
   return (
     <div className="help-text">
       <div className="help-text-icon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
           <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
@@ -54,6 +23,20 @@ const HelpText = ({ children, isVisible }) => {
     </div>
   );
 };
+
+// Modern filter button component
+const FilterButton = ({ isActive, onClick, children }) => (
+  <button 
+    className={`filter-button ${isActive ? 'active' : ''}`}
+    onClick={onClick}
+    title="Filter"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+    </svg>
+    {children}
+  </button>
+);
 
 const OffsetTransactions = ({ helpTextVisible }) => {
   const [transactions, setTransactions] = useState([]);
@@ -211,65 +194,58 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     label: ''
   });
   
-  // Fetch offset transactions from the backend
+  // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
-    setIsTransactionsLoading(true);
-    
-    axios.get('http://localhost:5000/offset-transactions')
-      .then(response => {
-        console.log('Offset transactions loaded:', response.data.length);
+    const fetchInitialData = async () => {
+      setIsTransactionsLoading(true);
+      setIsLabelsLoading(true);
+      
+      try {
+        console.log('Fetching offset transactions data using optimized endpoint...');
         
-        // Check for transactions with split properties
-        const hasSplitTransactions = response.data.filter(t => t.has_split);
-        const splitFromTransactions = response.data.filter(t => t.split_from_id);
+        // Single API call to get all offset initial data
+        const response = await axios.get('http://localhost:5000/offset-initial-data');
         
-        console.log('Transactions with has_split:', hasSplitTransactions.length);
-        if (hasSplitTransactions.length > 0) {
-          console.log('Sample has_split transaction:', hasSplitTransactions[0]);
+        if (response.data.success) {
+          const { offsetTransactions, offsetCategories, labels } = response.data.data;
+          
+          // Check for transactions with split properties (for debugging)
+          const hasSplitTransactions = offsetTransactions.filter(t => t.has_split);
+          const splitFromTransactions = offsetTransactions.filter(t => t.split_from_id);
+          
+          console.log('Transactions with has_split:', hasSplitTransactions.length);
+          if (hasSplitTransactions.length > 0) {
+            console.log('Sample has_split transaction:', hasSplitTransactions[0]);
+          }
+          
+          console.log('Transactions with split_from_id:', splitFromTransactions.length);
+          if (splitFromTransactions.length > 0) {
+            console.log('Sample split_from_id transaction:', splitFromTransactions[0]);
+          }
+          
+          // Set all data from the combined response
+          setTransactions(offsetTransactions);
+          setFilteredTransactions(offsetTransactions);
+          setAllFilteredTransactions(offsetTransactions);
+          setIsTransactionsLoading(false);
+          
+          setAvailableCategories(offsetCategories);
+          
+          setLabels(labels);
+          setIsLabelsLoading(false);
+          
+          console.log('All offset transactions data loaded successfully using optimized endpoint');
+        } else {
+          throw new Error(response.data.error || 'Failed to fetch offset initial data');
         }
-        
-        console.log('Transactions with split_from_id:', splitFromTransactions.length);
-        if (splitFromTransactions.length > 0) {
-          console.log('Sample split_from_id transaction:', splitFromTransactions[0]);
-        }
-        
-        setTransactions(response.data);
-        setFilteredTransactions(response.data);
-        setAllFilteredTransactions(response.data);
+      } catch (error) {
+        console.error('Error fetching offset initial data:', error);
         setIsTransactionsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsTransactionsLoading(false);
-      });
-  }, []);
-
-  // Update the useEffect that fetches categories
-  useEffect(() => {
-    axios.get('http://localhost:5000/offset-categories')
-      .then(response => {
-        // Map the data to extract just the category names
-        const categories = response.data.map(item => item.category);
-        setAvailableCategories(categories);
-      })
-      .catch(err => {
-        console.error('Error fetching offset categories:', err);
-      });
-  }, []);
-
-  // Fetch labels from the backend
-  useEffect(() => {
-    setIsLabelsLoading(true);
+        setIsLabelsLoading(false);
+      }
+    };
     
-    axios.get('http://localhost:5000/labels')
-      .then(response => {
-        setLabels(response.data);
-        setIsLabelsLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching labels:', err);
-        setIsLabelsLoading(false);
-      });
+    fetchInitialData();
   }, []);
 
   // Close filter dropdown when clicking outside
@@ -616,6 +592,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           return (
             <input
               type="date"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
@@ -625,26 +602,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ textAlign: 'center' }}
               autoFocus
             />
           );
@@ -653,6 +611,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             <input
               type="number"
               step="0.01"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
@@ -662,84 +621,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ textAlign: 'center' }}
               autoFocus
             />
           );
         case 'category':
           return (
             <select 
-              value={editValue || ''}
-              onChange={handleInputChange} 
-              onBlur={(e) => {
-                e.target.style.borderColor = editValue === '' ? '#ffc107' : '#e2e8f0';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-                handleUpdate(transaction.id, field);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleUpdate(transaction.id, field);
-                }
-              }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: editValue === '' ? '2px solid #ffc107' : '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                backgroundSize: '16px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
-              autoFocus
-            >
-              <option value="" style={{ color: '#a0aec0' }}>Select a category (required)</option>
-              {availableCategories.map(category => (
-                <option key={category} value={category} style={{ color: '#2d3748' }}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          );
-        case 'label':
-          return (
-            <select 
-              value={editValue || ''}
+              className="modern-select"
+              value={editValue || ''} 
               onChange={handleInputChange} 
               onBlur={() => handleUpdate(transaction.id, field)}
               onKeyDown={(e) => {
@@ -748,38 +638,34 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
-                width: '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                backgroundSize: '16px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ textAlign: 'center' }}
               autoFocus
             >
-              <option value="" style={{ color: '#a0aec0' }}>Select a label</option>
+              <option value="">Select a category</option>
+              {availableCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          );
+        case 'label':
+          return (
+            <select 
+              className="modern-select"
+              value={editValue || ''} 
+              onChange={handleInputChange} 
+              onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
+              style={{ textAlign: 'center' }}
+              autoFocus
+            >
+              <option value="">Select a label</option>
               {labels.map(label => (
-                <option key={label} value={label} style={{ color: '#2d3748' }}>
-                  {label}
-                </option>
+                <option key={label} value={label}>{label}</option>
               ))}
             </select>
           );
@@ -787,6 +673,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           return (
             <input
               type="text"
+              className="modern-input"
               value={editValue || ''}
               onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
@@ -796,33 +683,14 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
-                width: field === 'description' ? '400px' : '200px',
-                maxWidth: '100%',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                position: 'relative',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                color: '#2d3748',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4299e1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.15)';
-              }}
+              style={{ width: field === 'description' ? '400px' : '200px', textAlign: 'center' }}
               autoFocus
             />
           );
       }
     }
 
-    // For non-edit mode, just display the value directly
+    // Display cell content
     const isEmpty = 
       transaction[field] === null || 
       transaction[field] === undefined || 
@@ -830,11 +698,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     
     return (
       <div 
+        className="cell-content editable-cell"
         onDoubleClick={() => handleDoubleClick(transaction.id, field, transaction[field] || '')}
-        style={{ cursor: 'pointer', minHeight: '1.2em' }}
       >
         {isEmpty ? (
-          ''
+          <span className="empty-value"></span>
         ) : field === 'date' ? (
           new Date(transaction[field]).toLocaleDateString('en-GB', {
             day: 'numeric',
@@ -842,7 +710,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             year: 'numeric'
           })
         ) : field === 'amount' && transaction[field] != null && !isNaN(transaction[field]) ? (
-          transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`
+          <span className={transaction[field] < 0 ? 'amount-negative' : 'amount-positive'}>
+            {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
+          </span>
         ) : (
           transaction[field]
         )}
@@ -850,29 +720,449 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     );
   };
 
+  // Add helper functions for split transactions
+  const getRelatedTransactions = (transaction) => {
+    // If this is an original transaction that's been split
+    if (transaction.has_split) {
+      return transactions.filter(t => t.split_from_id === transaction.id);
+    }
+    // If this is a split transaction
+    else if (transaction.split_from_id) {
+      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
+      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
+      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
+    }
+    return [];
+  };
+
+  const renderRelatedTransactionIndicator = (transaction) => {
+    const relatedTransactions = getRelatedTransactions(transaction);
+    
+    if (relatedTransactions.length === 0) return null;
+    
+    if (transaction.has_split) {
+      return (
+        <span style={{
+          backgroundColor: '#e0f2fe',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0369a1',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px solid #bae6fd',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+          </svg>
+          <span>Split ({relatedTransactions.length})</span>
+        </span>
+      );
+    } else if (transaction.split_from_id) {
+      const originalTransaction = relatedTransactions[0];
+      return (
+        <span style={{
+          backgroundColor: '#f0f9ff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0284c7',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px dashed #7dd3fc',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+          </svg>
+          <span>Split from</span>
+        </span>
+      );
+    }
+    return null;
+  };
+
   // Loading spinner component
   const LoadingSpinner = () => (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      padding: '20px',
-      height: '100px'
-    }}>
-      <div style={{ 
-        width: '40px', 
-        height: '40px', 
-        border: '4px solid rgba(0, 0, 0, 0.1)', 
-        borderLeft: '4px solid #3498db', 
-        borderRadius: '50%', 
-        animation: 'spin 1s linear infinite' 
-      }}></div>
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+    <div className="loading-spinner" />
+  );
+
+  // Get row color class based on label
+  const getRowLabelClass = (label) => {
+    if (label === labels[0]) return 'row-ruby';
+    if (label === labels[1]) return 'row-jack';
+    if (label === labels[2]) return 'row-both';
+    return '';
+  };
+
+  // Modern table render function
+  const renderTransactionsTable = () => (
+    <div className="modern-table-container fade-in">
+      {isTransactionsLoading || isLabelsLoading ? (
+        <div className="loading-spinner" />
+      ) : (
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Date</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'date'}
+                    onClick={() => toggleColumnFilter('date')}
+                  />
+                </div>
+                {activeFilterColumn === 'date' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-group">
+                      <label>From:</label>
+                      <input 
+                        type="date" 
+                        name="startDate"
+                        className="modern-input"
+                        value={dateFilter.startDate}
+                        onChange={handleDateFilterChange}
+                        min={dateRange.min}
+                        max={dateRange.max}
+                      />
+                    </div>
+                    <div className="filter-group">
+                      <label>To:</label>
+                      <input 
+                        type="date" 
+                        name="endDate"
+                        className="modern-input"
+                        value={dateFilter.endDate}
+                        onChange={handleDateFilterChange}
+                        min={dateRange.min}
+                        max={dateRange.max}
+                      />
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Description</span>
+                </div>
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Amount</span>
+                </div>
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Category</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'category'}
+                    onClick={() => toggleColumnFilter('category')}
+                  />
+                </div>
+                {activeFilterColumn === 'category' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-options">
+                      {availableCategories.map(category => (
+                        <label key={category} className="filter-option">
+                          <input 
+                            type="checkbox"
+                            className="modern-checkbox"
+                            checked={categoryFilter.includes(category)}
+                            onChange={(e) => handleCategoryFilterChange(category, e)}
+                          />
+                          <span>{category}</span>
+                        </label>
+                      ))}
+                      {transactions.some(t => !t.category) && (
+                        <label className="filter-option">
+                          <input 
+                            type="checkbox"
+                            className="modern-checkbox"
+                            checked={categoryFilter.includes(null)}
+                            onChange={(e) => handleCategoryFilterChange(null, e)}
+                          />
+                          <span>(Empty/Null)</span>
+                        </label>
+                      )}
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setCategoryFilter([])}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+              <th>
+                <div className="modern-filter-header">
+                  <span>Label</span>
+                  <FilterButton
+                    isActive={activeFilterColumn === 'label'}
+                    onClick={() => toggleColumnFilter('label')}
+                  />
+                </div>
+                {activeFilterColumn === 'label' && (
+                  <div ref={filterPopupRef} className="filter-dropdown">
+                    <div className="filter-options">
+                      {labels.map(label => (
+                        <label key={label} className="filter-option">
+                          <input 
+                            type="checkbox"
+                            className="modern-checkbox"
+                            checked={labelFilter.includes(label)}
+                            onChange={(e) => handleLabelFilterChange(label, e)}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="filter-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => setLabelFilter([])}
+                      >
+                        Clear
+                      </button>
+                      <button 
+                        className="btn-primary"
+                        onClick={() => setActiveFilterColumn(null)}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTransactions.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="empty-state">
+                  <div className="empty-state-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </div>
+                  <h3>No transactions found</h3>
+                  <p>Try adjusting your filters or add a new transaction</p>
+                </td>
+              </tr>
+            ) : (
+              filteredTransactions.map(transaction => (
+                <React.Fragment key={transaction.id}>
+                  <tr 
+                    className={getRowLabelClass(transaction.label)} 
+                    style={{ 
+                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
+                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                      transition: 'background-color 0.2s',
+                      borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
+                    }}
+                  >
+                    <td>{renderCell(transaction, 'date')}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
+                          {transaction.split_from_id && (
+                            <span style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              marginRight: '6px',
+                              color: '#3b82f6',
+                              flexShrink: 0
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M7 17l-5-5 5-5"/>
+                              </svg>
+                            </span>
+                          )}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {renderCell(transaction, 'description')}
+                            {renderRelatedTransactionIndicator(transaction)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f0f0f0';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="Click to expand transaction options"
+                        >
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2"
+                            style={{ 
+                              transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s',
+                              opacity: 0.7
+                            }}
+                          >
+                            <path d="M6 9l6 6 6-6"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td>{renderCell(transaction, 'amount')}</td>
+                    <td>{renderCell(transaction, 'category')}</td>
+                    <td>{renderCell(transaction, 'label')}</td>
+                  </tr>
+                  {expandedRow === transaction.id && (
+                    <tr>
+                      <td colSpan="5" style={{ 
+                        padding: '0',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ 
+                          padding: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
+                        }}>
+                          <div style={{ display: 'flex', gap: '20px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSplitTransaction(transaction);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s'
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                              </svg>
+                              Split Transaction
+                            </button>
+                          </div>
+                          
+                          {/* Show related transactions when expanded */}
+                          {getRelatedTransactions(transaction).length > 0 && (
+                            <div style={{ 
+                              marginTop: '12px', 
+                              borderTop: '1px dashed #cbd5e1',
+                              paddingTop: '12px'
+                            }}>
+                              <div style={{ 
+                                fontSize: '14px', 
+                                fontWeight: '500', 
+                                marginBottom: '8px',
+                                color: '#475569'
+                              }}>
+                                {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {getRelatedTransactions(transaction).map(related => (
+                                  <div key={related.id} style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    padding: '8px',
+                                    backgroundColor: 'white',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      gap: '12px', 
+                                      alignItems: 'center',
+                                      fontSize: '13px',
+                                      flex: 1,
+                                      marginRight: '16px'
+                                    }}>
+                                      <div>{new Date(related.date).toLocaleDateString()}</div>
+                                      <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                    </div>
+                                    <div style={{ 
+                                      fontWeight: '500',
+                                      fontSize: '13px',
+                                      color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                    }}>
+                                      {parseFloat(related.amount) < 0 ? 
+                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                        `$${parseFloat(related.amount).toFixed(2)}`}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 
@@ -1329,382 +1619,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       selectedNegativeOffsetBucket: bucketName 
     });
   };
-
-  // Add this function before the renderTransactionsTable function to group related split transactions
-  const getRelatedTransactions = (transaction) => {
-    console.log('getRelatedTransactions called for transaction:', transaction.id, 
-                'has_split:', transaction.has_split, 
-                'split_from_id:', transaction.split_from_id);
-    
-    // If this is an original transaction that's been split
-    if (transaction.has_split) {
-      return transactions.filter(t => t.split_from_id === transaction.id);
-    }
-    // If this is a split transaction
-    else if (transaction.split_from_id) {
-      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
-      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
-      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
-    }
-    return [];
-  };
-
-  // Add a function to render the related transactions indicator
-  const renderRelatedTransactionIndicator = (transaction) => {
-    console.log('renderRelatedTransactionIndicator called for transaction:', transaction.id, 
-                'has_split:', transaction.has_split, 
-                'split_from_id:', transaction.split_from_id);
-    
-    const relatedTransactions = getRelatedTransactions(transaction);
-    
-    if (relatedTransactions.length === 0) return null;
-    
-    if (transaction.has_split) {
-      console.log('Rendering split-into indicator for transaction:', transaction.id, 
-                  'related count:', relatedTransactions.length);
-      return (
-        <span style={{
-          backgroundColor: '#e0f2fe',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: '#0369a1',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          border: '1px solid #bae6fd',
-          marginLeft: '8px',
-          whiteSpace: 'nowrap',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
-          </svg>
-          <span style={{ fontWeight: '500' }}>Split ({relatedTransactions.length})</span>
-        </span>
-      );
-    } else if (transaction.split_from_id) {
-      const originalTransaction = relatedTransactions[0];
-      console.log('Rendering split-from indicator for transaction:', transaction.id, 
-                  'original transaction:', originalTransaction ? originalTransaction.id : 'unknown');
-      return (
-        <span style={{
-          backgroundColor: '#f0f9ff',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: '#0284c7',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          border: '1px dashed #7dd3fc',
-          marginLeft: '8px',
-          whiteSpace: 'nowrap',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-          zIndex: 5,
-          position: 'relative'
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
-          </svg>
-          <span style={{ fontWeight: '500' }}>Split from</span>
-        </span>
-      );
-    }
-    return null;
-  };
-
-  // Update the renderTransactionsTable function to include the visual elements for split transactions
-  const renderTransactionsTable = () => {
-    return (
-      <div className="modern-table-container">
-        {isTransactionsLoading ? (
-          <LoadingSpinner />
-        ) : (
-          <table className="modern-table">
-            <thead>
-              <tr>
-                <th>
-                  <div className="modern-filter-header">
-                    <span>Date</span>
-                    <button 
-                      className={`filter-button ${activeFilterColumn === 'date' ? 'active' : ''}`}
-                      onClick={() => toggleColumnFilter('date')}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-                      </svg>
-                    </button>
-                  </div>
-                  {activeFilterColumn === 'date' && (
-                    <div className="filter-dropdown">
-                      <div className="filter-group">
-                        <label>From:</label>
-                        <input 
-                          type="date" 
-                          name="startDate"
-                          value={dateFilter.startDate}
-                          onChange={handleDateFilterChange}
-                          min={dateRange.min}
-                          max={dateRange.max}
-                        />
-                      </div>
-                      <div className="filter-group">
-                        <label>To:</label>
-                        <input 
-                          type="date" 
-                          name="endDate"
-                          value={dateFilter.endDate}
-                          onChange={handleDateFilterChange}
-                          min={dateRange.min}
-                          max={dateRange.max}
-                        />
-                      </div>
-                      <div className="filter-actions">
-                        <button onClick={clearFilters}>Clear</button>
-                        <button onClick={() => setActiveFilterColumn(null)}>Apply</button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>
-                  <div className="modern-filter-header">
-                    <span>Category</span>
-                    <button 
-                      className={`filter-button ${activeFilterColumn === 'category' ? 'active' : ''}`}
-                      onClick={() => toggleColumnFilter('category')}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-                      </svg>
-                    </button>
-                  </div>
-                  {activeFilterColumn === 'category' && (
-                    <div className="filter-dropdown">
-                      <div className="filter-options">
-                        {availableCategories.map(category => (
-                          <label key={category} className="filter-checkbox">
-                            <input 
-                              type="checkbox"
-                              checked={categoryFilter.includes(category)}
-                              onChange={(e) => handleCategoryFilterChange(category, e)}
-                            />
-                            <span>{category}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="filter-actions">
-                        <button onClick={() => setCategoryFilter([])}>Clear</button>
-                        <button onClick={() => setActiveFilterColumn(null)}>Apply</button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-                <th>Label</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map(transaction => (
-                <React.Fragment key={transaction.id}>
-                  <tr 
-                    style={{ 
-                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
-                                     transaction.split_from_id ? '#f7fbff' : undefined,
-                      transition: 'background-color 0.2s',
-                      borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
-                    }}
-                  >
-                    <td>{renderCell(transaction, 'date')}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {transaction.split_from_id && (
-                              <div style={{ 
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '2px 4px',
-                                backgroundColor: '#e6f2ff',
-                                color: '#3b82f6',
-                                borderRadius: '4px',
-                                fontWeight: 'bold',
-                                fontSize: '12px',
-                                border: '1px solid #93c5fd'
-                              }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M7 17l-5-5 5-5"/>
-                                </svg>
-                                <span style={{ marginLeft: '4px' }}>Split</span>
-                              </div>
-                            )}
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center',
-                              minWidth: 0,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {renderCell(transaction, 'description')}
-                              {renderRelatedTransactionIndicator(transaction)}
-                            </div>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: '4px',
-                              transition: 'background-color 0.2s',
-                              flexShrink: 0
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f0f0f0';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                            title="Click to expand transaction options"
-                          >
-                            <svg 
-                              width="16" 
-                              height="16" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2"
-                              style={{ 
-                                transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s',
-                                opacity: 0.7
-                              }}
-                            >
-                              <path d="M6 9l6 6 6-6"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{renderCell(transaction, 'amount')}</td>
-                    <td>{renderCell(transaction, 'category')}</td>
-                    <td>{renderCell(transaction, 'label')}</td>
-                  </tr>
-                  {expandedRow === transaction.id && (
-                    <tr>
-                      <td colSpan="5" style={{ 
-                        padding: '0',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0'
-                      }}>
-                        <div style={{ 
-                          padding: '12px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ display: 'flex', gap: '20px' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSplitTransaction(transaction);
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 16px',
-                                backgroundColor: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'background-color 0.2s'
-                              }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
-                              </svg>
-                              Split Transaction
-                            </button>
-                          </div>
-                          
-                          {/* Show related transaction details when expanded */}
-                          <div>
-                            
-                            {/* Show related transactions when expanded */}
-                            {getRelatedTransactions(transaction).length > 0 && (
-                              <div style={{ 
-                                marginTop: '12px', 
-                                borderTop: '1px dashed #cbd5e1',
-                                paddingTop: '12px'
-                              }}>
-                                <div style={{ 
-                                  fontSize: '14px', 
-                                  fontWeight: '500', 
-                                  marginBottom: '8px',
-                                  color: '#475569'
-                                }}>
-                                  {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  {getRelatedTransactions(transaction).map(related => (
-                                    <div key={related.id} style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'space-between',
-                                      padding: '8px',
-                                      backgroundColor: 'white',
-                                      borderRadius: '4px',
-                                      border: '1px solid #e2e8f0'
-                                    }}>
-                                      <div style={{ 
-                                        display: 'flex', 
-                                        gap: '12px', 
-                                        alignItems: 'center',
-                                        fontSize: '13px',
-                                        flex: 1,
-                                        marginRight: '16px'
-                                      }}>
-                                        <div>{new Date(related.date).toLocaleDateString()}</div>
-                                        <div style={{ fontWeight: '500' }}>{related.description}</div>
-                                      </div>
-                                      <div style={{ 
-                                        fontWeight: '500',
-                                        fontSize: '13px',
-                                        color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
-                                      }}>
-                                        {parseFloat(related.amount) < 0 ? 
-                                          `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
-                                          `$${parseFloat(related.amount).toFixed(2)}`}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    );
-  };
-
+  
   return (
     <div style={{ position: 'relative' }}>
       {isUpdating && (
@@ -3235,466 +3150,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         </div>
       )}
       
-      {/* Transactions table */}
-      {isTransactionsLoading ? (
-        <LoadingSpinner />
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('date')}
-                >
-                  Date {activeFilterColumn === 'date' ? '▲' : '▼'}
-                </div>
-                {activeFilterColumn === 'date' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '250px'
-                    }}
-                  >
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ display: 'block', marginBottom: '4px' }}>From:</label>
-                      <input 
-                        type="date" 
-                        name="startDate"
-                        value={dateFilter.startDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ display: 'block', marginBottom: '4px' }}>To:</label>
-                      <input 
-                        type="date" 
-                        name="endDate"
-                        value={dateFilter.endDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#f0f0f0',
-                          color: '#333',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#4a90e2',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Description</th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Amount</th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('category')}
-                >
-                  Category {activeFilterColumn === 'category' ? '▲' : '▼'}
-                </div>
-                {activeFilterColumn === 'category' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '200px',
-                      maxHeight: '300px',
-                      overflowY: 'auto'
-                    }}
-                  >
-                    {availableCategories.map(category => (
-                      <div key={category} style={{ marginBottom: '6px' }}>
-                        <label style={{  display: 'flex', alignItems: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={categoryFilter.includes(category)}
-                            onChange={(e) => handleCategoryFilterChange(category, e)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          {category}
-                        </label>
-                      </div>
-                    ))}
-                    
-                    <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={categoryFilter.includes(null)}
-                          onChange={(e) => handleCategoryFilterChange(null, e)}
-                          style={{ marginRight: '8px' }}
-                        />
-                        (Empty/Null)
-                      </label>
-                    </div>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setCategoryFilter([])}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#f0f0f0',
-                          color: '#333',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#4a90e2',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-              <th style={{ border: '1px solid black', padding: '8px', textAlign: 'center', position: 'relative' }}>
-                <div 
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  onClick={() => toggleColumnFilter('label')}
-                >
-                  Label {activeFilterColumn === 'label' ? '▲' : '▼'}
-                </div>
-                {activeFilterColumn === 'label' && (
-                  <div 
-                    ref={filterPopupRef}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      zIndex: 100,
-                      background: 'white',
-                      border: '1px solid #ccc',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      width: '200px',
-                      maxHeight: '300px',
-                      overflowY: 'auto'
-                    }}
-                  >
-                    {labels.map(label => (
-                      <div key={label} style={{ marginBottom: '6px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={labelFilter.includes(label)}
-                            onChange={(e) => handleLabelFilterChange(label, e)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          {label}
-                        </label>
-                      </div>
-                    ))}
-                    
-                    <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={labelFilter.includes(null)}
-                          onChange={(e) => handleLabelFilterChange(null, e)}
-                          style={{ marginRight: '8px' }}
-                        />
-                        (Empty/Null)
-                      </label>
-                    </div>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <button 
-                        onClick={() => setLabelFilter([])}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#f0f0f0',
-                          color: '#333',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        onClick={() => setActiveFilterColumn(null)}
-                        style={{ 
-                          padding: '6px 12px',
-                          backgroundColor: '#4a90e2',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTransactions.map(transaction => (
-              <React.Fragment key={transaction.id}>
-                <tr 
-                  style={{ 
-                    backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 'white',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                    {renderCell(transaction, 'date')}
-                  </td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
-                        {transaction.split_from_id && (
-                          <span style={{ 
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            marginRight: '6px',
-                            color: '#3b82f6',
-                            flexShrink: 0
-                          }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M7 17l-5-5 5-5"/>
-                            </svg>
-                          </span>
-                        )}
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center',
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {renderCell(transaction, 'description')}
-                          {renderRelatedTransactionIndicator(transaction)}
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '4px',
-                          transition: 'background-color 0.2s',
-                          flexShrink: 0
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f0f0f0';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                        title="Click to expand transaction options"
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2"
-                          style={{ 
-                            transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s',
-                            opacity: 0.7
-                          }}
-                        >
-                          <path d="M6 9l6 6 6-6"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                  <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                    {renderCell(transaction, 'amount')}
-                  </td>
-                  <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                    {renderCell(transaction, 'category')}
-                  </td>
-                  <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                    {renderCell(transaction, 'label')}
-                  </td>
-                </tr>
-                {expandedRow === transaction.id && (
-                  <tr>
-                    <td colSpan="5" style={{ 
-                      padding: '0',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <div style={{ 
-                        padding: '12px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start'
-                      }}>
-                        <div style={{ display: 'flex', gap: '20px' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSplitTransaction(transaction);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '8px 16px',
-                              backgroundColor: '#3b82f6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              transition: 'background-color 0.2s'
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
-                            </svg>
-                            Split Transaction
-                          </button>
-                        </div>
-                        
-                        {/* Show related transaction details when expanded */}
-                        <div>
-                          
-                          {/* Show related transactions when expanded */}
-                          {getRelatedTransactions(transaction).length > 0 && (
-                            <div style={{ 
-                              marginTop: '12px', 
-                              borderTop: '1px dashed #cbd5e1',
-                              paddingTop: '12px'
-                            }}>
-                              <div style={{ 
-                                fontSize: '14px', 
-                                fontWeight: '500', 
-                                marginBottom: '8px',
-                                color: '#475569'
-                              }}>
-                                {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {getRelatedTransactions(transaction).map(related => (
-                                  <div key={related.id} style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'space-between',
-                                    padding: '8px',
-                                    backgroundColor: 'white',
-                                    borderRadius: '4px',
-                                    border: '1px solid #e2e8f0'
-                                  }}>
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      gap: '12px', 
-                                      alignItems: 'center',
-                                      fontSize: '13px',
-                                      flex: 1,
-                                      marginRight: '16px'
-                                    }}>
-                                      <div>{new Date(related.date).toLocaleDateString()}</div>
-                                      <div style={{ fontWeight: '500' }}>{related.description}</div>
-                                    </div>
-                                    <div style={{ 
-                                      fontWeight: '500',
-                                      fontSize: '13px',
-                                      color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
-                                    }}>
-                                      {parseFloat(related.amount) < 0 ? 
-                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
-                                        `$${parseFloat(related.amount).toFixed(2)}`}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* Transactions table with modern styling */}
+      {renderTransactionsTable()}
     </div>
   );
 };

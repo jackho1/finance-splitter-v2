@@ -209,3 +209,15 @@
 
 - [ ] **Fix logs occuring twice**:
    - When switching to personal webpage, log statements appear twice, which indicate something is being triggered twice when it should only trigger once. "No changes detected for user settings default, skipping database update"
+
+- [ ] **Update offset category table**:
+   - Currently its primary key is the name of the category, fix this so the primary key is an id and category is just a name that is easily interchangeable. 
+
+- [ ] **Update Budget Filtering**:
+   - Currently, when users click on chart data for a different month, the Transactions webpage does not reflect the selected months data. Instead it shows data on the current month which is incorrect.  
+
+- [x] **index.js errors**:
+   - Fix "sorry, too many clients already" bug relating to labelling. Possibly related to the split transaction bug as well. 
+
+- [ ] **Re-test all functionality**:
+   - Consider adding unit tests to test every single functionality and their expected behaviour.  
