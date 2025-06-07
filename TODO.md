@@ -201,14 +201,14 @@
    - npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
    - npm warn deprecated domexception@4.0.0: Use your platform's native DOMException instead
 
-- [ ] **Fix "Filter by Category" button**:
+- [x] **Fix "Filter by Category" button**:
    - It appears after some table category updates in psql, this filter is broken now.
 
 - [ ] **Add initializer psql code"**:
    - Upon running this program for the first time, there should be code to ensure all psql tables are set up correctly. This means any new modifications made to these tables will also need to amend this initializer function/file. Currently this is only partially implemented e.g., ensureSplitColumnsExist in index.js.
 
-- [ ] **Fix logs occuring twice**:
-   - When switching to personal webpage, log statements appear twice, which indicate something is being triggered twice when it should only trigger once. "No changes detected for user settings default, skipping database update"
+- [x] **Fix logs occuring twice**:
+   - When switching to personal webpage, log statements appear twice, which indicate something is being triggered twice when it should only trigger once. "No changes detected for user settings default, skipping database update". Update: This is the expected behaviour for dev builds and is called twice for testing purposes.
 
 - [ ] **Update offset category table**:
    - Currently its primary key is the name of the category, fix this so the primary key is an id and category is just a name that is easily interchangeable. 
@@ -221,3 +221,6 @@
 
 - [ ] **Re-test all functionality**:
    - Consider adding unit tests to test every single functionality and their expected behaviour.  
+
+- [ ] **Productionize code**:
+   - Productionize this app.
