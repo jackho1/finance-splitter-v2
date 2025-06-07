@@ -224,3 +224,9 @@
 
 - [ ] **Productionize code**:
    - Productionize this app.
+
+- [ ] **Note: New PSQL Tables are Generated**:
+   - When new tables are generated using data that can come externally or from a u ser, create an id column as the primary key and use "BY DEFAULT AS IDENTITY PRIMARY KEY. 
+   - DEFAULT ensures the external endpoint can update this id column automatically or if no id is supplied, PostgreSQL will auto-generate one using the sequence. 
+   - AS IDENTITY ensures its generates a new id value when new records are inserted without an id populated.
+   - PRIMARY KEY is self-explanatory.

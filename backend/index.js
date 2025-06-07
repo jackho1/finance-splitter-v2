@@ -293,7 +293,7 @@ app.get('/personal-initial-data', async (req, res) => {
       autoDistributionRulesResult,
       personalSettingsResult
     ] = await Promise.all([
-      client.query('SELECT * FROM personal_transactions ORDER BY date DESC'),
+      client.query('SELECT * FROM personal_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM personal_category ORDER BY category'),
       client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', ['default']),
       client.query('SELECT * FROM personal_settings WHERE user_id = $1', ['default'])
@@ -333,7 +333,7 @@ app.get('/offset-initial-data', async (req, res) => {
       offsetCategoriesResult,
       labelsResult
     ] = await Promise.all([
-      client.query('SELECT * FROM offset_transactions ORDER BY date DESC'),
+      client.query('SELECT * FROM offset_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM offset_category ORDER BY category'),
       client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC')
     ]);
@@ -618,7 +618,7 @@ app.put('/personal-transactions/:id', async (req, res) => {
     const allowedFields = ['date', 'description', 'amount', 'category'];
     
     // Get current transaction for comparison
-    const checkResult = await pool.query('SELECT * FROM personal_transactions WHERE id = $1', [id]);
+    const checkResult = await pool.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
@@ -722,7 +722,7 @@ app.put('/offset-transactions/:id', async (req, res) => {
     const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
     
     // Get current transaction for comparison
-    const checkResult = await pool.query('SELECT * FROM offset_transactions WHERE id = $1', [id]);
+    const checkResult = await pool.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
@@ -1343,7 +1343,7 @@ app.post('/refresh-personal-bank-feeds', async (req, res) => {
 // GET /personal-transactions - Retrieves personal transactions
 app.get('/personal-transactions', async (req, res) => {
   try {
-    const query = 'SELECT * FROM personal_transactions ORDER BY date DESC';
+    const query = 'SELECT * FROM personal_transactions_generalized ORDER BY date DESC';
     const { rows } = await pool.query(query);
     res.json(rows);
   } catch (err) {
@@ -1420,7 +1420,7 @@ app.post('/personal-transactions/split', async (req, res) => {
     
     // Check if the original transaction exists
     const originalResult = await client.query(
-      'SELECT * FROM personal_transactions WHERE id = $1',
+      'SELECT * FROM personal_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
     
@@ -1620,7 +1620,7 @@ app.post('/refresh-offset-bank-feeds', async (req, res) => {
 // GET /offset-transactions - Retrieves offset transactions
 app.get('/offset-transactions', async (req, res) => {
   try {
-    const query = 'SELECT * FROM offset_transactions ORDER BY date DESC';
+    const query = 'SELECT * FROM offset_transactions_generalized ORDER BY date DESC';
     const { rows } = await pool.query(query);
     res.json(rows);
   } catch (err) {
@@ -1697,7 +1697,7 @@ app.post('/offset-transactions/split', async (req, res) => {
     
     // Check if the original transaction exists
     const originalResult = await client.query(
-      'SELECT * FROM offset_transactions WHERE id = $1',
+      'SELECT * FROM offset_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
     
