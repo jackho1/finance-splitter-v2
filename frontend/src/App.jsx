@@ -26,6 +26,71 @@ import {
 } from './utils/updateHandlers';
 import './ModernTables.css';
 
+// Add CSS styles for buttons
+const buttonStyles = `
+  .modern-button {
+    background-color: #ffffff;
+    color: #2c3e50;
+    border: 1px solid #e0e0e0;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    outline: none;
+  }
+
+  .modern-button:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+  }
+
+  .modern-button:active {
+    background-color: #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transform: translateY(0);
+  }
+
+  .modern-button.navigation {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+  }
+
+  .modern-button.navigation.prev {
+    padding-left: 2px;
+  }
+
+  .modern-button.navigation.next {
+    padding-right: 2px;
+  }
+
+  .modern-button.navigation svg {
+    margin: 0 5px;
+  }
+
+  .month-navigation {
+    display: flex;
+    margin-bottom: 15px;
+    align-items: center;
+  }
+
+  .month-display {
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    padding: 0 15px;
+    color: #2c3e50;
+  }
+`;
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -2038,6 +2103,7 @@ const App = () => {
       <h1 className="dashboard-title">Finance Dashboard</h1>
       
       {/* Global CSS styles */}
+      <style>{buttonStyles}</style>
       <style>
       {`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -2792,48 +2858,27 @@ const App = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button 
                   onClick={handlePrevMonth}
-                  style={{ 
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '8px 15px',
-                    backgroundColor: 'transparent',
-                    color: '#2c3e50',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  }}
+                  className="modern-button navigation prev"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '5px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                   Previous Month
                 </button>
-                <div style={{ padding: '0 10px', fontWeight: '500' }}>
+                <div className="month-display">
                   {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </div>
                 <button 
                   onClick={handleNextMonth}
-                  style={{ 
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '8px 15px',
-                    backgroundColor: 'transparent',
-                    color: '#2c3e50',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isCurrentMonthCurrent() ? 'none' : '0 1px 3px rgba(0,0,0,0.05)',
-                    opacity: isCurrentMonthCurrent() ? 0.7 : 1
-                  }}
+                  className="modern-button navigation next"
                   disabled={isCurrentMonthCurrent()}
+                  style={{
+                    opacity: isCurrentMonthCurrent() ? 0.7 : 1,
+                    cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   Next Month
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '5px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>

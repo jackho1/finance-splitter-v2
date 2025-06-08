@@ -233,3 +233,6 @@
 
 - [ ] **Address failed unit tests**:
    - Fix all failed unit tests when running npm test in frontend/
+
+- [ ] **Add the ability to create new webpages + tables**:
+   - Through a single button, add the ability to create a brand new webpage when brand new PSQL tables. It should replicate the table beahviour of personal and offset tables.
