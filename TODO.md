@@ -246,3 +246,8 @@
 - [ ] **Add ability to create new saving buckets**:
    - Add.
 
+- [ ] **Integrate Sort By Feature to Column Titles**:
+   - Remove the Sort By dropdown menu and integrate it into a double-click for each title instead.
+
+- [ ] **Consistent CSS Styling**:
+   - Need to ensure consistent styling such as titles, section locations are all aligned between different webpages.

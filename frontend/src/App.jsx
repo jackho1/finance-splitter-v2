@@ -86,7 +86,7 @@ const buttonStyles = `
     font-family: 'Inter', sans-serif;
     font-size: 16px;
     font-weight: 500;
-    padding: 0 15px;
+    padding: 0 8px;
     color: #2c3e50;
   }
 `;
@@ -605,18 +605,7 @@ const App = () => {
         position: 'top',
       },
       title: {
-        display: true,
-        text: chartLabelFilter === 'All' 
-          ? 'All-Time Transactions by Month and Category' 
-          : `${chartLabelFilter}'s All-Time Transactions by Month and Category`,
-        font: {
-          size: 24,
-          weight: 'bold'
-        },
-        padding: {
-          top: 20,
-          bottom: 30
-        }
+        display: false, // Removed built-in title since we have custom title
       },
     },
     scales: {
@@ -2658,63 +2647,94 @@ const App = () => {
               <LoadingSpinner />
             ) : (
               <>
-                <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '15px', alignItems: 'center' }}>
-                  <div>
+                {/* Custom title section with integrated controls */}
+                <div style={{ 
+                  width: '100%', 
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                  marginTop: '20px'
+                }}>
+                  <h3 style={{
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    color: '#2c3e50',
+                    margin: 0,
+                    fontFamily: 'Inter, sans-serif',
+                    textAlign: 'center'
+                  }}>
+                    {chartLabelFilter === 'All' 
+                      ? 'All-Time Transactions' 
+                      : `${chartLabelFilter}'s All-Time Transactions`}
+                  </h3>
+                  
+                  <div style={{ 
+                    position: 'absolute',
+                    right: '20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    display: 'flex', 
+                    gap: '8px', 
+                    alignItems: 'center',
+                    zIndex: 100
+                  }}>
                     <select
                       value={chartLabelFilter}
                       onChange={(e) => setChartLabelFilter(e.target.value)}
                       style={{
-                        padding: '8px 12px',
+                        padding: '6px 10px',
+                        margin: '0px',
                         borderRadius: '4px',
                         border: '1px solid #ccc',
                         backgroundColor: 'white',
                         cursor: 'pointer',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        outline: 'none'
+                        outline: 'none',
+                        fontSize: '13px'
                       }}
                     >
                       <option value="All">All Transactions</option>
                       {labels.length > 0 && (
                         <>
-                          <option value={labels[0]}>{labels[0]}'s Transactions</option>
-                          <option value={labels[1]}>{labels[1]}'s Transactions</option>
+                          <option value={labels[0]}>{labels[0]}'s</option>
+                          <option value={labels[1]}>{labels[1]}'s</option>
                         </>
                       )}
                     </select>
-                  </div>
-                  <div>
                     <button 
                       data-filter="category"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter');
                       }}
+                      className="modern-button"
                       style={{ 
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
+                        padding: '6px 12px',
                         backgroundColor: categoryFilter.length > 0 ? '#e6f7ff' : 'white',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        gap: '4px',
+                        fontSize: '13px',
                         position: 'relative'
                       }}
                     >
-                      <span>Filter by Category</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                      </svg>
+                      <span>Categories</span>
                       {categoryFilter.length > 0 && (
                         <span style={{ 
                           backgroundColor: '#4a90e2', 
                           color: 'white', 
                           borderRadius: '50%', 
-                          width: '18px', 
-                          height: '18px', 
+                          width: '16px', 
+                          height: '16px', 
                           display: 'inline-flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          fontSize: '12px'
+                          fontSize: '11px'
                         }}>
                           {categoryFilter.length}
                         </span>
@@ -2817,7 +2837,8 @@ const App = () => {
                     </button>
                   </div>
                 </div>
-                <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '30px auto' }}>
+                
+                <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '0 auto' }}>
                   <Bar data={data} options={options} />
                   <HelpText isVisible={helpTextVisible}>
                     Chart displays data for all months regardless of the month filter above and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
@@ -2855,18 +2876,26 @@ const App = () => {
               alignItems: 'center',
               marginBottom: '5px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center'
+              }}>
                 <button 
                   onClick={handlePrevMonth}
                   className="modern-button navigation prev"
+                  style={{ marginRight: 0 }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Previous Month
+                  Prev
                 </button>
-                <div className="month-display">
-                  {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                <div className="month-display" style={{
+                  textAlign: 'center',
+                  padding: '0 12px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short', year: 'numeric' })}
                 </div>
                 <button 
                   onClick={handleNextMonth}
@@ -2877,7 +2906,7 @@ const App = () => {
                     cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  Next Month
+                  Next
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
