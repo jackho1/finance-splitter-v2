@@ -230,3 +230,6 @@
    - DEFAULT ensures the external endpoint can update this id column automatically or if no id is supplied, PostgreSQL will auto-generate one using the sequence. 
    - AS IDENTITY ensures its generates a new id value when new records are inserted without an id populated.
    - PRIMARY KEY is self-explanatory.
+
+- [ ] **Address failed unit tests**:
+   - Fix all failed unit tests when running npm test in frontend/

@@ -9,4 +9,20 @@ export default defineConfig({
       usePolling: true,
     },
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+    css: true,
+    transformMode: {
+      web: [/\.[jt]sx?$/]
+    },
+    deps: {
+      optimizer: {
+        web: {
+          include: ['react-chartjs-2', 'chart.js']
+        }
+      }
+    }
+  }
 })
