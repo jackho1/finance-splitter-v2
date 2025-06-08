@@ -611,15 +611,18 @@ app.put('/transactions/:id', async (req, res) => {
  * PUT /personal-transactions/:id - Updates a personal transaction (OPTIMIZED)
  */
 app.put('/personal-transactions/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
     
     const allowedFields = ['date', 'description', 'amount', 'category'];
     
     // Get current transaction for comparison
-    const checkResult = await pool.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
+    const checkResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         error: 'Transaction not found' 
@@ -635,23 +638,56 @@ app.put('/personal-transactions/:id', async (req, res) => {
         const fieldType = getFieldType(key);
         let processedValue = value;
         
-        // Process the value based on field type
-        if (fieldType === 'number') {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : parseFloat(value);
-        } else if (fieldType === 'date') {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : new Date(value).toISOString().split('T')[0];
+        // Special handling for category field
+        if (key === 'category') {
+          if (value === null || value === undefined || value === '') {
+            processedValue = null;
+          } else {
+            // Look up the category ID from the category name
+            const categoryResult = await client.query(
+              'SELECT id FROM personal_category WHERE category = $1',
+              [value]
+            );
+            
+            if (categoryResult.rows.length === 0) {
+              await client.query('ROLLBACK');
+              return res.status(400).json({ 
+                success: false, 
+                error: `Category '${value}' not found` 
+              });
+            }
+            
+            processedValue = categoryResult.rows[0].id;
+            
+            // For comparison, compare the category name, not the ID
+            if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
+              validUpdates[key] = processedValue;  // Store category ID in updates
+              hasChanges = true;
+              console.log(`Personal transaction field '${key}' changed: '${currentTransaction[key]}' -> '${value}' (ID: ${processedValue})`);
+            }
+            
+            // Skip the general comparison for category
+            continue;
+          }
         } else {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : (typeof value === 'string' ? value.trim() || null : value);
+          // Process the value based on field type for non-category fields
+          if (fieldType === 'number') {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : parseFloat(value);
+          } else if (fieldType === 'date') {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : new Date(value).toISOString().split('T')[0];
+          } else {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : (typeof value === 'string' ? value.trim() || null : value);
+          }
         }
         
-        // OPTIMIZATION: Check if the value has actually changed
-        if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
+        // OPTIMIZATION: Check if the value has actually changed (skip for category as it's handled above)
+        if (key !== 'category' && !valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
           validUpdates[key] = processedValue;
           hasChanges = true;
           console.log(`Personal transaction field '${key}' changed: '${currentTransaction[key]}' -> '${processedValue}'`);
@@ -661,6 +697,7 @@ app.put('/personal-transactions/:id', async (req, res) => {
     
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
+      await client.query('ROLLBACK');
       console.log(`No changes detected for personal transaction ${id}, skipping database update`);
       return res.json({
         success: true,
@@ -671,6 +708,7 @@ app.put('/personal-transactions/:id', async (req, res) => {
     }
     
     if (Object.keys(validUpdates).length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         error: 'No valid fields to update' 
@@ -686,28 +724,38 @@ app.put('/personal-transactions/:id', async (req, res) => {
     
     console.log(`Executing database update for personal transaction ${id} with changes:`, validUpdates);
     
-    const { rows } = await pool.query(query, values);
+    const updateResult = await client.query(query, values);
     
-    if (rows.length === 0) {
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         error: 'Transaction not found' 
       });
     }
     
+    // Fetch updated data from the generalized view to return to the client
+    const updatedResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
+    const updatedTransaction = updatedResult.rows[0];
+    
+    await client.query('COMMIT');
+    
     res.json({
       success: true,
-      data: rows[0],
+      data: updatedTransaction,
       message: 'Transaction updated successfully',
       changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error updating personal transaction:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -715,15 +763,18 @@ app.put('/personal-transactions/:id', async (req, res) => {
  * PUT /offset-transactions/:id - Updates an offset transaction (OPTIMIZED)
  */
 app.put('/offset-transactions/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
     
     const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
     
     // Get current transaction for comparison
-    const checkResult = await pool.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
+    const checkResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         error: 'Transaction not found' 
@@ -739,23 +790,56 @@ app.put('/offset-transactions/:id', async (req, res) => {
         const fieldType = getFieldType(key);
         let processedValue = value;
         
-        // Process the value based on field type
-        if (fieldType === 'number') {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : parseFloat(value);
-        } else if (fieldType === 'date') {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : new Date(value).toISOString().split('T')[0];
+        // Special handling for category field
+        if (key === 'category') {
+          if (value === null || value === undefined || value === '') {
+            processedValue = null;
+          } else {
+            // Look up the category ID from the category name
+            const categoryResult = await client.query(
+              'SELECT id FROM offset_category WHERE category = $1',
+              [value]
+            );
+            
+            if (categoryResult.rows.length === 0) {
+              await client.query('ROLLBACK');
+              return res.status(400).json({ 
+                success: false, 
+                error: `Category '${value}' not found` 
+              });
+            }
+            
+            processedValue = categoryResult.rows[0].id;
+            
+            // For comparison, compare the category name, not the ID
+            if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
+              validUpdates[key] = processedValue;  // Store category ID in updates
+              hasChanges = true;
+              console.log(`Offset transaction field '${key}' changed: '${currentTransaction[key]}' -> '${value}' (ID: ${processedValue})`);
+            }
+            
+            // Skip the general comparison for category
+            continue;
+          }
         } else {
-          processedValue = value === null || value === undefined || value === '' 
-            ? null 
-            : (typeof value === 'string' ? value.trim() || null : value);
+          // Process the value based on field type for non-category fields
+          if (fieldType === 'number') {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : parseFloat(value);
+          } else if (fieldType === 'date') {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : new Date(value).toISOString().split('T')[0];
+          } else {
+            processedValue = value === null || value === undefined || value === '' 
+              ? null 
+              : (typeof value === 'string' ? value.trim() || null : value);
+          }
         }
         
-        // OPTIMIZATION: Check if the value has actually changed
-        if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
+        // OPTIMIZATION: Check if the value has actually changed (skip for category as it's handled above)
+        if (key !== 'category' && !valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
           validUpdates[key] = processedValue;
           hasChanges = true;
           console.log(`Offset transaction field '${key}' changed: '${currentTransaction[key]}' -> '${processedValue}'`);
@@ -765,6 +849,7 @@ app.put('/offset-transactions/:id', async (req, res) => {
     
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
+      await client.query('ROLLBACK');
       console.log(`No changes detected for offset transaction ${id}, skipping database update`);
       return res.json({
         success: true,
@@ -775,6 +860,7 @@ app.put('/offset-transactions/:id', async (req, res) => {
     }
     
     if (Object.keys(validUpdates).length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         error: 'No valid fields to update' 
@@ -790,28 +876,38 @@ app.put('/offset-transactions/:id', async (req, res) => {
     
     console.log(`Executing database update for offset transaction ${id} with changes:`, validUpdates);
     
-    const { rows } = await pool.query(query, values);
+    const updateResult = await client.query(query, values);
     
-    if (rows.length === 0) {
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         error: 'Transaction not found' 
       });
     }
     
+    // Fetch updated data from the generalized view to return to the client
+    const updatedResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
+    const updatedTransaction = updatedResult.rows[0];
+    
+    await client.query('COMMIT');
+    
     res.json({
       success: true,
-      data: rows[0],
+      data: updatedTransaction,
       message: 'Transaction updated successfully',
       changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error updating offset transaction:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 

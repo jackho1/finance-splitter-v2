@@ -210,10 +210,10 @@
 - [x] **Fix logs occuring twice**:
    - When switching to personal webpage, log statements appear twice, which indicate something is being triggered twice when it should only trigger once. "No changes detected for user settings default, skipping database update". Update: This is the expected behaviour for dev builds and is called twice for testing purposes.
 
-- [ ] **Update offset category table**:
+- [x] **Update offset category table**:
    - Currently its primary key is the name of the category, fix this so the primary key is an id and category is just a name that is easily interchangeable. 
 
-- [ ] **Update Budget Filtering**:
+- [x] **Update Budget Filtering**:
    - Currently, when users click on chart data for a different month, the Transactions webpage does not reflect the selected months data. Instead it shows data on the current month which is incorrect.  
 
 - [x] **index.js errors**:
@@ -236,3 +236,13 @@
 
 - [ ] **Add the ability to create new webpages + tables**:
    - Through a single button, add the ability to create a brand new webpage when brand new PSQL tables. It should replicate the table beahviour of personal and offset tables.
+
+- [ ] **Add category history table**:
+   - add this for an audit trail
+
+- [ ] **Add ability to rename existing saving buckets**:
+   - Add.
+
+- [ ] **Add ability to create new saving buckets**:
+   - Add.
+
