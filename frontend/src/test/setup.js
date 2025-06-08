@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import axios from 'axios';
 
 // Mock DOM methods that might not be available in jsdom

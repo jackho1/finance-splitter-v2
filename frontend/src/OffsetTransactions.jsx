@@ -2222,6 +2222,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 
                   // Check if reconciled
                   const isReconciled = Math.abs(categoryTotal - latestClosingBalance) < 0.01;
+                  const difference = categoryTotal - latestClosingBalance;
+                  const hasDifference = Math.abs(difference) >= 0.01;
                   
                   return (
                     <>
@@ -2229,25 +2231,25 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '28px', // Reduced from 36px
+                        gap: '20px', // Further reduced for more compact layout
                       }}>
-                        {/* Balance information - Reduced sizing */}
+                        {/* Balance information - Compact layout */}
                         <div style={{
                           display: 'flex',
-                          gap: '28px', // Reduced from 32px
+                          gap: '20px', // Further reduced
                           alignItems: 'center',
                         }}>
                           <div style={{ 
                             textAlign: 'center',
-                            padding: '12px 20px', // Reduced from 16px 24px
+                            padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0fdf4',
-                            borderRadius: '10px', // Reduced from 12px
+                            borderRadius: '8px', 
                             border: '1px solid #bbf7d0',
                           }}>
                             <div style={{ 
-                              fontSize: '12px', // Reduced from 13px
+                              fontSize: '11px',
                               color: '#059669',
-                              marginBottom: '6px', // Reduced from 8px
+                              marginBottom: '4px',
                               fontWeight: '600',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -2255,7 +2257,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                               Current Balance
                             </div>
                             <div style={{ 
-                              fontSize: '22px', // Reduced from 24px
+                              fontSize: '20px',
                               fontWeight: '700',
                               color: '#047857',
                             }}>
@@ -2265,21 +2267,22 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           
                           <div style={{
                             width: '2px',
-                            height: '50px', // Reduced from 60px
+                            height: '40px', // Further reduced
                             background: 'linear-gradient(180deg, transparent, #e5e7eb, transparent)',
                           }}/>
                           
                           <div style={{ 
                             textAlign: 'center',
-                            padding: '12px 20px', // Reduced from 16px 24px
+                            padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0f9ff',
-                            borderRadius: '10px', // Reduced from 12px
+                            borderRadius: '8px',
                             border: '1px solid #bae6fd',
+                            position: 'relative', // Added for tooltip positioning
                           }}>
                             <div style={{ 
-                              fontSize: '12px', // Reduced from 13px
+                              fontSize: '11px',
                               color: '#0369a1',
-                              marginBottom: '6px', // Reduced from 8px
+                              marginBottom: '4px',
                               fontWeight: '600',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -2287,45 +2290,64 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                               Categories Sum
                             </div>
                             <div style={{ 
-                              fontSize: '22px', // Reduced from 24px
+                              fontSize: '20px',
                               fontWeight: '700',
                               color: '#0c4a6e',
                             }}>
                               ${formatNumber(categoryTotal)}
                             </div>
+                            {/* Show diff as a badge if not reconciled */}
+                            {hasDifference && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '-8px',
+                                right: '-8px',
+                                backgroundColor: difference > 0 ? '#fecaca' : '#fee2e2',
+                                padding: '2px 6px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color: '#b91c1c',
+                                border: '1px solid #fca5a5',
+                                whiteSpace: 'nowrap',
+                              }} title={`Difference: ${difference > 0 ? '+' : ''}${formatNumber(difference)}`}>
+                                {difference > 0 ? '+$' : '-$'}{formatNumber(Math.abs(difference))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         
-                        {/* Modern Reconciliation Status - Reduced sizing */}
+                        {/* Compact Reconciliation Status */}
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '8px', // Reduced from 10px
-                          padding: '8px 16px', // Reduced from 10px 18px
+                          gap: '6px',
+                          padding: '6px 12px',
                           background: isReconciled 
                             ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
                             : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                          borderRadius: '20px', // Reduced from 24px
-                          fontSize: '13px', // Reduced from 14px
+                          borderRadius: '16px',
+                          fontSize: '12px',
                           fontWeight: '600',
                           color: isReconciled ? '#15803d' : '#b45309',
                           border: `1px solid ${isReconciled ? '#86efac' : '#fcd34d'}`,
                           boxShadow: isReconciled 
-                            ? '0 2px 6px rgba(34, 197, 94, 0.2)'
-                            : '0 2px 6px rgba(245, 158, 11, 0.2)',
+                            ? '0 2px 4px rgba(34, 197, 94, 0.2)'
+                            : '0 2px 4px rgba(245, 158, 11, 0.2)',
+                          whiteSpace: 'nowrap',
                         }}>
                           {isReconciled ? (
                             <>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                               Reconciled
                             </>
                           ) : (
                             <>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+                              </svg>
                               Not Reconciled
                             </>
                           )}

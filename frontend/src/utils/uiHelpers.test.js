@@ -232,19 +232,21 @@ describe('UI Helper Functions', () => {
       expect(typeof debouncedFn).toBe('function');
     });
 
-    test('should delay function execution', (done) => {
-      let called = false;
-      const mockFn = () => { 
-        called = true;
-        expect(called).toBe(true);
-        done();
-      };
-      const debouncedFn = debounce(mockFn, 10);
-      
-      debouncedFn();
-      // Skip immediate check since test environment timing is unpredictable..
-      
-      // Function should be called after delay
+    test('should delay function execution', () => {
+      return new Promise((resolve) => {
+        let called = false;
+        const mockFn = () => { 
+          called = true;
+          expect(called).toBe(true);
+          resolve();
+        };
+        const debouncedFn = debounce(mockFn, 10);
+        
+        debouncedFn();
+        // Skip immediate check since test environment timing is unpredictable..
+        
+        // Function should be called after delay
+      });
     });
 
     test('should pass arguments correctly', () => {
