@@ -708,7 +708,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       <h2 className="section-title">Monthly Expenditure</h2>
       <div className="month-navigation">
         <button 
-          className="modern-button navigation" 
+          className="modern-button navigation prev" 
           onClick={handlePrevMonth}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -720,7 +720,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           {`${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} ${currentYear}`}
         </div>
         <button 
-          className="modern-button navigation" 
+          className="modern-button navigation next" 
           onClick={handleNextMonth}
         >
           Next Month
@@ -896,6 +896,14 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           display: inline-flex;
           align-items: center;
           padding: 6px 12px;
+        }
+
+        .modern-button.navigation.prev {
+          padding-left: 2px;
+        }
+
+        .modern-button.navigation.next {
+          padding-right: 2px;
         }
 
         .modern-button.navigation svg {
