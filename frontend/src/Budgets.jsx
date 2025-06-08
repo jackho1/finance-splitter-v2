@@ -705,29 +705,50 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   return (
     <div style={{ padding: '15px', fontFamily: 'Arial, sans-serif' }}>
-      <h2 className="section-title">Monthly Expenditure</h2>
-      <div className="month-navigation">
-        <button 
-          className="modern-button navigation prev" 
-          onClick={handlePrevMonth}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Previous Month
-        </button>
-        <div className="month-display">
-          {`${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} ${currentYear}`}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        marginBottom: '15px'
+      }}>
+        <div style={{ 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start'
+        }}>
+          <button 
+            className="modern-button navigation prev" 
+            onClick={handlePrevMonth}
+            style={{ marginRight: 0 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Prev
+          </button>
+          <div className="month-display" style={{
+            textAlign: 'center',
+            padding: '0 12px',
+            whiteSpace: 'nowrap'
+          }}>
+            {`${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short' })} ${currentYear}`}
+          </div>
+          <button 
+            className="modern-button navigation next" 
+            onClick={handleNextMonth}
+          >
+            Next
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
-        <button 
-          className="modern-button navigation next" 
-          onClick={handleNextMonth}
-        >
-          Next Month
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        
+        <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>
+          Monthly Expenditure
+        </h2>
+        
+        <div></div>
       </div>
       
       <HelpText isVisible={helpTextVisible}>

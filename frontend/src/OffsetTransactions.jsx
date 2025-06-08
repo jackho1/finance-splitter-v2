@@ -1782,110 +1782,72 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         ) : (
           <div>
             <div style={{ 
-              marginBottom: '20px', // Reduced from 28px
-              textAlign: 'center',
+              marginBottom: '20px',
               position: 'relative',
             }}>
-              <h2 className="section-title">Savings Buckets</h2>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto 1fr',
+                alignItems: 'center',
+                marginBottom: '12px'
+              }}>
+                <div></div>
+                <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>Savings Buckets</h2>
+                
+                {/* Settings and Reset Button Container */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end'
+                }}>
+                  {/* Settings Button */}
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="modern-button"
+                    style={{ marginRight: 0, padding: '6px 12px' }}
+                    title="Settings"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                    </svg>
+                    Settings
+                  </button>
+                  
+                  {/* Modern Reset Button */}
+                  <button
+                    onClick={resetCategoryOrder}
+                    className="modern-button"
+                    style={{ padding: '6px 12px' }}
+                    title="Reset to default order"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                    Reset Order
+                  </button>
+                </div>
+              </div>
               
-              {/* Replace inline help text with HelpText component */}
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+              {/* HelpText below the title and buttons */}
+              <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   Drag category cards to reorder them. Your arrangement will be saved automatically. 
                 </HelpText>
               </div>
 
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+              <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   Double-click on any category to show all transactions for that category across all months.
                 </HelpText>
               </div>
 
-              <div style={{ marginBottom: '6px', marginRight: '140px' }}>
+              <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   When buckets go negative, they're excluded from Categories Sum calculation and their negative amounts are deducted from your selected offset bucket.
                 </HelpText>
-              </div>
-              
-              {/* Settings and Reset Button Container */}
-              <div style={{
-                position: 'absolute',
-                right: '0',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                display: 'flex',
-                gap: '8px',
-                alignItems: 'center'
-              }}>
-                {/* Settings Button */}
-                <button
-                  onClick={() => setShowSettings(true)}
-                  style={{
-                    fontSize: '13px',
-                    padding: '6px 12px',
-                    backgroundColor: 'transparent',
-                    color: '#64748b',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex', 
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.color = '#475569';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.color = '#64748b';
-                  }}
-                  title="Settings"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
-                  </svg>
-                  Settings
-                </button>
-                
-                {/* Modern Reset Button */}
-                <button
-                  onClick={resetCategoryOrder}
-                  style={{
-                    fontSize: '13px',
-                    padding: '6px 12px',
-                    backgroundColor: 'transparent',
-                    color: '#64748b',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex', 
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.color = '#475569';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.color = '#64748b';
-                  }}
-                  title="Reset to default order"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                  </svg>
-                  Reset Order
-                </button>
               </div>
             </div>
             
@@ -2472,18 +2434,26 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           alignItems: 'center',
           marginBottom: '5px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center'
+          }}>
             <button 
               onClick={handlePrevMonth}
               className="modern-button navigation prev"
+              style={{ marginRight: 0 }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Previous Month
+              Prev
             </button>
-            <div className="month-display">
-              {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
+            <div className="month-display" style={{
+              textAlign: 'center',
+              padding: '0 12px',
+              whiteSpace: 'nowrap'
+            }}>
+              {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short', year: 'numeric' })}
             </div>
             <button 
               onClick={handleNextMonth}
@@ -2494,7 +2464,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer'
               }}
             >
-              Next Month
+              Next
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
