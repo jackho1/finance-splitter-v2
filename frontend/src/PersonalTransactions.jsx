@@ -1054,7 +1054,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   // Modern table render function
   const renderTransactionsTable = () => (
-    <div className="modern-table-container fade-in">
+    <div className="modern-table-container fade-in" style={{ marginTop: '2px' }}>
       {isTransactionsLoading ? (
         <div className="loading-spinner" />
       ) : (
@@ -2728,8 +2728,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'flex-start',
-        marginBottom: '8px',
         padding: '5px',
+        paddingBottom: '0px',
+        marginBottom: '0px',
         backgroundColor: 'transparent',
         borderRadius: '8px',
         flexDirection: 'column'

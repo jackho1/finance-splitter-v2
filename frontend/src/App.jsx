@@ -1189,7 +1189,7 @@ const App = () => {
 
   // Transactions table modernized render - update the renderCell for the description field
   const renderTransactionsTable = () => (
-    <div className="modern-table-container fade-in">
+    <div className="modern-table-container fade-in" style={{ marginTop: '2px' }}>
       {isTransactionsLoading || isLabelsLoading ? (
         <div className="loading-spinner" />
       ) : (
@@ -2684,7 +2684,7 @@ const App = () => {
                       value={chartLabelFilter}
                       onChange={(e) => setChartLabelFilter(e.target.value)}
                       style={{
-                        padding: '6px 10px',
+                        padding: '5px 10px',
                         margin: '0px',
                         borderRadius: '4px',
                         border: '1px solid #ccc',
@@ -2716,7 +2716,6 @@ const App = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        fontSize: '13px',
                         position: 'relative'
                       }}
                     >
@@ -2863,8 +2862,9 @@ const App = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'flex-start',
-            marginBottom: '8px',
             padding: '5px',
+            paddingBottom: '0px',
+            marginBottom: '0px',
             backgroundColor: 'transparent',
             borderRadius: '8px',
             flexDirection: 'column'
