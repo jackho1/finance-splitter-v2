@@ -128,6 +128,74 @@ export const sortByDescription = (transactions, sortDirection) => {
 };
 
 /**
+ * Sort transactions by bank category
+ * @param {Array} transactions - Original transactions array
+ * @param {string} sortDirection - Sorting direction ('asc' or 'desc')
+ * @returns {Array} - Sorted transactions
+ */
+export const sortByBankCategory = (transactions, sortDirection) => {
+  return [...transactions].sort((a, b) => {
+    // Handle null/empty values - put them at the end for 'asc', at the beginning for 'desc'
+    const catA = (a.bank_category || '').toLowerCase();
+    const catB = (b.bank_category || '').toLowerCase();
+    
+    // If one is empty and the other isn't
+    if (!catA && catB) return sortDirection === 'asc' ? 1 : -1;
+    if (catA && !catB) return sortDirection === 'asc' ? -1 : 1;
+    
+    // Both empty or both have values
+    if (catA < catB) return sortDirection === 'asc' ? -1 : 1;
+    if (catA > catB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+};
+
+/**
+ * Sort transactions by label
+ * @param {Array} transactions - Original transactions array
+ * @param {string} sortDirection - Sorting direction ('asc' or 'desc')
+ * @returns {Array} - Sorted transactions
+ */
+export const sortByLabel = (transactions, sortDirection) => {
+  return [...transactions].sort((a, b) => {
+    const labelA = (a.label || '').toLowerCase();
+    const labelB = (b.label || '').toLowerCase();
+    
+    // If one is empty and the other isn't
+    if (!labelA && labelB) return sortDirection === 'asc' ? 1 : -1;
+    if (labelA && !labelB) return sortDirection === 'asc' ? -1 : 1;
+    
+    // Both empty or both have values
+    if (labelA < labelB) return sortDirection === 'asc' ? -1 : 1;
+    if (labelA > labelB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+};
+
+/**
+ * Sort transactions by category (for PersonalTransactions)
+ * @param {Array} transactions - Original transactions array
+ * @param {string} sortDirection - Sorting direction ('asc' or 'desc')
+ * @returns {Array} - Sorted transactions
+ */
+export const sortByCategory = (transactions, sortDirection) => {
+  return [...transactions].sort((a, b) => {
+    // Handle null/empty values - put them at the end for 'asc', at the beginning for 'desc'
+    const catA = (a.category || '').toLowerCase();
+    const catB = (b.category || '').toLowerCase();
+    
+    // If one is empty and the other isn't
+    if (!catA && catB) return sortDirection === 'asc' ? 1 : -1;
+    if (catA && !catB) return sortDirection === 'asc' ? -1 : 1;
+    
+    // Both empty or both have values
+    if (catA < catB) return sortDirection === 'asc' ? -1 : 1;
+    if (catA > catB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+};
+
+/**
  * Apply all filters and sorting to transactions
  * @param {Array} transactions - Original transactions array
  * @param {Object} filters - Object containing all filter and sort options
@@ -160,6 +228,15 @@ export const applyFilters = (transactions, filters) => {
         break;
       case 'description':
         filtered = sortByDescription(filtered, direction);
+        break;
+      case 'bank_category':
+        filtered = sortByBankCategory(filtered, direction);
+        break;
+      case 'label':
+        filtered = sortByLabel(filtered, direction);
+        break;
+      case 'category':
+        filtered = sortByCategory(filtered, direction);
         break;
       default:
         // Default to date descending if no valid sort option
