@@ -251,3 +251,6 @@
 
 - [ ] **Consistent CSS Styling**:
    - Need to ensure consistent styling such as titles, section locations are all aligned between different webpages.
+
+- [ ] **Refactor codebase**:
+   - Refactor codebase so it is more cleaner. Currently, all files are added everywhere with no properly file structure.  

@@ -25,6 +25,7 @@ import {
   getFieldType 
 } from './utils/updateHandlers';
 import './ModernTables.css';
+import './SortableTableHeaders.css';
 
 // Add CSS styles for buttons
 const buttonStyles = `
@@ -130,6 +131,32 @@ const FilterButton = ({ isActive, onClick, children }) => (
     {children}
   </button>
 );
+
+// Sortable header component
+const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, onFilterToggle, isFilterActive }) => {
+  const isActive = sortBy.startsWith(column);
+  const isDesc = sortBy === `${column}-desc`;
+  
+  return (
+    <div className={`modern-filter-header ${hasFilter ? 'sortable' : ''}`}>
+      <div className="sortable-column-content" onClick={() => onSort(column)}>
+        <span className="sortable-header">
+          {children}
+          <span className={`sort-indicator ${isActive ? 'active' : ''}`}>
+            <span className={`sort-arrow up ${isActive && !isDesc ? 'active' : ''}`}></span>
+            <span className={`sort-arrow down ${isActive && isDesc ? 'active' : ''}`}></span>
+          </span>
+        </span>
+      </div>
+      {hasFilter && (
+        <FilterButton
+          isActive={isFilterActive}
+          onClick={onFilterToggle}
+        />
+      )}
+    </div>
+  );
+};
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('transactions');
@@ -629,6 +656,24 @@ const App = () => {
   
   const toggleColumnFilter = (column) => {
     setActiveFilterColumn(activeFilterColumn === column ? null : column);
+  };
+  
+  // Handle sorting when clicking on table headers
+  const handleHeaderSort = (column) => {
+    const currentSort = filters.sortBy;
+    let newSort;
+    
+    // Determine new sort direction
+    if (currentSort === `${column}-desc`) {
+      newSort = `${column}-asc`;
+    } else if (currentSort === `${column}-asc`) {
+      newSort = `${column}-desc`;
+    } else {
+      // Default to descending for the clicked column
+      newSort = `${column}-desc`;
+    }
+    
+    setFilters(prev => ({ ...prev, sortBy: newSort }));
   };
   
   const handleDateFilterChange = (e) => {
@@ -1197,13 +1242,16 @@ const App = () => {
           <thead>
             <tr>
               <th>
-                <div className="modern-filter-header">
-                  <span>Date</span>
-                  <FilterButton
-                    isActive={activeFilterColumn === 'date'}
-                    onClick={() => toggleColumnFilter('date')}
-                  />
-                </div>
+                <SortableHeader
+                  column="date"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('date')}
+                  isFilterActive={activeFilterColumn === 'date'}
+                >
+                  Date
+                </SortableHeader>
                 {activeFilterColumn === 'date' && (
                   <div ref={filterPopupRef} className="filter-dropdown">
                     <div className="filter-group">
@@ -1248,23 +1296,34 @@ const App = () => {
                 )}
               </th>
               <th>
-                <div className="modern-filter-header">
-                  <span>Description</span>
-                </div>
+                <SortableHeader
+                  column="description"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                >
+                  Description
+                </SortableHeader>
               </th>
               <th>
-                <div className="modern-filter-header">
-                  <span>Amount</span>
-                </div>
+                <SortableHeader
+                  column="amount"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                >
+                  Amount
+                </SortableHeader>
               </th>
               <th>
-                <div className="modern-filter-header">
-                  <span>Bank Category</span>
-                  <FilterButton
-                    isActive={activeFilterColumn === 'bankCategory'}
-                    onClick={() => toggleColumnFilter('bankCategory')}
-                  />
-                </div>
+                <SortableHeader
+                  column="bank_category"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('bankCategory')}
+                  isFilterActive={activeFilterColumn === 'bankCategory'}
+                >
+                  Bank Category
+                </SortableHeader>
                 {activeFilterColumn === 'bankCategory' && (
                   <div ref={filterPopupRef} className="filter-dropdown">
                     <div className="filter-options">
@@ -1310,13 +1369,16 @@ const App = () => {
                 )}
               </th>
               <th>
-                <div className="modern-filter-header">
-                  <span>Label</span>
-                  <FilterButton
-                    isActive={activeFilterColumn === 'label'}
-                    onClick={() => toggleColumnFilter('label')}
-                  />
-                </div>
+                <SortableHeader
+                  column="label"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('label')}
+                  isFilterActive={activeFilterColumn === 'label'}
+                >
+                  Label
+                </SortableHeader>
                 {activeFilterColumn === 'label' && (
                   <div ref={filterPopupRef} className="filter-dropdown">
                     <div className="filter-options">
@@ -2914,29 +2976,6 @@ const App = () => {
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <div>
-                  <label htmlFor="sort-select" style={{ marginRight: '8px', fontSize: '14px', color: '#555' }}>Sort by:</label>
-                  <select
-                    id="sort-select"
-                    value={filters.sortBy}
-                    onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                      backgroundColor: 'white',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="date-desc">Date (Newest First)</option>
-                    <option value="date-asc">Date (Oldest First)</option>
-                    <option value="amount-desc">Amount (Highest First)</option>
-                    <option value="amount-asc">Amount (Lowest First)</option>
-                    <option value="description-asc">Description (A-Z)</option>
-                    <option value="description-desc">Description (Z-A)</option>
-                  </select>
-                </div>
-                
                 <button 
                   onClick={refreshBankFeeds}
                   disabled={isRefreshing}
