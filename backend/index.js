@@ -226,6 +226,61 @@ const getFieldType = (fieldName) => {
   }
 };
 
+/**
+ * Helper function to check if arrays are equal
+ */
+const arraysAreEqual = (arr1, arr2) => {
+  if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
+  if (arr1.length !== arr2.length) return false;
+  return arr1.every((val, index) => val === arr2[index]);
+};
+
+/**
+ * Helper function to resolve category name to ID
+ */
+const resolveCategoryToId = async (client, categoryName, categoryTable) => {
+  if (!categoryName || categoryName === '') return null;
+  
+  const result = await client.query(
+    `SELECT id FROM ${categoryTable} WHERE category = $1`,
+    [categoryName]
+  );
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Category '${categoryName}' not found in ${categoryTable}`);
+  }
+  
+  return result.rows[0].id;
+};
+
+/**
+ * Enhanced helper function to resolve category (name or ID) to ID
+ * Handles both category names and existing IDs
+ */
+const resolveCategoryNameOrIdToId = async (client, categoryValue, categoryTable) => {
+  // Handle null/undefined/empty values
+  if (!categoryValue || categoryValue === '') {
+    return null;
+  }
+  
+  // Check if category is already an ID (number)
+  if (typeof categoryValue === 'number' || /^\d+$/.test(categoryValue)) {
+    return parseInt(categoryValue);
+  }
+  
+  // It's a category name, need to look up the ID
+  const result = await client.query(
+    `SELECT id FROM ${categoryTable} WHERE category = $1`,
+    [categoryValue]
+  );
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Category '${categoryValue}' not found in ${categoryTable}`);
+  }
+  
+  return result.rows[0].id;
+};
+
 // OPTIMIZED COMBINED ENDPOINTS - Reduces database connections by fetching related data in single transactions
 
 // Combined initial data endpoint to reduce database connections
@@ -640,26 +695,10 @@ app.put('/personal-transactions/:id', async (req, res) => {
         
         // Special handling for category field
         if (key === 'category') {
-          if (value === null || value === undefined || value === '') {
-            processedValue = null;
-          } else {
-            // Look up the category ID from the category name
-            const categoryResult = await client.query(
-              'SELECT id FROM personal_category WHERE category = $1',
-              [value]
-            );
+          try {
+            processedValue = await resolveCategoryNameOrIdToId(client, value, 'personal_category');
             
-            if (categoryResult.rows.length === 0) {
-              await client.query('ROLLBACK');
-              return res.status(400).json({ 
-                success: false, 
-                error: `Category '${value}' not found` 
-              });
-            }
-            
-            processedValue = categoryResult.rows[0].id;
-            
-            // For comparison, compare the category name, not the ID
+            // For comparison, compare the category name, not the ID  
             if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
               validUpdates[key] = processedValue;  // Store category ID in updates
               hasChanges = true;
@@ -668,6 +707,12 @@ app.put('/personal-transactions/:id', async (req, res) => {
             
             // Skip the general comparison for category
             continue;
+          } catch (err) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ 
+              success: false, 
+              error: err.message 
+            });
           }
         } else {
           // Process the value based on field type for non-category fields
@@ -792,24 +837,8 @@ app.put('/offset-transactions/:id', async (req, res) => {
         
         // Special handling for category field
         if (key === 'category') {
-          if (value === null || value === undefined || value === '') {
-            processedValue = null;
-          } else {
-            // Look up the category ID from the category name
-            const categoryResult = await client.query(
-              'SELECT id FROM offset_category WHERE category = $1',
-              [value]
-            );
-            
-            if (categoryResult.rows.length === 0) {
-              await client.query('ROLLBACK');
-              return res.status(400).json({ 
-                success: false, 
-                error: `Category '${value}' not found` 
-              });
-            }
-            
-            processedValue = categoryResult.rows[0].id;
+          try {
+            processedValue = await resolveCategoryNameOrIdToId(client, value, 'offset_category');
             
             // For comparison, compare the category name, not the ID
             if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
@@ -820,6 +849,12 @@ app.put('/offset-transactions/:id', async (req, res) => {
             
             // Skip the general comparison for category
             continue;
+          } catch (err) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ 
+              success: false, 
+              error: err.message 
+            });
           }
         } else {
           // Process the value based on field type for non-category fields
@@ -1096,26 +1131,25 @@ app.put('/personal-settings/:userId', async (req, res) => {
         RETURNING *
       `;
       
-      console.log(`Updating personal settings for user ${userId} with:`, validUpdates);
+      console.log(`Executing database update for personal settings ${userId} with changes:`, validUpdates);
     }
     
     const { rows } = await pool.query(query, values);
     
-    // Parse category_order back to an array for the response
-    const responseData = rows[0];
-    if (responseData.category_order && typeof responseData.category_order === 'string') {
+    // Parse JSON fields back to objects/arrays before returning
+    const settings = rows[0];
+    if (settings.category_order && typeof settings.category_order === 'string') {
       try {
-        responseData.category_order = JSON.parse(responseData.category_order);
+        settings.category_order = JSON.parse(settings.category_order);
       } catch (error) {
-        console.error('Error parsing category_order for response:', error);
-        responseData.category_order = [];
+        settings.category_order = [];
       }
     }
     
     res.json({
       success: true,
-      data: responseData,
-      message: 'Settings updated successfully',
+      data: settings,
+      message: checkResult.rows.length === 0 ? 'Personal settings created successfully' : 'Personal settings updated successfully',
       changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
@@ -1129,42 +1163,37 @@ app.put('/personal-settings/:userId', async (req, res) => {
 });
 
 /**
- * Helper function to compare arrays deeply
- */
-const arraysAreEqual = (arr1, arr2) => {
-  if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
-  if (arr1.length !== arr2.length) return false;
-  return arr1.every((val, idx) => val === arr2[idx]);
-};
-
-/**
- * POST /transactions - Creates a new transaction with auto-generated ID
+ * POST /transactions/budget-impact - Check the impact of a transaction on budgets
  */
 app.post('/transactions', async (req, res) => {
   try {
-    const newTransaction = req.body;
+    const transaction = req.body;
     
-    // Process and validate fields
+    // List of required fields for validation
+    const requiredFields = ['date', 'description', 'amount'];
+    
+    // Validation: Ensure all required fields are present
     const validFields = {};
     const errors = [];
     
-    // Validate required fields
-    if (!newTransaction.date) {
-      errors.push('Date is required');
-    }
-    if (newTransaction.description === undefined || newTransaction.description === null) {
-      errors.push('Description is required');
-    }
-    if (newTransaction.amount === undefined || newTransaction.amount === null) {
-      errors.push('Amount is required');
+    for (const field of requiredFields) {
+      if (!transaction.hasOwnProperty(field)) {
+        errors.push(`Field "${field}" is required`);
+      }
     }
     
-    for (const [key, value] of Object.entries(newTransaction)) {
+    // If there are missing fields, return validation error
+    if (errors.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors 
+      });
+    }
+    
+    // Process and validate each field
+    for (const [key, value] of Object.entries(transaction)) {
       // Only process allowed fields
-      if (!allowedFields.includes(key) || key === 'id') { // Skip id as it will be auto-generated
-        if (key !== 'id') { // Don't report an error for id
-          errors.push(`Field "${key}" is not allowed for new transactions`);
-        }
+      if (!allowedFields.includes(key)) {
         continue;
       }
       
@@ -1460,15 +1489,30 @@ app.get('/personal-categories', async (req, res) => {
   }
 });
 
-// POST /personal-transactions - Creates a new personal transaction
+// POST /personal-transactions - Creates a new personal transaction (UPDATED TO HANDLE CATEGORY NAMES)
 app.post('/personal-transactions', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { date, description, amount, category } = req.body;
     
     if (!date || !description || amount === undefined) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         errors: ['Date, description, and amount are required'] 
+      });
+    }
+    
+    // Handle category conversion from name to ID
+    let categoryId;
+    try {
+      categoryId = await resolveCategoryNameOrIdToId(client, category, 'personal_category');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: err.message 
       });
     }
     
@@ -1478,20 +1522,29 @@ app.post('/personal-transactions', async (req, res) => {
       RETURNING *
     `;
     
-    const { rows } = await pool.query(query, [date, description, amount, category]);
+    const { rows } = await client.query(query, [date, description, amount, categoryId]);
+    
+    // Get the complete transaction data from the generalized view
+    const newTransactionId = rows[0].id;
+    const completeResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [newTransactionId]);
+    
+    await client.query('COMMIT');
     
     res.status(201).json({
       success: true,
-      data: rows[0],
+      data: completeResult.rows[0],
       message: 'Transaction created successfully'
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error creating personal transaction:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -1582,6 +1635,18 @@ app.post('/personal-transactions/split', async (req, res) => {
       // Ensure the split amount has the correct sign
       const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
       
+      // Handle category conversion from name to ID
+      let categoryId;
+      try {
+        categoryId = await resolveCategoryNameOrIdToId(client, split.category, 'personal_category');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          success: false, 
+          error: err.message 
+        });
+      }
+      
       const insertResult = await client.query(
         `INSERT INTO personal_transactions 
          (date, description, amount, category, split_from_id)
@@ -1591,7 +1656,7 @@ app.post('/personal-transactions/split', async (req, res) => {
           originalTransaction.date,
           split.description,
           adjustedAmount,
-          split.category,
+          categoryId,
           originalTransactionId // Set the split_from_id to the original transaction id
         ]
       );
@@ -1737,15 +1802,30 @@ app.get('/offset-categories', async (req, res) => {
   }
 });
 
-// POST /offset-transactions - Creates a new offset transaction
+// POST /offset-transactions - Creates a new offset transaction (UPDATED TO HANDLE CATEGORY NAMES)
 app.post('/offset-transactions', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { date, description, amount, category, label } = req.body;
     
     if (!date || !description || amount === undefined) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         errors: ['Date, description, and amount are required'] 
+      });
+    }
+    
+    // Handle category conversion from name to ID
+    let categoryId;
+    try {
+      categoryId = await resolveCategoryNameOrIdToId(client, category, 'offset_category');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: err.message 
       });
     }
     
@@ -1755,20 +1835,29 @@ app.post('/offset-transactions', async (req, res) => {
       RETURNING *
     `;
     
-    const { rows } = await pool.query(query, [date, description, amount, category, label]);
+    const { rows } = await client.query(query, [date, description, amount, categoryId, label]);
+    
+    // Get the complete transaction data from the generalized view
+    const newTransactionId = rows[0].id;
+    const completeResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [newTransactionId]);
+    
+    await client.query('COMMIT');
     
     res.status(201).json({
       success: true,
-      data: rows[0],
+      data: completeResult.rows[0],
       message: 'Transaction created successfully'
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error creating offset transaction:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -1862,6 +1951,18 @@ app.post('/offset-transactions/split', async (req, res) => {
       // Ensure the split amount has the correct sign
       const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
       
+      // Handle category conversion from name to ID
+      let categoryId;
+      try {
+        categoryId = await resolveCategoryNameOrIdToId(client, split.category, 'offset_category');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          success: false, 
+          error: err.message 
+        });
+      }
+      
       const insertResult = await client.query(
         `INSERT INTO offset_transactions 
          (date, description, amount, category, label, split_from_id)
@@ -1871,7 +1972,7 @@ app.post('/offset-transactions/split', async (req, res) => {
           originalTransaction.date,
           split.description,
           adjustedAmount,
-          split.category,
+          categoryId,
           split.label || originalTransaction.label,
           originalTransactionId // Set the split_from_id to the original transaction id
         ]
@@ -2022,16 +2123,43 @@ app.get('/auto-distribution-rules/:userId', async (req, res) => {
 });
 
 /**
- * POST /auto-distribution-rules - Create a new auto distribution rule
+ * POST /auto-distribution-rules - Create a new auto distribution rule (UPDATED TO HANDLE CATEGORY NAMES)
  */
 app.post('/auto-distribution-rules', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { user_id, rule_name, amount, source_bucket, dest_bucket } = req.body;
     
     if (!user_id || !rule_name) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         error: 'User ID and rule name are required' 
+      });
+    }
+    
+    // Convert source_bucket from name to ID
+    let sourceBucketId;
+    try {
+      sourceBucketId = await resolveCategoryNameOrIdToId(client, source_bucket, 'personal_category');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: err.message 
+      });
+    }
+    
+    // Convert dest_bucket from name to ID
+    let destBucketId;
+    try {
+      destBucketId = await resolveCategoryNameOrIdToId(client, dest_bucket, 'personal_category');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: err.message 
       });
     }
     
@@ -2041,7 +2169,9 @@ app.post('/auto-distribution-rules', async (req, res) => {
       RETURNING *
     `;
     
-    const { rows } = await pool.query(query, [user_id, rule_name, amount, source_bucket, dest_bucket]);
+    const { rows } = await client.query(query, [user_id, rule_name, amount, sourceBucketId, destBucketId]);
+    
+    await client.query('COMMIT');
     
     res.status(201).json({
       success: true,
@@ -2049,28 +2179,34 @@ app.post('/auto-distribution-rules', async (req, res) => {
       message: 'Auto distribution rule created successfully'
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error creating auto distribution rule:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
 /**
- * PUT /auto-distribution-rules/:id - Update an auto distribution rule (OPTIMIZED)
+ * PUT /auto-distribution-rules/:id - Update an auto distribution rule (UPDATED TO HANDLE CATEGORY NAMES)
  */
 app.put('/auto-distribution-rules/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
     
     const allowedFields = ['rule_name', 'amount', 'source_bucket', 'dest_bucket'];
     
     // Get current rule for comparison
-    const checkResult = await pool.query('SELECT * FROM auto_distribution_rules WHERE id = $1', [id]);
+    const checkResult = await client.query('SELECT * FROM auto_distribution_rules WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         error: 'Auto distribution rule not found' 
@@ -2085,17 +2221,38 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
       if (allowedFields.includes(key)) {
         const fieldType = getFieldType(key);
         
-        // OPTIMIZATION: Check if the value has actually changed
-        if (!valuesAreEqual(currentRule[key], value, fieldType)) {
-          validUpdates[key] = value;
-          hasChanges = true;
-          console.log(`Auto distribution rule field '${key}' changed: '${currentRule[key]}' -> '${value}'`);
+        // Handle category bucket conversions
+        if (key === 'source_bucket' || key === 'dest_bucket') {
+          let bucketId;
+          try {
+            bucketId = await resolveCategoryNameOrIdToId(client, value, 'personal_category');
+          } catch (err) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ 
+              success: false, 
+              error: err.message 
+            });
+          }
+          
+          if (!valuesAreEqual(currentRule[key], bucketId)) {
+            validUpdates[key] = bucketId;
+            hasChanges = true;
+            console.log(`Auto distribution rule field '${key}' changed: '${currentRule[key]}' -> '${bucketId}'`);
+          }
+        } else {
+          // For other fields, do regular comparison
+          if (!valuesAreEqual(currentRule[key], value, fieldType)) {
+            validUpdates[key] = value;
+            hasChanges = true;
+            console.log(`Auto distribution rule field '${key}' changed: '${currentRule[key]}' -> '${value}'`);
+          }
         }
       }
     }
     
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
+      await client.query('ROLLBACK');
       console.log(`No changes detected for auto distribution rule ${id}, skipping database update`);
       return res.json({
         success: true,
@@ -2106,6 +2263,7 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
     }
     
     if (Object.keys(validUpdates).length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         error: 'No valid fields to update' 
@@ -2126,7 +2284,9 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
     
     console.log(`Executing database update for auto distribution rule ${id} with changes:`, validUpdates);
     
-    const { rows } = await pool.query(query, values);
+    const { rows } = await client.query(query, values);
+    
+    await client.query('COMMIT');
     
     res.json({
       success: true,
@@ -2135,12 +2295,15 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
       changedFields: Object.keys(validUpdates)
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error updating auto distribution rule:', err);
     res.status(500).json({ 
       success: false, 
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -2173,6 +2336,227 @@ app.delete('/auto-distribution-rules/:id', async (req, res) => {
       error: 'Server error', 
       details: err.message 
     });
+  }
+});
+
+/**
+ * POST /auto-distribution/apply - Apply auto distribution rules for a user
+ */
+app.post('/auto-distribution/apply', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { user_id, month_year } = req.body;
+    
+    if (!user_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID is required' 
+      });
+    }
+    
+    // Get all auto distribution rules for the user  
+    // First get the rules without joins, then resolve category names separately
+    const rulesQuery = `
+      SELECT 
+        adr.id,
+        adr.rule_name,
+        adr.amount,
+        adr.source_bucket,
+        adr.dest_bucket
+      FROM auto_distribution_rules adr
+      WHERE adr.user_id = $1
+      ORDER BY adr.id
+    `;
+    
+    const rulesResult = await client.query(rulesQuery, [user_id]);
+    const rawRules = rulesResult.rows;
+    
+    // Resolve category names for each rule separately to avoid JOIN type issues
+    const rules = [];
+    for (const rule of rawRules) {
+      let sourceCategoryName = null;
+      let destCategoryName = null;
+      
+      // Get source category name - handle both IDs and names
+      if (rule.source_bucket) {
+        try {
+          // Check if it's already a number (ID)
+          if (typeof rule.source_bucket === 'number' || /^\d+$/.test(rule.source_bucket)) {
+            const sourceResult = await client.query(
+              'SELECT category FROM personal_category WHERE id = $1',
+              [parseInt(rule.source_bucket)]
+            );
+            if (sourceResult.rows.length > 0) {
+              sourceCategoryName = sourceResult.rows[0].category;
+            }
+          } else {
+            // It's a category name, use it directly
+            sourceCategoryName = rule.source_bucket;
+          }
+        } catch (err) {
+          console.log(`Could not resolve source category for rule ${rule.id}:`, err.message);
+          // If it's a name and lookup failed, use the name itself
+          sourceCategoryName = rule.source_bucket;
+        }
+      }
+      
+      // Get destination category name - handle both IDs and names
+      if (rule.dest_bucket) {
+        try {
+          // Check if it's already a number (ID)
+          if (typeof rule.dest_bucket === 'number' || /^\d+$/.test(rule.dest_bucket)) {
+            const destResult = await client.query(
+              'SELECT category FROM personal_category WHERE id = $1',
+              [parseInt(rule.dest_bucket)]
+            );
+            if (destResult.rows.length > 0) {
+              destCategoryName = destResult.rows[0].category;
+            }
+          } else {
+            // It's a category name, use it directly
+            destCategoryName = rule.dest_bucket;
+          }
+        } catch (err) {
+          console.log(`Could not resolve destination category for rule ${rule.id}:`, err.message);
+          // If it's a name and lookup failed, use the name itself
+          destCategoryName = rule.dest_bucket;
+        }
+      }
+      
+      rules.push({
+        ...rule,
+        source_category_name: sourceCategoryName,
+        dest_category_name: destCategoryName
+      });
+    }
+    
+    if (rules.length === 0) {
+      await client.query('ROLLBACK');
+      return res.json({
+        success: true,
+        message: 'No auto distribution rules found',
+        appliedCount: 0
+      });
+    }
+    
+    const currentDate = new Date();
+    const monthYearStr = month_year || `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
+    
+    let successCount = 0;
+    let failureCount = 0;
+    const createdTransactions = [];
+    
+    for (const rule of rules) {
+      try {
+        // Validate rule data more robustly (check for null/undefined, but allow 0 as valid ID)
+        if (rule.source_bucket === null || rule.source_bucket === undefined || 
+            rule.dest_bucket === null || rule.dest_bucket === undefined || 
+            !rule.amount || rule.amount <= 0) {
+          failureCount++;
+          console.log(`Skipping rule ${rule.id}: Invalid source/dest bucket or amount`, {
+            source_bucket: rule.source_bucket,
+            dest_bucket: rule.dest_bucket,
+            amount: rule.amount
+          });
+          continue;
+        }
+        
+        // Convert category names or IDs to valid integer IDs
+        let sourceBucketId, destBucketId;
+        try {
+          sourceBucketId = await resolveCategoryNameOrIdToId(client, rule.source_bucket, 'personal_category');
+          destBucketId = await resolveCategoryNameOrIdToId(client, rule.dest_bucket, 'personal_category');
+        } catch (err) {
+          failureCount++;
+          console.log(`Skipping rule ${rule.id}: Could not resolve category IDs - ${err.message}`, {
+            source_bucket: rule.source_bucket,
+            dest_bucket: rule.dest_bucket
+          });
+          continue;
+        }
+        
+        if (sourceBucketId === null || destBucketId === null) {
+          failureCount++;
+          console.log(`Skipping rule ${rule.id}: Resolved category IDs are null`, {
+            source_bucket: rule.source_bucket,
+            dest_bucket: rule.dest_bucket,
+            sourceBucketId,
+            destBucketId
+          });
+          continue;
+        }
+        
+        // Create source transaction (negative amount) - using the validated integer category ID
+        const sourceResult = await client.query(
+          `INSERT INTO personal_transactions 
+           (date, description, amount, category)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [
+            currentDate.toISOString().split('T')[0],
+            `${rule.rule_name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
+            -Math.abs(rule.amount),
+            sourceBucketId // Use the validated integer ID
+          ]
+        );
+        
+        // Create destination transaction (positive amount) - using the validated integer category ID
+        const destResult = await client.query(
+          `INSERT INTO personal_transactions 
+           (date, description, amount, category)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [
+            currentDate.toISOString().split('T')[0],
+            `${rule.rule_name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
+            Math.abs(rule.amount),
+            destBucketId // Use the validated integer ID
+          ]
+        );
+        
+        createdTransactions.push({
+          rule_id: rule.id,
+          rule_name: rule.rule_name,
+          source_transaction_id: sourceResult.rows[0].id,
+          dest_transaction_id: destResult.rows[0].id,
+          amount: rule.amount,
+          source_category: rule.source_category_name,
+          dest_category: rule.dest_category_name
+        });
+        
+        successCount++;
+      } catch (err) {
+        console.error(`Error applying rule ${rule.id}:`, err);
+        failureCount++;
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: `Auto distribution completed: ${successCount} rules applied successfully, ${failureCount} failed`,
+      data: {
+        appliedCount: successCount,
+        failedCount: failureCount,
+        createdTransactions: createdTransactions,
+        monthYear: monthYearStr
+      }
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error applying auto distribution:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  } finally {
+    client.release();
   }
 });
 
@@ -2333,4 +2717,9 @@ app.listen(port, () => {
   console.log('  - Skips unnecessary database operations');
   console.log('  - Detailed logging of changes vs. no-changes');
   console.log('  - Optimized responses for unchanged data');
+  console.log('🚀 Enhanced features:');
+  console.log('  - Auto distribution rules support category names');
+  console.log('  - Personal/offset transaction creation handles category name-to-ID conversion');
+  console.log('  - Transaction splits handle category name-to-ID conversion');
+  console.log('  - New /auto-distribution/apply endpoint for applying rules');
 });
