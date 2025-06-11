@@ -354,7 +354,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   }, []);
   
-  // Function to perform auto distribution
+  // Function to perform auto distribution using backend endpoint
   const performAutoDistribution = async () => {
     if (!autoDistributionRules || autoDistributionRules.length === 0) {
       return;
@@ -366,91 +366,57 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       const currentDate = new Date();
       const monthYearStr = `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
       
-      let successCount = 0;
-      let failureCount = 0;
+      // Use the backend endpoint for atomic distribution
+      const response = await axios.post('http://localhost:5000/auto-distribution/apply', {
+        user_id: userId,
+        month_year: monthYearStr
+      });
       
-      for (const rule of autoDistributionRules) {
-        if (!rule.sourceBucket || !rule.destBucket || !rule.amount) {
-          failureCount++;
-          continue;
-        }
+      if (response.data.success) {
+        const { appliedCount, failedCount, createdTransactions } = response.data.data;
         
-        const amount = parseFloat(rule.amount);
-        if (isNaN(amount) || amount <= 0) {
-          failureCount++;
-          continue;
-        }
+        // Update the last distribution month
+        const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+        setLastAutoDistributionMonth(currentMonthKey);
+        // Note: Backend already updates personal settings
         
-        try {
-          // Create source transaction (negative amount)
-          const sourceTransaction = {
-            date: currentDate.toISOString().split('T')[0],
-            description: `${rule.name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
-            amount: -amount,
-            category: rule.sourceBucket
-          };
-          
-          // Create destination transaction (positive amount)
-          const destTransaction = {
-            date: currentDate.toISOString().split('T')[0],
-            description: `${rule.name || 'Monthly Budget Distribution'} - ${monthYearStr}`,
-            amount: amount,
-            category: rule.destBucket
-          };
-          
-          // Add both transactions
-          const sourceResponse = await axios.post('http://localhost:5000/personal-transactions', sourceTransaction);
-          const destResponse = await axios.post('http://localhost:5000/personal-transactions', destTransaction);
-          
-          if (sourceResponse.data.success && destResponse.data.success) {
-            successCount++;
-          } else {
-            failureCount++;
-          }
-        } catch (error) {
-          console.error('Error in distribution rule:', error);
-          failureCount++;
-        }
-      }
-      
-      // Update the last distribution month
-      const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
-      setLastAutoDistributionMonth(currentMonthKey);
-      savePersonalSettings({ last_auto_distribution_month: currentMonthKey });
-      
-      // Refresh transactions
-      const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
-      setTransactions(transactionsResponse.data);
-      
-      // Show success notification
-      const notification = document.createElement('div');
-      notification.textContent = `Monthly distribution completed: ${successCount} successful, ${failureCount} failed`;
-      notification.style.position = 'fixed';
-      notification.style.top = '20px';
-      notification.style.right = '20px';
-      notification.style.backgroundColor = failureCount > 0 ? '#fff3cd' : '#d4edda';
-      notification.style.color = failureCount > 0 ? '#856404' : '#155724';
-      notification.style.padding = '15px 20px';
-      notification.style.borderRadius = '6px';
-      notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-      notification.style.zIndex = '1000';
-      notification.style.maxWidth = '400px';
-      notification.style.border = `1px solid ${failureCount > 0 ? '#ffeaa7' : '#c3e6cb'}`;
-      
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.opacity = '0';
-        notification.style.transition = 'opacity 0.3s ease';
+        // Refresh transactions
+        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        setTransactions(transactionsResponse.data);
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = `Monthly distribution completed: ${appliedCount} rules applied successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = failedCount > 0 ? '#fff3cd' : '#d4edda';
+        notification.style.color = failedCount > 0 ? '#856404' : '#155724';
+        notification.style.padding = '15px 20px';
+        notification.style.borderRadius = '6px';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        notification.style.zIndex = '1000';
+        notification.style.maxWidth = '400px';
+        notification.style.border = `1px solid ${failedCount > 0 ? '#ffeaa7' : '#c3e6cb'}`;
+        
+        document.body.appendChild(notification);
         
         setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 300);
-      }, 5000);
+          notification.style.opacity = '0';
+          notification.style.transition = 'opacity 0.3s ease';
+          
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 300);
+        }, 5000);
+      } else {
+        throw new Error(response.data.error || 'Auto distribution failed');
+      }
       
     } catch (error) {
       console.error('Error performing auto distribution:', error);
-      showErrorNotification('Error performing monthly distribution. Please check console for details.');
+      const errorMessage = error.response?.data?.error || error.message || 'Error performing monthly distribution. Please check console for details.';
+      showErrorNotification(errorMessage);
     } finally {
       setIsDistributing(false);
     }
