@@ -254,3 +254,9 @@
 
 - [ ] **Refactor codebase**:
    - Refactor codebase so it is more cleaner. Currently, all files are added everywhere with no properly file structure.  
+
+- [ ] **Remove zero categories from chart**:
+   - Within the App.jsx webpage, remove categories in the chart where that category is set to zero. It adds unnecessary clutter. 
+
+- [ ] **Refactor split transaction pop up window**:
+   - Personal and offset webpages need to be updated similar to the transactions webpage.
