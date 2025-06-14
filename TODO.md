@@ -260,3 +260,6 @@
 
 - [ ] **Refactor split transaction pop up window**:
    - Personal and offset webpages need to be updated similar to the transactions webpage.
+
+- [ ] **Update offset & personal webpage bucket load**:
+   - Update both pages such that it retrieves the save buckets ordering from the database before loading the savings bucket to the user. This is to ensure the buckets are shown in the actual order that is stored in the database. 
