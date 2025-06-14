@@ -3395,7 +3395,7 @@ const App = () => {
         </div>
       )}
       
-      {/* Split Transaction Modal */}
+      {/* Split Transaction Modal - REFACTORED VERSION */}
       {isSplitting && (
         <div style={{
           position: 'fixed',
@@ -3411,27 +3411,48 @@ const App = () => {
         }}>
           <div style={{
             backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-            width: '700px',
+            padding: '24px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            width: '600px',
             maxWidth: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto'
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#333' }}>Split Transaction</h2>
+            {/* Header */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '20px',
+              borderBottom: '1px solid #e5e7eb',
+              paddingBottom: '16px'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                color: '#1f2937',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                Split Transaction
+              </h2>
               <button
                 onClick={cancelSplit}
                 style={{
-                  padding: '8px',
+                  padding: '6px',
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#666'
+                  color: '#6b7280',
+                  borderRadius: '6px',
+                  transition: 'background-color 0.2s'
                 }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -3439,225 +3460,306 @@ const App = () => {
             </div>
             
             {transactionToSplit && (
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-                  <h3 style={{ fontSize: '16px', margin: '0 0 10px 0', color: '#495057' }}>Original Transaction</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Date:</div>
-                      <div style={{ fontSize: '14px', color: '#212529' }}>
-                        {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Amount:</div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* Original Transaction Summary - Compact Version */}
+                <div style={{ 
+                  marginBottom: '16px', 
+                  padding: '12px', 
+                  backgroundColor: '#f9fafb', 
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div style={{ flex: 1 }}>
                       <div style={{ 
-                        fontSize: '16px', 
-                        fontWeight: 'bold',
-                        color: parseFloat(transactionToSplit.amount) < 0 ? '#dc3545' : '#28a745'
+                        fontSize: '13px', 
+                        color: '#6b7280', 
+                        marginBottom: '4px',
+                        fontWeight: '500'
                       }}>
-                        {parseFloat(transactionToSplit.amount) < 0 
-                          ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
-                          : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
+                        Original Transaction
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#1f2937',
+                        fontWeight: '500'
+                      }}>
+                        {transactionToSplit.description}
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap',
+                        gap: '8px', 
+                        marginTop: '12px'
+                      }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#dbeafe',
+                          color: '#1e40af',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          border: '1px solid #bfdbfe'
+                        }}>
+                          📅 {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                        {transactionToSplit.bank_category && (
+                          <span style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#f0fdf4',
+                            color: '#166534',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: '1px solid #bbf7d0'
+                          }}>
+                            🏷️ {transactionToSplit.bank_category}
+                          </span>
+                        )}
+                        {transactionToSplit.label && (
+                          <span style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#fef3c7',
+                            color: '#92400e',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: '1px solid #fde68a'
+                          }}>
+                            👤 {transactionToSplit.label}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div style={{ gridColumn: '1 / span 2' }}>
-                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Description:</div>
-                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.description}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Bank Category:</div>
-                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.bank_category || 'None'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '2px' }}>Label:</div>
-                      <div style={{ fontSize: '14px', color: '#212529' }}>{transactionToSplit.label || 'None'}</div>
+                    <div style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: parseFloat(transactionToSplit.amount) < 0 ? '#dc2626' : '#059669',
+                      marginLeft: '16px'
+                    }}>
+                      {parseFloat(transactionToSplit.amount) < 0 
+                        ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
+                        : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
                     </div>
                   </div>
                 </div>
                 
+                {/* Remaining Amount - Compact Status Bar */}
                 <div style={{ 
-                  fontSize: '14px', 
-                  marginBottom: '20px', 
-                  display: 'flex', 
+                  marginBottom: '16px',
+                  padding: '10px 12px',
+                  backgroundColor: calculateRemainingAmount() === 0 ? '#dcfce7' : '#fef3c7',
+                  borderRadius: '8px',
+                  border: `1px solid ${calculateRemainingAmount() === 0 ? '#bef264' : '#fde047'}`,
+                  display: 'flex',
                   justifyContent: 'space-between',
-                  padding: '10px 15px',
-                  backgroundColor: '#e9f7ef',
-                  borderRadius: '6px',
-                  border: '1px solid #d1e7dd',
                   alignItems: 'center'
                 }}>
-                  <div>
-                    <span style={{ fontWeight: 'bold', marginRight: '5px' }}>Remaining Amount:</span>
+                  <span style={{ 
+                    fontSize: '13px', 
+                    color: '#374151',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>Remaining:</span>
                     <span style={{ 
-                      fontWeight: 'bold',
-                      color: calculateRemainingAmount() < 0 ? '#dc3545' : '#28a745'
+                      color: calculateRemainingAmount() < 0 ? '#dc2626' : '#059669',
+                      fontWeight: '600'
                     }}>
                       {calculateRemainingAmount() < 0 
                         ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}` 
                         : `$${calculateRemainingAmount().toFixed(2)}`}
                     </span>
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#198754' }}>
+                  </span>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: calculateRemainingAmount() === 0 ? '#059669' : '#92400e'
+                  }}>
                     {calculateRemainingAmount() === 0 
-                      ? 'Transaction fully split!' 
-                      : 'This amount will remain on the original transaction'}
-                  </div>
+                      ? '✓ Fully allocated' 
+                      : 'Will remain on original'}
+                  </span>
                 </div>
                 
-                <h3 style={{ fontSize: '16px', margin: '20px 0 15px 0', color: '#495057' }}>Split Into</h3>
-                
-                {splitTransactions.map((split, index) => (
-                  <div key={index} style={{ 
-                    marginBottom: '15px', 
-                    padding: '15px', 
-                    backgroundColor: '#f8f9fa', 
-                    borderRadius: '6px',
-                    border: '1px solid #e9ecef',
-                    position: 'relative'
+                {/* Split Transactions - More Compact */}
+                <div style={{ 
+                  flex: 1, 
+                  overflowY: 'auto',
+                  marginBottom: '16px'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '12px'
                   }}>
-                    {splitTransactions.length > 1 && (
-                      <button
-                        onClick={() => removeSplitTransaction(index)}
-                        style={{
-                          position: 'absolute',
-                          top: '10px',
-                          right: '10px',
-                          padding: '2px',
-                          backgroundColor: '#f8d7da',
-                          border: 'none',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          cursor: 'pointer',
-                          width: '20px',
-                          height: '20px'
-                        }}
-                        title="Remove split"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2">
-                          <line x1="18" y1="6" x2="6" y2="18"></line>
-                          <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                      </button>
-                    )}
-                    
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
-                        Description
-                      </label>
-                      <input
-                        type="text"
-                        value={split.description}
-                        onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          border: '1px solid #ced4da',
-                          fontSize: '14px',
-                          boxSizing: 'border-box'
-                        }}
-                        placeholder="Enter split description"
-                      />
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
-                          Amount
-                        </label>
+                    Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
+                  </h3>
+                  
+                  {splitTransactions.map((split, index) => (
+                    <div key={index} style={{ 
+                      marginBottom: '12px', 
+                      padding: '12px', 
+                      backgroundColor: '#ffffff', 
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      position: 'relative'
+                    }}>
+                      {splitTransactions.length > 1 && (
+                        <button
+                          onClick={() => removeSplitTransaction(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            padding: '2px',
+                            backgroundColor: '#fee2e2',
+                            border: 'none',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            width: '20px',
+                            height: '20px'
+                          }}
+                          title="Remove split"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      )}
+                      
+                      {/* Compact form layout */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <input
-                          type="number"
-                          step="0.01"
-                          value={split.amount}
-                          onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                          type="text"
+                          value={split.description}
+                          onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
                           style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            border: '1px solid #ced4da',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #d1d5db',
                             fontSize: '14px',
-                            boxSizing: 'border-box'
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            transition: 'border-color 0.2s'
                           }}
-                          placeholder={parseFloat(transactionToSplit.amount) < 0 ? "Negative amount" : "Positive amount"}
+                          placeholder="Description"
+                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                         />
-                      </div>
-                      
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
-                          Bank Category
-                        </label>
-                        <select
-                          value={split.bank_category}
-                          onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            border: '1px solid #ced4da',
-                            fontSize: '14px',
-                            backgroundColor: 'white',
-                            boxSizing: 'border-box'
-                          }}
-                        >
-                          <option value="">Select a category</option>
-                          {availableBankCategories
-                            .filter(category => category !== null && category !== undefined && category !== '')
-                            .map(category => (
-                              <option key={category} value={category}>{category}</option>
-                            ))
-                          }
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', color: '#6c757d' }}>
-                          Label
-                        </label>
-                        <select
-                          value={split.label}
-                          onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            border: '1px solid #ced4da',
-                            fontSize: '14px',
-                            backgroundColor: 'white',
-                            boxSizing: 'border-box'
-                          }}
-                        >
-                          <option value="">Select a label</option>
-                          {labels.map(label => (
-                            <option key={label} value={label}>{label}</option>
-                          ))}
-                        </select>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={split.amount}
+                            onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                              fontSize: '14px',
+                              boxSizing: 'border-box',
+                              transition: 'border-color 0.2s'
+                            }}
+                            placeholder="Amount"
+                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          />
+                          
+                          <select
+                            value={split.bank_category}
+                            onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                              fontSize: '14px',
+                              backgroundColor: 'white',
+                              boxSizing: 'border-box',
+                              cursor: 'pointer',
+                              transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          >
+                            <option value="">Category</option>
+                            {availableBankCategories
+                              .filter(category => category !== null && category !== undefined && category !== '')
+                              .map(category => (
+                                <option key={category} value={category}>{category}</option>
+                              ))
+                            }
+                          </select>
+                          
+                          <select
+                            value={split.label}
+                            onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                              fontSize: '14px',
+                              backgroundColor: 'white',
+                              boxSizing: 'border-box',
+                              cursor: 'pointer',
+                              transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          >
+                            <option value="">Label</option>
+                            {labels.map(label => (
+                              <option key={label} value={label}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                  ))}
+                  
+                  {/* Add split button */}
                   <button
                     onClick={addSplitTransaction}
                     style={{
-                      backgroundColor: '#e9ecef',
-                      color: '#495057',
-                      border: '1px dashed #adb5bd',
-                      borderRadius: '4px',
-                      padding: '8px 16px',
+                      width: '100%',
+                      padding: '10px',
+                      backgroundColor: 'transparent',
+                      color: '#3b82f6',
+                      border: '1px dashed #3b82f6',
+                      borderRadius: '8px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px'
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#eff6ff';
+                      e.target.style.borderColor = '#2563eb';
+                      e.target.style.color = '#2563eb';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.color = '#3b82f6';
                     }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3668,17 +3770,32 @@ const App = () => {
                   </button>
                 </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                {/* Action buttons - Sticky footer */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: '8px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
                   <button
                     onClick={cancelSplit}
                     style={{
                       padding: '10px 16px',
-                      backgroundColor: '#f8f9fa',
-                      color: '#495057',
-                      border: '1px solid #ced4da',
-                      borderRadius: '4px',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
                       cursor: 'pointer',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f9fafb';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#ffffff';
                     }}
                   >
                     Cancel
@@ -3688,15 +3805,27 @@ const App = () => {
                     disabled={isSavingSplit}
                     style={{
                       padding: '10px 20px',
-                      backgroundColor: isSavingSplit ? '#6c757d' : '#0d6efd',
+                      backgroundColor: isSavingSplit ? '#9ca3af' : '#3b82f6',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '4px',
+                      borderRadius: '8px',
                       cursor: isSavingSplit ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
+                      fontWeight: '500',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSavingSplit) {
+                        e.target.style.backgroundColor = '#2563eb';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSavingSplit) {
+                        e.target.style.backgroundColor = '#3b82f6';
+                      }
                     }}
                   >
                     {isSavingSplit ? (
@@ -3709,11 +3838,6 @@ const App = () => {
                       </>
                     ) : (
                       <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                          <polyline points="17 21 17 13 7 13 7 21" />
-                          <polyline points="7 3 7 8 15 8" />
-                        </svg>
                         Save Splits
                       </>
                     )}
