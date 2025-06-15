@@ -18,6 +18,7 @@ import {
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import { groupSplitTransactions } from './utils/transactionGrouping';
 import { 
   optimizedHandleUpdate, 
   normalizeValue, 
@@ -515,6 +516,9 @@ const App = () => {
       });
     }
     
+    // Group split transactions together after filtering and sorting
+    filtered = groupSplitTransactions(filtered);
+    
     // Store the filtered transactions without month filter for the chart
     setAllFilteredTransactions(filtered);
     
@@ -527,6 +531,9 @@ const App = () => {
         const date = new Date(transaction.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
+      
+      // Re-group after month filtering to maintain split transaction grouping
+      tableFiltered = groupSplitTransactions(tableFiltered);
     }
 
     setFilteredTransactions(tableFiltered);

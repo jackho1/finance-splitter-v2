@@ -4,6 +4,7 @@ import axios from 'axios';
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
@@ -159,6 +160,16 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   }]);
   const [isSavingSplit, setIsSavingSplit] = useState(false);
   
+  // Smart splitting based on shared transactions states
+  const [useSmartSplit, setUseSmartSplit] = useState(false);
+  const [smartSplitData, setSmartSplitData] = useState(null);
+  const [isLoadingSmartSplit, setIsLoadingSmartSplit] = useState(false);
+  const [smartSplitFilters, setSmartSplitFilters] = useState({
+    startDate: '',
+    endDate: '',
+    user: 'Jack'
+  });
+  
   // Add state for expanded row
   const [expandedRow, setExpandedRow] = useState(null);
   
@@ -249,6 +260,41 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const SETTINGS_KEY = 'personal_transactions_settings';
   const AUTO_DISTRIBUTION_KEY = 'personal_auto_distribution_settings';
   const LAST_DISTRIBUTION_KEY = 'personal_last_auto_distribution';
+  
+  // Date formatting utility - concise version for transaction descriptions
+  const formatDateRangeConcise = (startDate, endDate) => {
+    const formatDate = (dateStr) => {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      const month = date.toLocaleString('default', { month: 'short' });
+      return `${day} ${month}`;
+    };
+    
+    return `${formatDate(startDate)}-${formatDate(endDate)}`;
+  };
+  
+  const formatDateRange = (startDate, endDate) => {
+    const formatDate = (dateStr) => {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      const month = date.toLocaleString('default', { month: 'long' });
+      
+      // Add ordinal suffix
+      const getOrdinalSuffix = (day) => {
+        if (day > 3 && day < 21) return 'th';
+        switch (day % 10) {
+          case 1: return 'st';
+          case 2: return 'nd';
+          case 3: return 'rd';
+          default: return 'th';
+        }
+      };
+      
+      return `${day}${getOrdinalSuffix(day)} ${month}`;
+    };
+    
+    return `from ${formatDate(startDate)} to ${formatDate(endDate)}`;
+  };
   
   // Double-click feature
   const handleCategoryDoubleClick = (category) => {
@@ -515,8 +561,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       setIsTransactionsLoading(true);
       
       try {
-        console.log('Fetching personal transactions data using optimized endpoint...');
-        
         // Single API call to get all personal initial data
         const response = await axios.get('http://localhost:5000/personal-initial-data');
         
@@ -572,8 +616,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           setTimeout(() => {
             setInitialLoadComplete(true);
           }, 1000);
-          
-          console.log('All personal transactions data loaded successfully using optimized endpoint');
         } else {
           throw new Error(response.data.error || 'Failed to fetch personal initial data');
         }
@@ -751,6 +793,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   };
 
+
+
   // Update the filter logic in useEffect
   useEffect(() => {
     let filtered = applyFilters(transactions, {
@@ -767,6 +811,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       });
     }
     
+    // Group split transactions together after filtering and sorting
+    filtered = groupSplitTransactions(filtered);
+    
     setAllFilteredTransactions(filtered);
     
     let tableFiltered = filtered;
@@ -775,6 +822,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         const date = new Date(transaction.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
+      
+      // Re-group after month filtering to maintain split transaction grouping
+      tableFiltered = groupSplitTransactions(tableFiltered);
     }
     
     setFilteredTransactions(tableFiltered);
@@ -1650,14 +1700,92 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   };
 
+  // Smart Split Functions
+  const loadSmartSplitData = async () => {
+    // Automatically fill in today's date if end date is missing
+    const today = new Date().toISOString().split('T')[0];
+    const effectiveFilters = { ...smartSplitFilters };
+    
+    if (!effectiveFilters.endDate) {
+      effectiveFilters.endDate = today;
+      setSmartSplitFilters(prev => ({ ...prev, endDate: today }));
+    }
+    
+    if (!useSmartSplit || !effectiveFilters.startDate) {
+      showErrorNotification('Please provide a start date for smart split');
+      return;
+    }
+    
+    try {
+      setIsLoadingSmartSplit(true);
+      const response = await axios.get('http://localhost:5000/shared-transactions-filtered', {
+        params: effectiveFilters
+      });
+      
+      if (response.data.success) {
+        setSmartSplitData(response.data.data);
+        
+        // Map grouped categories to personal savings buckets and populate split transactions
+        const categoryMapping = {
+          'Bills': 'Bills',
+          'Gifts': 'New Home Gift', 
+          'Holidays': 'Holidays'
+          // Food and Monthly Expenditure will remain in the original transaction
+        };
+        
+        const newSplitTransactions = [];
+        const groupedTotals = response.data.data.groupedTotals;
+        
+        // Create a readable date range for the transaction descriptions
+        const dateRangeText = formatDateRangeConcise(effectiveFilters.startDate, effectiveFilters.endDate);
+        
+        Object.entries(groupedTotals).forEach(([groupName, data]) => {
+          const personalCategory = categoryMapping[groupName];
+          if (personalCategory && data.total < 0) { // Changed from > 0 to < 0 for expenses
+            newSplitTransactions.push({
+              description: `${groupName} ${dateRangeText}`,
+              amount: data.total.toFixed(2), // Keep the negative amount as-is
+              category: personalCategory
+            });
+          }
+        });
+        
+        if (newSplitTransactions.length > 0) {
+          setSplitTransactions(newSplitTransactions);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading smart split data:', error);
+      showErrorNotification('Failed to load shared transaction data for smart splitting');
+    } finally {
+      setIsLoadingSmartSplit(false);
+    }
+  };
+
   // Split Transaction Handlers
   const handleSplitTransaction = (transaction) => {
+    // Auto-populate smart split filters with sensible defaults
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoString = weekAgo.toISOString().split('T')[0];
+    
     setTransactionToSplit(transaction);
     setSplitTransactions([{
       description: '',
       amount: '',
       category: ''
     }]);
+    setUseSmartSplit(false);
+    setSmartSplitData(null);
+    
+    // Auto-populate smart split filters with default date range (last 7 days)
+    setSmartSplitFilters({
+      startDate: weekAgoString,
+      endDate: today,
+      user: 'Jack'
+    });
+    
     setIsSplitting(true);
   };
 
@@ -1815,6 +1943,13 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       amount: '',
       category: ''
     }]);
+    setUseSmartSplit(false);
+    setSmartSplitData(null);
+    setSmartSplitFilters({
+      startDate: '',
+      endDate: '',
+      user: 'Jack'
+    });
   };
 
   // Handle settings change - database version
@@ -1854,7 +1989,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         rule_name: `Rule ${autoDistributionRules.length + 1}`,
         amount: 0,
         source_bucket: '',
-        dest_bucket: ''
+        destBucket: ''
       };
       
       const response = await axios.post('http://localhost:5000/auto-distribution-rules', newRule);
@@ -3769,6 +3904,188 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 </span>
               </div>
               
+              {/* Smart Split Options */}
+              <div style={{ 
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#f0f9ff',
+                borderRadius: '8px',
+                border: '1px solid #bae6fd'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  gap: '8px',
+                  marginBottom: '12px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={useSmartSplit}
+                    onChange={(e) => setUseSmartSplit(e.target.checked)}
+                    style={{ 
+                      cursor: 'pointer',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                  <div>
+                    <div style={{ 
+                      fontSize: '14px',
+                      color: '#0369a1',
+                      fontWeight: '500'
+                    }}>
+                      Split based on shared transactions
+                    </div>
+                    <div style={{ 
+                      fontSize: '12px',
+                      color: '#0284c7',
+                      marginTop: '2px'
+                    }}>
+                      Automatically split based on Jack's filtered transactions from the Transactions page
+                    </div>
+                  </div>
+                </label>
+                
+                {useSmartSplit && (
+                  <div style={{ 
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr auto',
+                    gap: '8px',
+                    alignItems: 'end'
+                  }}>
+                    <div>
+                      <label style={{ 
+                        fontSize: '11px',
+                        color: '#6b7280',
+                        fontWeight: '500',
+                        display: 'block',
+                        marginBottom: '2px'
+                      }}>Start Date</label>
+                      <input
+                        type="date"
+                        value={smartSplitFilters.startDate}
+                        onChange={(e) => setSmartSplitFilters(prev => ({
+                          ...prev,
+                          startDate: e.target.value
+                        }))}
+                        style={{
+                          width: '100%',
+                          height: '32px',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '13px',
+                          backgroundColor: 'white',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label style={{ 
+                        fontSize: '11px',
+                        color: '#6b7280',
+                        fontWeight: '500',
+                        display: 'block',
+                        marginBottom: '2px'
+                      }}>End Date</label>
+                      <input
+                        type="date"
+                        value={smartSplitFilters.endDate}
+                        onChange={(e) => setSmartSplitFilters(prev => ({
+                          ...prev,
+                          endDate: e.target.value
+                        }))}
+                        style={{
+                          width: '100%',
+                          height: '32px',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '13px',
+                          backgroundColor: 'white',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={loadSmartSplitData}
+                      disabled={isLoadingSmartSplit || !smartSplitFilters.startDate}
+                      style={{
+                        height: '32px',
+                        padding: '0 12px',
+                        backgroundColor: isLoadingSmartSplit ? '#9ca3af' : '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: isLoadingSmartSplit ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {isLoadingSmartSplit ? 'Loading...' : 'Load Split'}
+                    </button>
+                  </div>
+                )}
+                
+                {smartSplitData && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '8px',
+                    backgroundColor: '#dcfce7',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    color: '#15803d'
+                  }}>
+                    <div style={{ marginBottom: '6px' }}>
+                      Found {smartSplitData.count} transactions totaling {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`} {formatDateRange(smartSplitFilters.startDate, smartSplitFilters.endDate)}
+                    </div>
+                    
+                    {/* Show breakdown by grouped categories */}
+                    <div style={{ fontSize: '11px', color: '#059669' }}>
+                      <strong>Split Breakdown:</strong>
+                      {Object.entries(smartSplitData.groupedTotals).map(([groupName, data]) => {
+                        const mapping = {
+                          'Bills': 'Bills',
+                          'Gifts': 'New Home Gift', 
+                          'Holidays': 'Holidays'
+                        };
+                        const personalCategory = mapping[groupName];
+                        
+                        // Only show categories that are being split out OR Monthly Expenditure
+                        if (personalCategory || groupName === 'Monthly Expenditure') {
+                          return (
+                            <div key={groupName} style={{ marginLeft: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>
+                                {groupName === 'Monthly Expenditure' ? 'Monthly Expenditure (stays)' : `${groupName} → ${personalCategory}`}
+                              </span>
+                              <span style={{ fontWeight: 'bold' }}>
+                                {data.total < 0 ? `-$${Math.abs(data.total).toFixed(2)}` : `$${data.total.toFixed(2)}`} ({data.count})
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      {/* Total aggregate */}
+                      <div style={{ 
+                        marginTop: '4px', 
+                        marginLeft: '8px',
+                        fontWeight: 'bold',
+                        borderTop: '1px solid #059669',
+                        paddingTop: '2px'
+                      }}>
+                        Total: {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Split Transactions - More Compact */}
               <div style={{ 
                 flex: 1, 

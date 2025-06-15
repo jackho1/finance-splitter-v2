@@ -108,8 +108,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       setLoading(true);
       
       try {
-        console.log('Fetching budgets data using optimized endpoint...');
-        
         // Single API call to get all budget initial data
         const response = await axios.get('http://localhost:5000/budget-initial-data');
         
@@ -139,7 +137,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           setCategoryMappings(categoryMappings);
           
           setLoading(false);
-          console.log('All budgets data loaded successfully using optimized endpoint');
         } else {
           throw new Error(response.data.error || 'Failed to fetch budget initial data');
         }
@@ -196,50 +193,21 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
     });
 
-    console.log('=== BUDGET SPEND CALCULATION DEBUG ===');
-    console.log('Budget categories:', Object.keys(budgets));
-    console.log('Category mappings:', categoryMappings);
-    console.log('Current month/year:', currentMonth, currentYear);
-    
-    let processedTransactions = 0;
-    let mappedTransactions = 0;
-    let unmappedTransactions = [];
-
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-        processedTransactions++;
         // Use the category field directly from the transaction instead of mapping from bank_category
         const category = transaction.category;
         const amount = parseFloat(transaction.amount) || 0;
 
-        console.log(`Transaction: ${transaction.description} | Category: ${category} | Amount: ${amount} | Label: ${transaction.label}`);
-
         // Only process if we have a valid category AND it exists in our budgets
         if (category && spend[category]) {
-          mappedTransactions++;
           if (labels.includes(transaction.label)) {
             spend[category][transaction.label] += amount;
-            console.log(`  -> Added ${amount} to ${category}[${transaction.label}]`);
-          } else {
-            console.log(`  -> Skipped: Label "${transaction.label}" not in allowed labels`);
           }
-        } else {
-          unmappedTransactions.push({
-            description: transaction.description,
-            category: category,
-            amount: amount,
-            reason: !category ? 'No category found' : `Category "${category}" not in budgets`
-          });
         }
       }
     });
-
-    console.log(`Processed ${processedTransactions} transactions for current month`);
-    console.log(`Successfully mapped ${mappedTransactions} transactions`);
-    console.log(`Unmapped transactions (${unmappedTransactions.length}):`, unmappedTransactions);
-    console.log('Final spend object:', spend);
-    console.log('=== END DEBUG ===');
 
     return spend;
   };
@@ -286,8 +254,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       
       // OPTIMIZATION: Check if the budget value has actually changed before sending request
       if (valuesAreEqual(currentBudget, newBudget, 'number')) {
-        console.log(`🔍 No changes detected for budget category ${budgetCategory.id}: ${currentBudget} === ${newBudget} (skipping API call)`);
-        
         // Show a subtle notification that no changes were made
         const notification = document.createElement('div');
         notification.textContent = 'No changes detected - budget value already matches current data';
@@ -315,8 +281,6 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         return; // Don't make API call
       }
 
-      console.log(`💰 Budget value changed for category ${budgetCategory.id}: ${currentBudget} -> ${newBudget} (making API call)`);
-      
       const response = await axios.put(`http://localhost:5000/budget-categories/${budgetCategory.id}`, {
         budget: newBudget
       });
@@ -542,7 +506,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       try {
         document.body.removeChild(dragGhostRef.current);
       } catch(err) {
-        console.log('Drag ghost already removed');
+        // Drag ghost already removed
       }
       dragGhostRef.current = null;
     }
