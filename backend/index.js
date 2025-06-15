@@ -2705,6 +2705,149 @@ app.post('/transactions/split', async (req, res) => {
   }
 });
 
+/**
+ * GET /shared-transactions-filtered - Get filtered shared transactions for personal splitting
+ * Query params: startDate, endDate, user (Jack/Ruby/Both)
+ */
+app.get('/shared-transactions-filtered', async (req, res) => {
+  try {
+    const { startDate, endDate, user = 'Jack' } = req.query;
+    
+    // Build dynamic query with filters
+    let query = 'SELECT * FROM shared_transactions_generalized WHERE 1=1';
+    const values = [];
+    let paramIndex = 1;
+    
+    // Add date filters if provided (inclusive)
+    if (startDate) {
+      query += ` AND date >= $${paramIndex}`;
+      values.push(startDate);
+      paramIndex++;
+    }
+    
+    if (endDate) {
+      query += ` AND date <= $${paramIndex}`;
+      values.push(endDate);
+      paramIndex++;
+    }
+    
+    // Filter by user (Jack's transactions and Both transactions)
+    query += ` AND (label = $${paramIndex} OR label = 'Both')`;
+    values.push(user);
+    paramIndex++;
+    
+    // Add ordering
+    query += ' ORDER BY date DESC';
+    
+    const { rows } = await pool.query(query, values);
+    
+    // Group transactions by budget category for splitting calculation
+    const categoryTotals = {};
+    let totalAmount = 0;
+    
+    rows.forEach(transaction => {
+      const category = transaction.category || 'Uncategorized';
+      let amount = parseFloat(transaction.amount) || 0;
+      const originalAmount = amount;
+      
+      // Only process transactions with label "Jack" or "Both"
+      if (transaction.label !== 'Jack' && transaction.label !== 'Both') {
+        return; // Skip this transaction
+      }
+      
+      // For "Both" transactions, divide by 2 to get Jack's portion
+      if (transaction.label === 'Both') {
+        amount = amount / 2;
+      }
+      
+      if (!categoryTotals[category]) {
+        categoryTotals[category] = {
+          total: 0,
+          count: 0,
+          transactions: []
+        };
+      }
+      
+      // Keep the actual negative amounts for expenses (remove Math.abs)
+      categoryTotals[category].total += amount;
+      categoryTotals[category].count += 1;
+      categoryTotals[category].transactions.push(transaction);
+      totalAmount += amount;
+    });
+    
+    // Group categories according to new requirements
+    const groupedTotals = {
+      'Monthly Expenditure': {
+        total: 0,
+        count: 0,
+        categories: ['Vehicle', 'Entertainment', 'Food', 'Home', 'Medical', 'Personal Items', 'Travel', 'Other'],
+        transactions: []
+      },
+      'Bills': {
+        total: 0,
+        count: 0,
+        categories: ['Bills'],
+        transactions: []
+      },
+      'Gifts': {
+        total: 0,
+        count: 0,
+        categories: ['Gifts'],
+        transactions: []
+      },
+      'Holidays': {
+        total: 0,
+        count: 0,
+        categories: ['Holidays'],
+        transactions: []
+      }
+    };
+    
+    // Aggregate categories into groups
+    Object.entries(categoryTotals).forEach(([category, data]) => {
+      let assignedToGroup = false;
+      
+      Object.entries(groupedTotals).forEach(([groupName, groupData]) => {
+        if (groupData.categories.includes(category)) {
+          groupData.total += data.total;
+          groupData.count += data.count;
+          groupData.transactions.push(...data.transactions);
+          assignedToGroup = true;
+        }
+      });
+      
+      // If category doesn't match any group, add to Monthly Expenditure
+      if (!assignedToGroup) {
+        groupedTotals['Monthly Expenditure'].total += data.total;
+        groupedTotals['Monthly Expenditure'].count += data.count;
+        groupedTotals['Monthly Expenditure'].transactions.push(...data.transactions);
+      }
+    });
+    
+    // Calculate grand total
+    const grandTotal = Object.values(groupedTotals).reduce((sum, group) => sum + group.total, 0);
+    
+    res.json({
+      success: true,
+      data: {
+        transactions: rows,
+        categoryTotals,
+        groupedTotals,
+        totalAmount: grandTotal,
+        filters: { startDate, endDate, user },
+        count: rows.length
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching filtered shared transactions:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err.message 
+    });
+  }
+});
+
 // Default route for root URL
 app.get('/', (req, res) => {
   res.send('Welcome to the Finance Dashboard API! Use /transactions to get transaction data and ?column_name= to filter available data.');
@@ -2712,14 +2855,4 @@ app.get('/', (req, res) => {
 
 app.listen(port, () => {
   console.log(`✅ Server running on http://localhost:${port}`);
-  console.log('📊 Database optimization features enabled:');
-  console.log('  - Value comparison before database updates');
-  console.log('  - Skips unnecessary database operations');
-  console.log('  - Detailed logging of changes vs. no-changes');
-  console.log('  - Optimized responses for unchanged data');
-  console.log('🚀 Enhanced features:');
-  console.log('  - Auto distribution rules support category names');
-  console.log('  - Personal/offset transaction creation handles category name-to-ID conversion');
-  console.log('  - Transaction splits handle category name-to-ID conversion');
-  console.log('  - New /auto-distribution/apply endpoint for applying rules');
 });

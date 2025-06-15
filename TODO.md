@@ -186,7 +186,7 @@
 - [ ] **Different method to fetch closing balance**:
    - Research pocketsmitsh API to find a way to fetch closing balance. Issue with current approach is it fetches closing balance from the latest transaction. The issue with this approach is that the closing balance may have changed since then and there are no new recent transactions to update this field e.g., in the event of a pending transaction being fulfilled fully. 
 
-- [ ] **Fix category order column value fetch in DB**:
+- [x] **Fix category order column value fetch in DB**:
    - Currently hardcoded to specific values. If users decide to change category name, this value is not updated in this column name under personal_settings table. 
 
 - [x] **Ensure manual label change is not overwritten automatically**:
@@ -195,7 +195,7 @@
 - [x] **Add the ability to store bucket ordering for offset webpage**:
    - Replicate behavior in personal webpage where category order is saved in DB, but for the offset webpage. This involves setting up new tables in psql. 
 
-- [ ] **Fix deprecated packages/modules when npm install**:
+- [x] **Fix deprecated packages/modules when npm install**:
    - dule is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
    - npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
    - npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
@@ -262,4 +262,7 @@
    - Personal and offset webpages need to be updated similar to the transactions webpage.
 
 - [ ] **Update offset & personal webpage bucket load**:
-   - Update both pages such that it retrieves the save buckets ordering from the database before loading the savings bucket to the user. This is to ensure the buckets are shown in the actual order that is stored in the database. 
+   - Update both pages such that it retrieves the save buckets ordering from the database before loading the savings bucket to the user. This is to ensure the buckets are shown in the actual order that is stored in the database.
+
+- [ ] **Add offset_settings table**:
+   - Add this table, similar to personal webpage table to save all settings (removes need for persistent local storage), and category order.

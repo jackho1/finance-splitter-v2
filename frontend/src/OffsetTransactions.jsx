@@ -4,6 +4,7 @@ import axios from 'axios';
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
+import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
@@ -293,27 +294,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       setIsLabelsLoading(true);
       
       try {
-        console.log('Fetching offset transactions data using optimized endpoint...');
-        
         // Single API call to get all offset initial data
         const response = await axios.get('http://localhost:5000/offset-initial-data');
         
         if (response.data.success) {
           const { offsetTransactions, offsetCategories, labels } = response.data.data;
-          
-          // Check for transactions with split properties (for debugging)
-          const hasSplitTransactions = offsetTransactions.filter(t => t.has_split);
-          const splitFromTransactions = offsetTransactions.filter(t => t.split_from_id);
-          
-          console.log('Transactions with has_split:', hasSplitTransactions.length);
-          if (hasSplitTransactions.length > 0) {
-            console.log('Sample has_split transaction:', hasSplitTransactions[0]);
-          }
-          
-          console.log('Transactions with split_from_id:', splitFromTransactions.length);
-          if (splitFromTransactions.length > 0) {
-            console.log('Sample split_from_id transaction:', splitFromTransactions[0]);
-          }
           
           // Set all data from the combined response
           setTransactions(offsetTransactions);
@@ -325,8 +310,6 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           
           setLabels(labels);
           setIsLabelsLoading(false);
-          
-          console.log('All offset transactions data loaded successfully using optimized endpoint');
         } else {
           throw new Error(response.data.error || 'Failed to fetch offset initial data');
         }
@@ -580,6 +563,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       });
     }
     
+    // Group split transactions together after filtering and sorting
+    filtered = groupSplitTransactions(filtered);
+    
     setAllFilteredTransactions(filtered);
     
     let tableFiltered = filtered;
@@ -589,6 +575,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         const date = new Date(transaction.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
+      
+      // Re-group after month filtering to maintain split transaction grouping
+      tableFiltered = groupSplitTransactions(tableFiltered);
     }
     
     setFilteredTransactions(tableFiltered);
