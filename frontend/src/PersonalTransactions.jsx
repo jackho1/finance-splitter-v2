@@ -72,6 +72,17 @@ const buttonStyles = `
     padding: 0 15px;
     color: #2c3e50;
   }
+
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
 `;
 
 // Help Text Component for consistent styling
@@ -190,6 +201,28 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Add state to track initial loading completion
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
+  // Personal Split Configuration States
+  const [personalSplitEnabled, setPersonalSplitEnabled] = useState(false);
+  const [personalSplitDefaultDays, setPersonalSplitDefaultDays] = useState(7);
+  const [personalSplitGroups, setPersonalSplitGroups] = useState([]);
+  const [personalSplitMappings, setPersonalSplitMappings] = useState([]);
+  const [availableBudgetCategories, setAvailableBudgetCategories] = useState([]);
+  const [availablePersonalCategories, setAvailablePersonalCategories] = useState([]);
+  const [showPersonalSplitConfig, setShowPersonalSplitConfig] = useState(false);
+  const [isLoadingPersonalSplitConfig, setIsLoadingPersonalSplitConfig] = useState(false);
+  const [showAddGroupForm, setShowAddGroupForm] = useState(false);
+  const [newGroupForm, setNewGroupForm] = useState({ 
+    group_name: '', 
+    personal_category: '',
+    budget_categories: []
+  });
+  
+  // Edit mode states
+  const [editingGroups, setEditingGroups] = useState({}); // Track which groups are being edited
+  const [editingChanges, setEditingChanges] = useState({}); // Track changes for each group
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  
   // Add user ID constant for database operations | TODO: Add login functionality to remove this hardcoded value
   const userId = 'default';
   
@@ -220,6 +253,115 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   };
 
+  // Personal Split Configuration API Functions
+  const loadPersonalSplitConfig = async () => {
+    try {
+      setIsLoadingPersonalSplitConfig(true);
+      
+      // Load split groups, budget categories, and personal categories
+      const [groupsResponse, budgetCategoriesResponse, personalCategoriesResponse] = await Promise.all([
+        axios.get(`http://localhost:5000/personal-split-groups/${userId}`),
+        axios.get('http://localhost:5000/budget-categories'),
+        axios.get('http://localhost:5000/personal-categories')
+      ]);
+      
+
+      
+      if (groupsResponse.data.success) {
+        setPersonalSplitGroups(groupsResponse.data.data);
+      }
+      
+      // Budget categories returns { success: true, data: ["category1", "category2"] }
+      if (budgetCategoriesResponse.data.success) {
+        setAvailableBudgetCategories(budgetCategoriesResponse.data.data);
+      }
+      
+      // Personal categories returns the array directly without success wrapper
+      if (personalCategoriesResponse.data && Array.isArray(personalCategoriesResponse.data)) {
+        setAvailablePersonalCategories(personalCategoriesResponse.data);
+      } else if (personalCategoriesResponse.data.success && personalCategoriesResponse.data.data) {
+        setAvailablePersonalCategories(personalCategoriesResponse.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading personal split configuration:', error);
+    } finally {
+      setIsLoadingPersonalSplitConfig(false);
+    }
+  };
+
+  const createPersonalSplitGroup = async (groupData) => {
+    try {
+      const response = await axios.post('http://localhost:5000/personal-split-groups', {
+        user_id: userId,
+        ...groupData
+      });
+      
+      if (response.data.success) {
+        await loadPersonalSplitConfig(); // Reload configuration
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Error creating personal split group:', error);
+      throw error;
+    }
+  };
+
+  const updatePersonalSplitGroup = async (groupId, updates) => {
+    try {
+      const response = await axios.put(`http://localhost:5000/personal-split-groups/${groupId}`, updates);
+      
+      if (response.data.success) {
+        await loadPersonalSplitConfig(); // Reload configuration
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Error updating personal split group:', error);
+      throw error;
+    }
+  };
+
+  const deletePersonalSplitGroup = async (groupId) => {
+    try {
+      const response = await axios.delete(`http://localhost:5000/personal-split-groups/${groupId}`);
+      
+      if (response.data.success) {
+        await loadPersonalSplitConfig(); // Reload configuration
+      }
+    } catch (error) {
+      console.error('Error deleting personal split group:', error);
+      throw error;
+    }
+  };
+
+  const updatePersonalSplitMapping = async (groupId, budgetCategories) => {
+    try {
+      // First, delete existing mappings for this group
+      const existingMappings = personalSplitGroups.find(g => g.id === groupId)?.mapped_categories || [];
+      if (existingMappings.length > 0) {
+        await axios.delete(`http://localhost:5000/personal-split-mapping/bulk/${userId}`, {
+          data: {
+            personal_split_group_id: groupId,
+            budget_categories: existingMappings.map(m => m.budget_category)
+          }
+        });
+      }
+      
+      // Then, create new mappings
+      if (budgetCategories.length > 0) {
+        await axios.post('http://localhost:5000/personal-split-mapping', {
+          user_id: userId,
+          personal_split_group_id: groupId,
+          budget_categories: budgetCategories
+        });
+      }
+      
+      await loadPersonalSplitConfig(); // Reload configuration
+    } catch (error) {
+      console.error('Error updating personal split mappings:', error);
+      throw error;
+    }
+  };
+
   const loadPersonalSettings = async () => {
     try {
       const response = await axios.get(`http://localhost:5000/personal-settings/${userId}`);
@@ -228,6 +370,10 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         setHideZeroBalanceBuckets(settings.hide_zero_balance_buckets || false);
         setEnableNegativeOffsetBucket(settings.enable_negative_offset_bucket || false);
         setSelectedNegativeOffsetBucket(settings.selected_negative_offset_bucket || '');
+        
+        // Personal split settings
+        setPersonalSplitEnabled(settings.personal_split_enabled || false);
+        setPersonalSplitDefaultDays(settings.personal_split_default_days || 7);
         
         // Make sure category_order is handled correctly if it's a string
         if (settings.category_order) {
@@ -593,6 +739,10 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             setEnableNegativeOffsetBucket(personalSettings.enable_negative_offset_bucket || false);
             setSelectedNegativeOffsetBucket(personalSettings.selected_negative_offset_bucket || '');
             
+            // Personal split settings
+            setPersonalSplitEnabled(personalSettings.personal_split_enabled || false);
+            setPersonalSplitDefaultDays(personalSettings.personal_split_default_days || 7);
+            
             // Handle category order if it exists
             if (personalSettings.category_order) {
               if (typeof personalSettings.category_order === 'string') {
@@ -609,6 +759,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               }
             }
           }
+          
+          // Load personal split configuration
+          await loadPersonalSplitConfig();
           
           setIsTransactionsLoading(false);
           
@@ -1700,8 +1853,19 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   };
 
-  // Smart Split Functions
+  // Smart Split Functions - Updated to use database configuration
   const loadSmartSplitData = async () => {
+    // Check if personal split is enabled and configured
+    if (!personalSplitEnabled) {
+      showErrorNotification('Personal split is not enabled. Please enable it in settings first.');
+      return;
+    }
+    
+    if (personalSplitGroups.length === 0) {
+      showErrorNotification('No split groups configured. Please configure split groups in settings first.');
+      return;
+    }
+    
     // Automatically fill in today's date if end date is missing
     const today = new Date().toISOString().split('T')[0];
     const effectiveFilters = { ...smartSplitFilters };
@@ -1719,19 +1883,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     try {
       setIsLoadingSmartSplit(true);
       const response = await axios.get('http://localhost:5000/shared-transactions-filtered', {
-        params: effectiveFilters
+        params: { ...effectiveFilters, userId }
       });
       
       if (response.data.success) {
         setSmartSplitData(response.data.data);
-        
-        // Map grouped categories to personal savings buckets and populate split transactions
-        const categoryMapping = {
-          'Bills': 'Bills',
-          'Gifts': 'New Home Gift', 
-          'Holidays': 'Holidays'
-          // Food and Monthly Expenditure will remain in the original transaction
-        };
         
         const newSplitTransactions = [];
         const groupedTotals = response.data.data.groupedTotals;
@@ -1739,19 +1895,28 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         // Create a readable date range for the transaction descriptions
         const dateRangeText = formatDateRangeConcise(effectiveFilters.startDate, effectiveFilters.endDate);
         
+        // Use database-driven configuration instead of hardcoded mapping
         Object.entries(groupedTotals).forEach(([groupName, data]) => {
-          const personalCategory = categoryMapping[groupName];
-          if (personalCategory && data.total < 0) { // Changed from > 0 to < 0 for expenses
+          // Find the corresponding group configuration
+          const groupConfig = personalSplitGroups.find(g => g.group_name === groupName);
+          
+          // Only create split transactions for groups that have a personal category (not "original")
+          if (groupConfig && 
+              groupConfig.personal_category && 
+              groupConfig.personal_category !== 'original' && 
+              data.total < 0) { // For expenses
             newSplitTransactions.push({
               description: `${groupName} ${dateRangeText}`,
               amount: data.total.toFixed(2), // Keep the negative amount as-is
-              category: personalCategory
+              category: groupConfig.personal_category
             });
           }
         });
         
         if (newSplitTransactions.length > 0) {
           setSplitTransactions(newSplitTransactions);
+        } else {
+          showErrorNotification('No split transactions were generated. Check your split group configuration.');
         }
       }
     } catch (error) {
@@ -1764,11 +1929,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   // Split Transaction Handlers
   const handleSplitTransaction = (transaction) => {
-    // Auto-populate smart split filters with sensible defaults
+    // Auto-populate smart split filters with user's configured defaults
     const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoString = weekAgo.toISOString().split('T')[0];
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - personalSplitDefaultDays);
+    const daysAgoString = daysAgo.toISOString().split('T')[0];
     
     setTransactionToSplit(transaction);
     setSplitTransactions([{
@@ -1776,14 +1941,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       amount: '',
       category: ''
     }]);
-    setUseSmartSplit(false);
+    setUseSmartSplit(personalSplitEnabled); // Auto-enable if configured
     setSmartSplitData(null);
     
-    // Auto-populate smart split filters with default date range (last 7 days)
+    // Auto-populate smart split filters with user's configured default date range
     setSmartSplitFilters({
-      startDate: weekAgoString,
+      startDate: daysAgoString,
       endDate: today,
-      user: 'Jack'
+      user: 'Jack' // This will be replaced with logged-in user when authentication is implemented
     });
     
     setIsSplitting(true);
@@ -1981,6 +2146,206 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     savePersonalSettings({ auto_distribution_enabled: checked });
   };
 
+  // Handle personal split settings changes
+  const handlePersonalSplitEnabledChange = (checked) => {
+    setPersonalSplitEnabled(checked);
+    savePersonalSettings({ personal_split_enabled: checked });
+  };
+
+  const handlePersonalSplitDefaultDaysChange = (days) => {
+    setPersonalSplitDefaultDays(days);
+    savePersonalSettings({ personal_split_default_days: days });
+  };
+
+  // Edit mode helper functions
+  const startEditingGroup = (groupId) => {
+    const group = personalSplitGroups.find(g => g.id === groupId);
+    if (group) {
+      setEditingGroups(prev => ({ ...prev, [groupId]: true }));
+      setEditingChanges(prev => ({
+        ...prev,
+        [groupId]: group.mapped_categories ? group.mapped_categories.map(m => m.budget_category) : []
+      }));
+    }
+  };
+
+  const cancelEditingGroup = (groupId) => {
+    setEditingGroups(prev => {
+      const newState = { ...prev };
+      delete newState[groupId];
+      return newState;
+    });
+    setEditingChanges(prev => {
+      const newState = { ...prev };
+      delete newState[groupId];
+      return newState;
+    });
+    
+    // Check if there are any remaining unsaved changes
+    const remainingChanges = Object.keys(editingChanges).filter(id => id !== groupId);
+    setHasUnsavedChanges(remainingChanges.length > 0);
+  };
+
+  const saveEditingGroup = async (groupId) => {
+    try {
+      const newCategories = editingChanges[groupId] || [];
+      
+      // Check for category conflicts with other groups
+      const usedCategories = getUsedBudgetCategories(groupId);
+      const conflictingCategories = newCategories.filter(category => 
+        usedCategories.has(category)
+      );
+      
+      if (conflictingCategories.length > 0) {
+        showErrorNotification(`The following categories are already used in other groups: ${conflictingCategories.join(', ')}. Please remove them from other groups first.`);
+        return;
+      }
+      
+      await updatePersonalSplitMapping(groupId, newCategories);
+      
+      // Clear editing state for this group
+      setEditingGroups(prev => {
+        const newState = { ...prev };
+        delete newState[groupId];
+        return newState;
+      });
+      setEditingChanges(prev => {
+        const newState = { ...prev };
+        delete newState[groupId];
+        return newState;
+      });
+      
+      // Check if there are any remaining unsaved changes
+      const remainingChanges = Object.keys(editingChanges).filter(id => id !== groupId);
+      setHasUnsavedChanges(remainingChanges.length > 0);
+    } catch (error) {
+      showErrorNotification('Failed to save category mappings');
+    }
+  };
+
+  const handleEditingCategoryChange = (groupId, category, isSelected) => {
+    setEditingChanges(prev => {
+      const currentCategories = prev[groupId] || [];
+      const updatedCategories = isSelected
+        ? [...currentCategories, category]
+        : currentCategories.filter(c => c !== category);
+      
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        [groupId]: updatedCategories
+      };
+    });
+  };
+
+  const handleClosePersonalSplitConfig = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedChangesModal(true);
+    } else {
+      setShowPersonalSplitConfig(false);
+    }
+  };
+
+  const handleConfirmDiscardChanges = () => {
+    // Clear all editing states
+    setEditingGroups({});
+    setEditingChanges({});
+    setHasUnsavedChanges(false);
+    setShowUnsavedChangesModal(false);
+    setShowPersonalSplitConfig(false);
+  };
+
+  const handleCancelDiscardChanges = () => {
+    setShowUnsavedChangesModal(false);
+  };
+
+  // Helper function to get all used budget categories across all groups
+  const getUsedBudgetCategories = (excludeGroupId = null) => {
+    const usedCategories = new Set();
+    
+    personalSplitGroups.forEach(group => {
+      if (group.id !== excludeGroupId && group.mapped_categories) {
+        group.mapped_categories.forEach(mapping => {
+          usedCategories.add(mapping.budget_category);
+        });
+      }
+    });
+    
+    // Also include categories from other groups being edited
+    Object.entries(editingChanges).forEach(([groupId, categories]) => {
+      if (parseInt(groupId) !== excludeGroupId) {
+        categories.forEach(category => {
+          usedCategories.add(category);
+        });
+      }
+    });
+    
+    return usedCategories;
+  };
+
+  // Helper function to check if a category is available for a specific group
+  const isCategoryAvailable = (category, groupId = null) => {
+    const usedCategories = getUsedBudgetCategories(groupId);
+    return !usedCategories.has(category);
+  };
+
+  // Helper function to get available categories for a specific group
+  const getAvailableCategoriesForGroup = (groupId = null) => {
+    const usedCategories = getUsedBudgetCategories(groupId);
+    return availableBudgetCategories.filter(category => !usedCategories.has(category));
+  };
+
+  // Handle new group form
+  const handleNewGroupFormChange = (field, value) => {
+    setNewGroupForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupForm.group_name.trim() || !newGroupForm.personal_category.trim()) {
+      showErrorNotification('Please fill in both group name and personal category');
+      return;
+    }
+
+    if (newGroupForm.budget_categories.length === 0) {
+      showErrorNotification('Please select at least one budget category');
+      return;
+    }
+
+    // Check for category conflicts
+    const usedCategories = getUsedBudgetCategories();
+    const conflictingCategories = newGroupForm.budget_categories.filter(category => 
+      usedCategories.has(category)
+    );
+    
+    if (conflictingCategories.length > 0) {
+      showErrorNotification(`The following categories are already used in other groups: ${conflictingCategories.join(', ')}. Please remove them from other groups first.`);
+      return;
+    }
+
+    try {
+      // Create the group first
+      const createdGroup = await createPersonalSplitGroup({
+        group_name: newGroupForm.group_name,
+        personal_category: newGroupForm.personal_category
+      });
+      
+      // Then create the mappings
+      if (createdGroup && newGroupForm.budget_categories.length > 0) {
+        await updatePersonalSplitMapping(createdGroup.id, newGroupForm.budget_categories);
+      }
+      
+      setNewGroupForm({ group_name: '', personal_category: '', budget_categories: [] });
+      setShowAddGroupForm(false);
+    } catch (error) {
+      showErrorNotification('Failed to create split group');
+    }
+  };
+
+  const cancelAddGroup = () => {
+    setNewGroupForm({ group_name: '', personal_category: '', budget_categories: [] });
+    setShowAddGroupForm(false);
+  };
+
   // Add a new distribution rule
   const addDistributionRule = async () => {
     try {
@@ -2138,16 +2503,52 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 alignItems: 'center',
                 marginBottom: '12px'
               }}>
-                <div></div>
-                <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>Savings Buckets</h2>
-                
-                {/* Settings and Reset Button Container */}
+                {/* Split Groups and Auto Rules Button Container - Left Side */}
                 <div style={{
                   display: 'flex',
                   gap: '8px',
                   alignItems: 'center',
-                  justifyContent: 'flex-end'
+                  justifyContent: 'flex-start'
                 }}>
+                  {/* Personal Split Groups Info Button (if enabled and configured) */}
+                  {personalSplitEnabled && personalSplitGroups.length > 0 && (
+                    <button
+                      onClick={() => setShowPersonalSplitConfig(true)}
+                      style={{
+                        fontSize: '13px',
+                        padding: '6px 12px',
+                        backgroundColor: '#f0f4ff',
+                        color: '#5b21b6',
+                        border: '1px solid #c4b5fd',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.backgroundColor = '#e0e7ff';
+                        e.currentTarget.style.borderColor = '#a78bfa';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.backgroundColor = '#f0f4ff';
+                        e.currentTarget.style.borderColor = '#c4b5fd';
+                      }}
+                      title="View and manage split groups"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                        <path d="M12 11h4"/>
+                        <path d="M12 16h4"/>
+                        <path d="M8 11h.01"/>
+                        <path d="M8 16h.01"/>
+                      </svg>
+                      {personalSplitGroups.length} Split Group{personalSplitGroups.length > 1 ? 's' : ''}
+                    </button>
+                  )}
+
                   {/* Auto Distribution Info Button (if enabled) */}
                   {autoDistributionEnabled && autoDistributionRules.length > 0 && (
                     <button
@@ -2183,7 +2584,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       {autoDistributionRules.length} Auto Rule{autoDistributionRules.length > 1 ? 's' : ''}
                     </button>
                   )}
-                  
+                </div>
+
+                <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>Savings Buckets</h2>
+                
+                {/* Settings and Reset Button Container - Right Side */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end'
+                }}>
                   {/* Settings Button */}
                   <button
                     onClick={() => setShowSettings(true)}
@@ -3431,6 +3842,111 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               </div>
             </div>
             
+            {/* Personal Split Configuration Section */}
+            <div style={{ marginBottom: '12px' }}>
+              <h3 style={{ 
+                margin: '0 0 6px 0',
+                color: '#374151',
+                fontSize: '15px',
+                fontWeight: '500'
+              }}>
+                Personal Split Configuration
+              </h3>
+              
+              <div style={{
+                padding: '10px',
+                backgroundColor: '#f0f4ff',
+                borderRadius: '6px',
+                border: '1px solid #c4b5fd',
+                marginBottom: '8px'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start',
+                  cursor: 'pointer',
+                  gap: '6px'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={personalSplitEnabled}
+                    onChange={(e) => handlePersonalSplitEnabledChange(e.target.checked)}
+                    style={{ 
+                      marginTop: '1px',
+                      cursor: 'pointer',
+                      width: '14px',
+                      height: '14px'
+                    }}
+                  />
+                  <div>
+                    <div style={{ 
+                      fontSize: '13px',
+                      color: '#5b21b6',
+                      fontWeight: '500',
+                      marginBottom: '1px'
+                    }}>
+                      Enable personal split feature
+                    </div>
+                    <div style={{ 
+                      fontSize: '12px',
+                      color: '#7c3aed',
+                      lineHeight: '1.2'
+                    }}>
+                      Use configured budget category mappings instead of hardcoded rules.
+                    </div>
+                  </div>
+                </label>
+                
+                {personalSplitEnabled && (
+                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #c4b5fd' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label style={{ 
+                          fontSize: '12px',
+                          color: '#5b21b6',
+                          fontWeight: '500',
+                          minWidth: '120px'
+                        }}>
+                          Default lookback (days):
+                        </label>
+                        <input
+                          type="number"
+                          value={personalSplitDefaultDays}
+                          onChange={(e) => handlePersonalSplitDefaultDaysChange(parseInt(e.target.value) || 7)}
+                          min="1"
+                          max="365"
+                          style={{
+                            width: '60px',
+                            padding: '4px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '12px',
+                            backgroundColor: 'white',
+                            color: '#374151'
+                          }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setShowPersonalSplitConfig(true)}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#7c3aed',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          transition: 'background-color 0.2s'
+                        }}
+                      >
+                        Configure
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
             {/* Updated Negative Bucket Offsetting Settings */}
             <div style={{ marginBottom: '16px' }}> {/* Reduced from 24px */}
               <h3 style={{ 
@@ -3560,6 +4076,562 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 }}
                 onMouseOut={e => {
                   e.currentTarget.style.backgroundColor = '#4f46e5';
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Personal Split Configuration Modal */}
+      {showPersonalSplitConfig && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+            width: '800px',
+            maxWidth: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '20px',
+              borderBottom: '1px solid #e5e7eb',
+              paddingBottom: '16px'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                color: '#1f2937',
+                fontSize: '24px',
+                fontWeight: '600'
+              }}>
+                Personal Split Configuration
+              </h2>
+              <button
+                onClick={handleClosePersonalSplitConfig}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  color: '#6b7280',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            
+            {isLoadingPersonalSplitConfig ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  border: '4px solid #f3f4f6', 
+                  borderTop: '4px solid #3b82f6', 
+                  borderRadius: '50%', 
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto 16px'
+                }}></div>
+                <p>Loading split configuration...</p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 16px 0' }}>
+                    Configure how budget categories from shared transactions are grouped and mapped to your personal savings buckets.
+                  </p>
+                  
+                  {!showAddGroupForm ? (
+                    <button
+                      onClick={() => setShowAddGroupForm(true)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#7c3aed',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        marginBottom: '16px'
+                      }}
+                    >
+                      + Add Split Group
+                    </button>
+                  ) : (
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      marginBottom: '16px'
+                    }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: '#1e293b', fontSize: '16px' }}>
+                        Add New Split Group
+                      </h4>
+                      
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                            Group Name
+                          </label>
+                          <input
+                            type="text"
+                            value={newGroupForm.group_name}
+                            onChange={(e) => handleNewGroupFormChange('group_name', e.target.value)}
+                            placeholder="e.g., Monthly Bills"
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '14px',
+                              backgroundColor: 'white',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                            Budget Categories ({newGroupForm.budget_categories.length} selected)
+                          </label>
+                          <div style={{
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            backgroundColor: 'white',
+                            padding: '6px'
+                          }}>
+
+                            {availableBudgetCategories.map(category => {
+                              const isAvailable = isCategoryAvailable(category);
+                              const isSelected = newGroupForm.budget_categories.includes(category);
+                              const isDisabled = !isAvailable && !isSelected;
+                              
+                              return (
+                                <label key={category} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '3px 6px',
+                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                  borderRadius: '4px',
+                                  transition: 'background-color 0.2s',
+                                  opacity: isDisabled ? 0.5 : 1,
+                                  backgroundColor: isSelected ? '#f0f4ff' : 'transparent'
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={isDisabled}
+                                    onChange={(e) => {
+                                      const currentCategories = newGroupForm.budget_categories;
+                                      const updatedCategories = e.target.checked
+                                        ? [...currentCategories, category]
+                                        : currentCategories.filter(c => c !== category);
+                                      handleNewGroupFormChange('budget_categories', updatedCategories);
+                                    }}
+                                    style={{
+                                      marginRight: '8px',
+                                      cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                    }}
+                                  />
+                                  <span style={{ 
+                                    fontSize: '14px', 
+                                    color: isDisabled ? '#9ca3af' : '#374151',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    {category}
+                                    {isDisabled && (
+                                      <span style={{
+                                        fontSize: '11px',
+                                        color: '#ef4444',
+                                        fontStyle: 'italic'
+                                      }}>
+                                        (already used)
+                                      </span>
+                                    )}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {newGroupForm.budget_categories.length > 0 && (
+                            <div style={{ marginTop: '8px' }}>
+                              <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
+                                Selected categories:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {newGroupForm.budget_categories.map(category => (
+                                  <span key={category} style={{
+                                    padding: '3px 8px',
+                                    backgroundColor: '#ddd6fe',
+                                    color: '#5b21b6',
+                                    borderRadius: '12px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    {category}
+                                    <button
+                                      onClick={() => {
+                                        const updatedCategories = newGroupForm.budget_categories.filter(c => c !== category);
+                                        handleNewGroupFormChange('budget_categories', updatedCategories);
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#5b21b6',
+                                        cursor: 'pointer',
+                                        padding: '0',
+                                        fontSize: '14px',
+                                        lineHeight: '1'
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                            Personal Category/Bucket
+                          </label>
+                          <select
+                            value={newGroupForm.personal_category}
+                            onChange={(e) => handleNewGroupFormChange('personal_category', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '14px',
+                              backgroundColor: 'white',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <option value="">Select personal category...</option>
+
+                            {availablePersonalCategories.map(category => (
+                              <option key={category.category} value={category.category}>
+                                {category.category}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={cancelAddGroup}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateGroup}
+                          disabled={!newGroupForm.group_name.trim() || !newGroupForm.personal_category.trim() || newGroupForm.budget_categories.length === 0}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) ? '#7c3aed' : '#9ca3af',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) ? 'pointer' : 'not-allowed',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Create Group
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {personalSplitGroups.length === 0 ? (
+                  <div style={{
+                    padding: '40px',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    color: '#6b7280'
+                  }}>
+                    <p>No split groups configured yet.</p>
+                    <p style={{ fontSize: '14px' }}>Click "Add Split Group" to create your first group.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {personalSplitGroups.map((group) => (
+                      <div key={group.id} style={{
+                        padding: '12px',
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                              <h4 style={{ margin: '0', color: '#1e293b', fontSize: '14px', fontWeight: '600' }}>
+                                {group.group_name}
+                              </h4>
+                              <span style={{ 
+                                fontSize: '11px', 
+                                color: '#64748b',
+                                backgroundColor: '#e2e8f0',
+                                padding: '2px 6px',
+                                borderRadius: '8px',
+                                fontWeight: '500'
+                              }}>
+                                {group.mapped_categories ? group.mapped_categories.length : 0} categories
+                              </span>
+                            </div>
+                            <p style={{ margin: '0', color: '#64748b', fontSize: '13px' }}>
+                              → <strong>{group.personal_category}</strong>
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {!editingGroups[group.id] ? (
+                              <button
+                                onClick={() => startEditingGroup(group.id)}
+                                style={{
+                                  padding: '3px 6px',
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '3px',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Edit
+                              </button>
+                            ) : (
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  onClick={() => saveEditingGroup(group.id)}
+                                  style={{
+                                    padding: '3px 6px',
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '3px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => cancelEditingGroup(group.id)}
+                                  style={{
+                                    padding: '3px 6px',
+                                    backgroundColor: '#f3f4f6',
+                                    color: '#6b7280',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '3px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Delete split group "${group.group_name}"?`)) {
+                                  try {
+                                    await deletePersonalSplitGroup(group.id);
+                                  } catch (error) {
+                                    showErrorNotification('Failed to delete split group');
+                                  }
+                                }
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#ef4444',
+                                padding: '3px'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="3,6 5,6 21,6"></polyline>
+                                <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          gap: '3px', 
+                          marginBottom: '6px',
+                          maxHeight: '60px',
+                          overflowY: 'auto',
+                          padding: '4px',
+                          backgroundColor: 'white',
+                          borderRadius: '4px',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          {group.mapped_categories && group.mapped_categories.length > 0 ? (
+                            group.mapped_categories.map((mapping) => (
+                              <span key={mapping.id} style={{
+                                padding: '2px 6px',
+                                backgroundColor: '#ddd6fe',
+                                color: '#5b21b6',
+                                borderRadius: '8px',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {mapping.budget_category}
+                              </span>
+                            ))
+                          ) : (
+                            <span style={{ 
+                              color: '#9ca3af', 
+                              fontSize: '12px', 
+                              fontStyle: 'italic',
+                              padding: '4px'
+                            }}>
+                              No categories mapped
+                            </span>
+                          )}
+                        </div>
+                        
+                        {editingGroups[group.id] && (
+                          <div style={{
+                            maxHeight: '150px',
+                            overflowY: 'auto',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '4px',
+                            backgroundColor: 'white',
+                            padding: '4px',
+                            marginTop: '8px'
+                          }}>
+                            {availableBudgetCategories.map(category => {
+                              const isSelected = editingChanges[group.id] ? 
+                                editingChanges[group.id].includes(category) : false;
+                              const isAvailable = isCategoryAvailable(category, group.id);
+                              const isDisabled = !isAvailable && !isSelected;
+                              
+                              return (
+                                <label key={category} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '2px 4px',
+                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                  borderRadius: '3px',
+                                  backgroundColor: isSelected ? '#f0f4ff' : 'transparent',
+                                  opacity: isDisabled ? 0.5 : 1
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={isDisabled}
+                                    onChange={(e) => {
+                                      handleEditingCategoryChange(group.id, category, e.target.checked);
+                                    }}
+                                    style={{
+                                      marginRight: '6px',
+                                      cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                    }}
+                                  />
+                                  <span style={{ 
+                                    fontSize: '13px', 
+                                    color: isDisabled ? '#9ca3af' : '#374151',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    {category}
+                                    {isDisabled && (
+                                      <span style={{
+                                        fontSize: '10px',
+                                        color: '#ef4444',
+                                        fontStyle: 'italic'
+                                      }}>
+                                        (used elsewhere)
+                                      </span>
+                                    )}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              marginTop: '24px',
+              paddingTop: '16px',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button
+                onClick={handleClosePersonalSplitConfig}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#4f46e5',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
                 }}
               >
                 Done
@@ -3904,187 +4976,198 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 </span>
               </div>
               
-              {/* Smart Split Options */}
-              <div style={{ 
-                marginBottom: '16px',
-                padding: '12px',
-                backgroundColor: '#f0f9ff',
-                borderRadius: '8px',
-                border: '1px solid #bae6fd'
-              }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  gap: '8px',
-                  marginBottom: '12px'
+              {/* Personal Split Options - Simplified */}
+              {personalSplitEnabled && personalSplitGroups.length > 0 && (
+                <div style={{ 
+                  marginBottom: '16px',
+                  padding: '12px',
+                  backgroundColor: '#f0f4ff',
+                  borderRadius: '8px',
+                  border: '1px solid #c4b5fd'
                 }}>
-                  <input 
-                    type="checkbox" 
-                    checked={useSmartSplit}
-                    onChange={(e) => setUseSmartSplit(e.target.checked)}
-                    style={{ 
-                      cursor: 'pointer',
-                      width: '16px',
-                      height: '16px'
-                    }}
-                  />
-                  <div>
-                    <div style={{ 
-                      fontSize: '14px',
-                      color: '#0369a1',
-                      fontWeight: '500'
-                    }}>
-                      Split based on shared transactions
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px',
-                      color: '#0284c7',
-                      marginTop: '2px'
-                    }}>
-                      Automatically split based on Jack's filtered transactions from the Transactions page
-                    </div>
-                  </div>
-                </label>
-                
-                {useSmartSplit && (
-                  <div style={{ 
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr auto',
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'flex-start',
+                    cursor: 'pointer',
                     gap: '8px',
-                    alignItems: 'end'
+                    marginBottom: useSmartSplit ? '12px' : '0'
                   }}>
-                    <div>
-                      <label style={{ 
-                        fontSize: '11px',
-                        color: '#6b7280',
-                        fontWeight: '500',
-                        display: 'block',
-                        marginBottom: '2px'
-                      }}>Start Date</label>
-                      <input
-                        type="date"
-                        value={smartSplitFilters.startDate}
-                        onChange={(e) => setSmartSplitFilters(prev => ({
-                          ...prev,
-                          startDate: e.target.value
-                        }))}
-                        style={{
-                          width: '100%',
-                          height: '32px',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid #d1d5db',
-                          fontSize: '13px',
-                          backgroundColor: 'white',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label style={{ 
-                        fontSize: '11px',
-                        color: '#6b7280',
-                        fontWeight: '500',
-                        display: 'block',
-                        marginBottom: '2px'
-                      }}>End Date</label>
-                      <input
-                        type="date"
-                        value={smartSplitFilters.endDate}
-                        onChange={(e) => setSmartSplitFilters(prev => ({
-                          ...prev,
-                          endDate: e.target.value
-                        }))}
-                        style={{
-                          width: '100%',
-                          height: '32px',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid #d1d5db',
-                          fontSize: '13px',
-                          backgroundColor: 'white',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    </div>
-                    
-                    <button
-                      onClick={loadSmartSplitData}
-                      disabled={isLoadingSmartSplit || !smartSplitFilters.startDate}
-                      style={{
-                        height: '32px',
-                        padding: '0 12px',
-                        backgroundColor: isLoadingSmartSplit ? '#9ca3af' : '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: isLoadingSmartSplit ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {isLoadingSmartSplit ? 'Loading...' : 'Load Split'}
-                    </button>
-                  </div>
-                )}
-                
-                {smartSplitData && (
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '8px',
-                    backgroundColor: '#dcfce7',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#15803d'
-                  }}>
-                    <div style={{ marginBottom: '6px' }}>
-                      Found {smartSplitData.count} transactions totaling {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`} {formatDateRange(smartSplitFilters.startDate, smartSplitFilters.endDate)}
-                    </div>
-                    
-                    {/* Show breakdown by grouped categories */}
-                    <div style={{ fontSize: '11px', color: '#059669' }}>
-                      <strong>Split Breakdown:</strong>
-                      {Object.entries(smartSplitData.groupedTotals).map(([groupName, data]) => {
-                        const mapping = {
-                          'Bills': 'Bills',
-                          'Gifts': 'New Home Gift', 
-                          'Holidays': 'Holidays'
-                        };
-                        const personalCategory = mapping[groupName];
-                        
-                        // Only show categories that are being split out OR Monthly Expenditure
-                        if (personalCategory || groupName === 'Monthly Expenditure') {
-                          return (
-                            <div key={groupName} style={{ marginLeft: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>
-                                {groupName === 'Monthly Expenditure' ? 'Monthly Expenditure (stays)' : `${groupName} → ${personalCategory}`}
-                              </span>
-                              <span style={{ fontWeight: 'bold' }}>
-                                {data.total < 0 ? `-$${Math.abs(data.total).toFixed(2)}` : `$${data.total.toFixed(2)}`} ({data.count})
-                              </span>
-                            </div>
-                          );
+                    <input 
+                      type="checkbox" 
+                      checked={useSmartSplit}
+                      onChange={(e) => {
+                        setUseSmartSplit(e.target.checked);
+                        if (e.target.checked) {
+                          // Automatically load split data when enabled
+                          setTimeout(() => loadSmartSplitData(), 100);
                         }
-                        return null;
-                      })}
-                      
-                      {/* Total aggregate */}
+                      }}
+                      style={{ 
+                        cursor: 'pointer',
+                        width: '16px',
+                        height: '16px',
+                        marginTop: '1px'
+                      }}
+                    />
+                    <div>
                       <div style={{ 
-                        marginTop: '4px', 
-                        marginLeft: '8px',
-                        fontWeight: 'bold',
-                        borderTop: '1px solid #059669',
-                        paddingTop: '2px'
+                        fontSize: '14px',
+                        color: '#5b21b6',
+                        fontWeight: '500'
                       }}>
-                        Total: {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`}
+                        Use configured split groups
+                      </div>
+                      <div style={{ 
+                        fontSize: '12px',
+                        color: '#7c3aed',
+                        marginTop: '2px',
+                        lineHeight: '1.3'
+                      }}>
+                        Automatically split based on your configured category mappings ({personalSplitDefaultDays} days lookback)
                       </div>
                     </div>
+                  </label>
+                  
+                  {useSmartSplit && (
+                    <div style={{ 
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'center',
+                      marginBottom: '8px'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ 
+                          fontSize: '11px',
+                          color: '#6b7280',
+                          fontWeight: '500',
+                          display: 'block',
+                          marginBottom: '2px'
+                        }}>Date Range</label>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px' }}>
+                          <input
+                            type="date"
+                            value={smartSplitFilters.startDate}
+                            onChange={(e) => setSmartSplitFilters(prev => ({
+                              ...prev,
+                              startDate: e.target.value
+                            }))}
+                            style={{
+                              padding: '4px 6px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '12px',
+                              backgroundColor: 'white'
+                            }}
+                          />
+                          <span style={{ color: '#6b7280' }}>to</span>
+                          <input
+                            type="date"
+                            value={smartSplitFilters.endDate}
+                            onChange={(e) => setSmartSplitFilters(prev => ({
+                              ...prev,
+                              endDate: e.target.value
+                            }))}
+                            style={{
+                              padding: '4px 6px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '12px',
+                              backgroundColor: 'white'
+                            }}
+                          />
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={loadSmartSplitData}
+                        disabled={isLoadingSmartSplit}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: isLoadingSmartSplit ? '#9ca3af' : '#7c3aed',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: isLoadingSmartSplit ? 'not-allowed' : 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap',
+                          marginTop: '16px'
+                        }}
+                      >
+                        {isLoadingSmartSplit ? 'Loading...' : 'Refresh'}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {smartSplitData && (
+                    <div style={{
+                      padding: '8px',
+                      backgroundColor: '#ecfdf5',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      color: '#059669',
+                      border: '1px solid #bbf7d0'
+                    }}>
+                      <div style={{ marginBottom: '6px', fontWeight: '500' }}>
+                        ✓ Loaded {smartSplitData.count} transactions • Total: {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`}
+                      </div>
+                      
+                      {/* Show configured group breakdown */}
+                      <div style={{ fontSize: '11px', color: '#047857' }}>
+                        {Object.entries(smartSplitData.groupedTotals).map(([groupName, data]) => {
+                          const groupConfig = personalSplitGroups.find(g => g.group_name === groupName);
+                          
+                          if (groupConfig && groupConfig.personal_category !== 'original') {
+                            return (
+                              <div key={groupName} style={{ 
+                                marginLeft: '8px', 
+                                display: 'flex', 
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <span>{groupName} → {groupConfig.personal_category}</span>
+                                <span style={{ fontWeight: 'bold' }}>
+                                  {data.total < 0 ? `-$${Math.abs(data.total).toFixed(2)}` : `$${data.total.toFixed(2)}`}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Show message if personal split is not configured */}
+              {(!personalSplitEnabled || personalSplitGroups.length === 0) && (
+                <div style={{ 
+                  marginBottom: '16px',
+                  padding: '12px',
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '8px',
+                  border: '1px solid #fde047'
+                }}>
+                  <div style={{ 
+                    fontSize: '13px',
+                    color: '#92400e',
+                    fontWeight: '500',
+                    marginBottom: '4px'
+                  }}>
+                    Personal Split Not Configured
                   </div>
-                )}
-              </div>
+                  <div style={{ 
+                    fontSize: '12px',
+                    color: '#b45309',
+                    lineHeight: '1.3'
+                  }}>
+                    {!personalSplitEnabled 
+                      ? 'Enable personal split in Settings to use automatic category mapping.'
+                      : 'Configure split groups in Settings to use automatic splitting.'}
+                  </div>
+                </div>
+              )}
 
               {/* Split Transactions - More Compact */}
               <div style={{ 
@@ -4320,6 +5403,125 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       {/* Transactions table with modern styling */}
       {renderTransactionsTable()}
+
+      {/* Unsaved Changes Confirmation Modal */}
+      {showUnsavedChangesModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            animation: 'modalSlideIn 0.2s ease-out'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#fef3c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '12px'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <h3 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#111827'
+              }}>
+                Unsaved Changes
+              </h3>
+            </div>
+            
+            <p style={{
+              margin: '0 0 20px 0',
+              fontSize: '14px',
+              color: '#6b7280',
+              lineHeight: '1.5'
+            }}>
+              You have unsaved changes to your split group configuration. Are you sure you want to close without saving? All changes will be discarded.
+            </p>
+            
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button
+                onClick={handleCancelDiscardChanges}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+              >
+                Keep Editing
+              </button>
+              <button
+                onClick={handleConfirmDiscardChanges}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#b91c1c';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#dc2626';
+                }}
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

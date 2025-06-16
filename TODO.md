@@ -129,7 +129,7 @@
 - [x] **Fix Total Budgets calculation**:
    - Currently, it is incorrectly calculated
 
-- [ ] **Make Transactions table colors more prominent**:
+- [x] **Make Transactions table colors more prominent**:
    - Currently, it makes it a little bit difficult to read, need to compare results.
 
 - [x] **Center Transaction Table Values**:
@@ -258,7 +258,7 @@
 - [ ] **Remove zero categories from chart**:
    - Within the App.jsx webpage, remove categories in the chart where that category is set to zero. It adds unnecessary clutter. 
 
-- [ ] **Refactor split transaction pop up window**:
+- [x] **Refactor split transaction pop up window**:
    - Personal and offset webpages need to be updated similar to the transactions webpage.
 
 - [ ] **Update offset & personal webpage bucket load**:
@@ -266,3 +266,10 @@
 
 - [ ] **Add offset_settings table**:
    - Add this table, similar to personal webpage table to save all settings (removes need for persistent local storage), and category order.
+
+- [ ] **Fix hardcoded auto split transactions**:
+   - Currently it is hardcoded. Fix this so new psql tables are set up to ensure this automation can be configured easily. 
+   Users should be able to create M2M relationships for automated budget categories and saving bucket relationships
+   - personal_split_groups - stores custom group names displays ordering of groups, 
+   - personal_split_mapping - multiple budget categories map to one savings bucket, can be added or deleted
+   - personal_settings (existing) - Users should be able to enable/disable auto split functionality. Stores user preference for default days e.g., 7, default user to split against, and users to include/exclude from shared transactions e.g., include jack and both/2 but exclude other users.
