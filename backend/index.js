@@ -373,6 +373,31 @@ const resolveCategoryNameOrIdToId = async (client, categoryValue, categoryTable)
   return result.rows[0].id;
 };
 
+// Helper function to resolve category ID back to category name
+const resolveCategoryIdToName = async (client, categoryValue, categoryTable) => {
+  // Handle null/undefined/empty values
+  if (!categoryValue || categoryValue === '') {
+    return null;
+  }
+  
+  // Check if it's already a category name (string that's not a number)
+  if (typeof categoryValue === 'string' && !/^\d+$/.test(categoryValue)) {
+    return categoryValue;
+  }
+  
+  // It's a number/ID, so resolve to name
+  const result = await client.query(
+    `SELECT category FROM ${categoryTable} WHERE id = $1`,
+    [parseInt(categoryValue)]
+  );
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Category ID '${categoryValue}' not found in ${categoryTable}`);
+  }
+  
+  return result.rows[0].category;
+};
+
 // OPTIMIZED COMBINED ENDPOINTS - Reduces database connections by fetching related data in single transactions
 
 // Combined initial data endpoint to reduce database connections
@@ -446,6 +471,22 @@ app.get('/personal-initial-data', async (req, res) => {
       client.query('SELECT * FROM personal_settings WHERE user_id = $1', ['default'])
     ]);
     
+    // Resolve category IDs back to category names for auto distribution rules
+    const rulesWithNames = await Promise.all(autoDistributionRulesResult.rows.map(async (rule) => {
+      const sourceBucket = rule.source_bucket ? 
+        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') : 
+        null;
+      const destBucket = rule.dest_bucket ? 
+        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') : 
+        null;
+      
+      return {
+        ...rule,
+        source_bucket: sourceBucket,
+        dest_bucket: destBucket
+      };
+    }));
+    
     console.log(`Successfully fetched personal data: ${personalTransactionsResult.rows.length} transactions, ${personalCategoriesResult.rows.length} categories, ${autoDistributionRulesResult.rows.length} rules`);
     
     res.json({
@@ -453,7 +494,7 @@ app.get('/personal-initial-data', async (req, res) => {
       data: {
         personalTransactions: personalTransactionsResult.rows,
         personalCategories: personalCategoriesResult.rows,
-        autoDistributionRules: autoDistributionRulesResult.rows,
+        autoDistributionRules: rulesWithNames,
         personalSettings: personalSettingsResult.rows[0] || {}
       }
     });
@@ -2200,15 +2241,32 @@ app.get('/personal-settings/:userId', async (req, res) => {
  * GET /auto-distribution-rules/:userId - Get user's auto distribution rules
  */
 app.get('/auto-distribution-rules/:userId', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { userId } = req.params;
     
     const query = 'SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id';
-    const { rows } = await pool.query(query, [userId]);
+    const { rows } = await client.query(query, [userId]);
+    
+    // Resolve category IDs back to category names
+    const rulesWithNames = await Promise.all(rows.map(async (rule) => {
+      const sourceBucket = rule.source_bucket ? 
+        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') : 
+        null;
+      const destBucket = rule.dest_bucket ? 
+        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') : 
+        null;
+      
+      return {
+        ...rule,
+        source_bucket: sourceBucket,
+        dest_bucket: destBucket
+      };
+    }));
     
     res.json({
       success: true,
-      data: rows
+      data: rulesWithNames
     });
   } catch (err) {
     console.error('Error fetching auto distribution rules:', err);
@@ -2217,6 +2275,8 @@ app.get('/auto-distribution-rules/:userId', async (req, res) => {
       error: 'Server error', 
       details: err.message 
     });
+  } finally {
+    client.release();
   }
 });
 
