@@ -246,7 +246,7 @@
 - [ ] **Add ability to create new saving buckets**:
    - Add.
 
-- [ ] **Integrate Sort By Feature to Column Titles**:
+- [x] **Integrate Sort By Feature to Column Titles**:
    - Remove the Sort By dropdown menu and integrate it into a double-click for each title instead.
 
 - [ ] **Consistent CSS Styling**:
@@ -255,7 +255,7 @@
 - [ ] **Refactor codebase**:
    - Refactor codebase so it is more cleaner. Currently, all files are added everywhere with no properly file structure.  
 
-- [ ] **Remove zero categories from chart**:
+- [x] **Remove zero categories from chart**:
    - Within the App.jsx webpage, remove categories in the chart where that category is set to zero. It adds unnecessary clutter. 
 
 - [x] **Refactor split transaction pop up window**:
