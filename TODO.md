@@ -267,9 +267,12 @@
 - [ ] **Add offset_settings table**:
    - Add this table, similar to personal webpage table to save all settings (removes need for persistent local storage), and category order.
 
-- [ ] **Fix hardcoded auto split transactions**:
+- [x] **Fix hardcoded auto split transactions**:
    - Currently it is hardcoded. Fix this so new psql tables are set up to ensure this automation can be configured easily. 
    Users should be able to create M2M relationships for automated budget categories and saving bucket relationships
    - personal_split_groups - stores custom group names displays ordering of groups, 
    - personal_split_mapping - multiple budget categories map to one savings bucket, can be added or deleted
-   - personal_settings (existing) - Users should be able to enable/disable auto split functionality. Stores user preference for default days e.g., 7, default user to split against, and users to include/exclude from shared transactions e.g., include jack and both/2 but exclude other users.
+   - personal_settings (existing) - Users should be able to enable/disable auto split functionality. Stores user preference for default days e.g., 7, default user to split against, and users to include from shared transactions e.g., include jack and both/2 and exclude other users.
+
+- [ ] **Add table for label names**:
+   - Add table to store label names.
