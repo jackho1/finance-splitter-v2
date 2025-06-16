@@ -197,6 +197,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [lastAutoDistributionMonth, setLastAutoDistributionMonth] = useState('');
   const [isDistributing, setIsDistributing] = useState(false);
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
+  const autoRulesButtonRef = useRef(null);
+  const [popupPosition, setPopupPosition] = useState({ top: '60px', left: '0' });
   
   // Add state to track initial loading completion
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -401,8 +403,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     }
   };
   
-  // Key for localStorage
-  const CATEGORY_ORDER_KEY = 'personal_categories_order';
+  // Keys for localStorage (category order now stored in database)
   const SETTINGS_KEY = 'personal_transactions_settings';
   const AUTO_DISTRIBUTION_KEY = 'personal_auto_distribution_settings';
   const LAST_DISTRIBUTION_KEY = 'personal_last_auto_distribution';
@@ -484,20 +485,6 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       }, 300);
     }, 2000);
   };
-  
-  // Load saved order from localStorage on mount
-  useEffect(() => {
-    const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
-    if (savedOrder) {
-      try {
-        const parsedOrder = JSON.parse(savedOrder);
-        setCategoryOrder(parsedOrder);
-      } catch (error) {
-        console.error('Error parsing saved category order:', error);
-        localStorage.removeItem(CATEGORY_ORDER_KEY);
-      }
-    }
-  }, []);
   
   // Load saved settings on mount - includes negative offset bucket settings
   useEffect(() => {
@@ -628,6 +615,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   }, [initialLoadComplete, autoDistributionEnabled, transactions, lastAutoDistributionMonth, autoDistributionRules]);
   
   // Initialize or update category order when transactions change
+  // Modified to respect database as source of truth and only update when there are actual changes
   useEffect(() => {
     if (transactions.length > 0) {
       // Calculate category data
@@ -648,41 +636,29 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       const currentCategories = Object.keys(categoryData);
       
-      // Get the current saved order
-      const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
-      let existingOrder = [];
-      
-      if (savedOrder) {
-        try {
-          existingOrder = JSON.parse(savedOrder);
-        } catch (error) {
-          console.error('Error parsing saved category order:', error);
-          localStorage.removeItem(CATEGORY_ORDER_KEY);
+      // Only update category order if:
+      // 1. We already have a category order (from database) AND
+      // 2. There are new or removed categories
+      if (categoryOrder.length > 0) {
+        // Check for new categories or removed categories
+        const newCategories = currentCategories.filter(cat => !categoryOrder.includes(cat));
+        const removedCategories = categoryOrder.filter(cat => !currentCategories.includes(cat));
+        
+        if (newCategories.length > 0 || removedCategories.length > 0) {
+          // Update the order: keep existing order but add new categories and remove old ones  
+          const updatedOrder = [
+            ...categoryOrder.filter(cat => currentCategories.includes(cat)), // Keep existing categories in order
+            ...newCategories // Add new categories at the end
+          ];
+          
+          setCategoryOrder(updatedOrder);
+          savePersonalSettings({ category_order: updatedOrder });
         }
       }
-      
-      // Check for new categories or removed categories
-      const newCategories = currentCategories.filter(cat => !existingOrder.includes(cat));
-      const removedCategories = existingOrder.filter(cat => !currentCategories.includes(cat));
-      
-      if (newCategories.length > 0 || removedCategories.length > 0) {
-        // Update the order: keep existing order but add new categories and remove old ones  
-        const updatedOrder = [
-          ...existingOrder.filter(cat => currentCategories.includes(cat)), // Keep existing categories in order
-          ...newCategories // Add new categories at the end
-        ];
-        
-        setCategoryOrder(updatedOrder);
-        savePersonalSettings({ category_order: updatedOrder });
-      } else if (existingOrder.length > 0 && categoryOrder.length === 0) {
-        // Set the category order if it's empty but we have a saved order
-        setCategoryOrder(existingOrder);
-      } else if (existingOrder.length === 0 && categoryOrder.length === 0) {
-        // No saved order and no current order, create initial order
-        setCategoryOrder(currentCategories);
-      }
+      // Note: Removed the else cases that were creating default orders
+      // Database should be the source of truth for category order
     }
-  }, [transactions]);
+  }, [transactions, categoryOrder]); // Added categoryOrder as dependency
 
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
@@ -743,20 +719,41 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             setPersonalSplitEnabled(personalSettings.personal_split_enabled || false);
             setPersonalSplitDefaultDays(personalSettings.personal_split_default_days || 7);
             
-            // Handle category order if it exists
+            // Handle category order if it exists in database
             if (personalSettings.category_order) {
               if (typeof personalSettings.category_order === 'string') {
                 try {
                   setCategoryOrder(JSON.parse(personalSettings.category_order));
                 } catch (error) {
                   console.error('Error parsing category_order from settings:', error);
-                  setCategoryOrder([]);
+                  // If there's an error parsing, create initial order from transactions but don't save it
+                  const categoryData = personalTransactions.reduce((acc, transaction) => {
+                    const category = transaction.category || 'Uncategorized';
+                    if (!acc[category]) acc[category] = true;
+                    return acc;
+                  }, {});
+                  setCategoryOrder(Object.keys(categoryData).sort());
                 }
               } else if (Array.isArray(personalSettings.category_order)) {
                 setCategoryOrder(personalSettings.category_order);
               } else {
-                setCategoryOrder([]);
+                // Invalid format, create initial order from transactions but don't save it
+                const categoryData = personalTransactions.reduce((acc, transaction) => {
+                  const category = transaction.category || 'Uncategorized';
+                  if (!acc[category]) acc[category] = true;
+                  return acc;
+                }, {});
+                setCategoryOrder(Object.keys(categoryData).sort());
               }
+            } else {
+              // No category order in database, create initial order from transactions but don't save it
+              // User will need to manually arrange and save to persist the order
+              const categoryData = personalTransactions.reduce((acc, transaction) => {
+                const category = transaction.category || 'Uncategorized';
+                if (!acc[category]) acc[category] = true;
+                return acc;
+              }, {});
+              setCategoryOrder(Object.keys(categoryData).sort());
             }
           }
           
@@ -1817,11 +1814,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   
   // Add a reset order function
   const resetCategoryOrder = () => {
-    if (window.confirm('Are you sure you want to reset the category order to default?')) {
-      // Clear saved order
-      localStorage.removeItem(CATEGORY_ORDER_KEY);
-      
-      // Reset to alphabetical order or original order
+    if (window.confirm('Are you sure you want to reset the category order to alphabetical?')) {
+      // Reset to alphabetical order based on current transactions
       const categoryData = transactions.reduce((acc, transaction) => {
         const category = transaction.category || 'Uncategorized';
         if (!acc[category]) acc[category] = true;
@@ -1834,7 +1828,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       // Show notification
       const notification = document.createElement('div');
-      notification.textContent = 'Category order reset to default!';
+      notification.textContent = 'Category order reset to alphabetical!';
       notification.style.position = 'fixed';
       notification.style.top = '20px';
       notification.style.right = '20px';
@@ -2552,7 +2546,32 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   {/* Auto Distribution Info Button (if enabled) */}
                   {autoDistributionEnabled && autoDistributionRules.length > 0 && (
                     <button
-                      onClick={() => setShowDistributionSummary(!showDistributionSummary)}
+                      ref={autoRulesButtonRef}
+                      onClick={() => {
+                        if (!showDistributionSummary && autoRulesButtonRef.current) {
+                          // Calculate position to align with button's left edge
+                          const buttonEl = autoRulesButtonRef.current;
+                          const buttonRect = buttonEl.getBoundingClientRect();
+                          const container = buttonEl.offsetParent;
+                          
+                          if (container) {
+                            const containerRect = container.getBoundingClientRect();
+                            const leftPosition = buttonRect.left - containerRect.left;
+                            
+                            setPopupPosition({
+                              top: '50px', // Position below the button row
+                              left: `${leftPosition}px`  // Align with button's left edge
+                            });
+                          } else {
+                            // Fallback if container detection fails
+                            setPopupPosition({
+                              top: '50px',
+                              left: '40px'
+                            });
+                          }
+                        }
+                        setShowDistributionSummary(!showDistributionSummary);
+                      }}
                       style={{
                         fontSize: '13px',
                         padding: '6px 12px',
@@ -2643,8 +2662,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             {showDistributionSummary && autoDistributionRules.length > 0 && (
               <div style={{
                 position: 'absolute',
-                top: '60px',
-                right: '0',
+                top: popupPosition.top,
+                left: popupPosition.left,
                 backgroundColor: 'white',
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
@@ -2653,80 +2672,80 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 zIndex: 100,
                 width: '320px'
               }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px'
-                }}>
-                  <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>Monthly Auto Distribution</h4>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    borderBottom: '1px solid #f3f4f6',
+                    paddingBottom: '8px'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>Monthly Auto Distribution</h4>
+                    <button
+                      onClick={() => setShowDistributionSummary(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#9ca3af'
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '13px' }}>
+                    {autoDistributionRules.map((rule, index) => (
+                      <div key={rule.id} style={{ 
+                        marginBottom: '8px',
+                        padding: '8px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '6px'
+                      }}>
+                        <div style={{ 
+                          color: '#374151', 
+                          marginBottom: '4px', 
+                          fontWeight: '500', 
+                          fontSize: '14px'
+                        }}>
+                          {rule.name || `Rule ${index + 1}`}
+                        </div>
+                        <div style={{ color: '#374151', marginBottom: '4px' }}>
+                          <strong>${rule.amount}</strong> per month
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                          From: <strong>{rule.sourceBucket || 'Not set'}</strong>
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                          To: <strong>{rule.destBucket || 'Not set'}</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                   <button
-                    onClick={() => setShowDistributionSummary(false)}
+                    onClick={() => {
+                      performAutoDistribution();
+                      setShowDistributionSummary(false);
+                    }}
+                    disabled={isDistributing}
                     style={{
-                      background: 'none',
+                      width: '100%',
+                      marginTop: '12px',
+                      padding: '8px',
+                      backgroundColor: isDistributing ? '#94a3b8' : '#3b82f6',
+                      color: 'white',
                       border: 'none',
-                      cursor: 'pointer',
-                      color: '#9ca3af'
+                      borderRadius: '6px',
+                      cursor: isDistributing ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'background-color 0.2s'
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                    {isDistributing ? 'Distributing...' : 'Distribute Now'}
                   </button>
-                </div>
-                <div style={{ fontSize: '13px' }}>
-                  {autoDistributionRules.map((rule, index) => (
-                    <div key={rule.id} style={{ 
-                      marginBottom: '8px',
-                      padding: '8px',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '6px'
-                    }}>
-                      <div style={{ 
-                        color: '#374151', 
-                        marginBottom: '4px', 
-                        fontWeight: '500', 
-                        fontSize: '14px'
-                      }}>
-                        {rule.name || `Rule ${index + 1}`}
-                      </div>
-                      <div style={{ color: '#374151', marginBottom: '4px' }}>
-                        <strong>${rule.amount}</strong> per month
-                      </div>
-                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                        From: <strong>{rule.sourceBucket || 'Not set'}</strong>
-                      </div>
-                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                        To: <strong>{rule.destBucket || 'Not set'}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => {
-                    performAutoDistribution();
-                    setShowDistributionSummary(false);
-                  }}
-                  disabled={isDistributing}
-                  style={{
-                    width: '100%',
-                    marginTop: '12px',
-                    padding: '8px',
-                    backgroundColor: isDistributing ? '#94a3b8' : '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: isDistributing ? 'not-allowed' : 'pointer',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  {isDistributing ? 'Distributing...' : 'Distribute Now'}
-                </button>
               </div>
             )}
             
@@ -3654,6 +3673,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
+                                marginTop: '1px',
                                 marginBottom: '1px' // Reduced from 2px
                               }}>Amount ($)</label>
                               <input
@@ -3688,6 +3708,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
+                                marginTop: '1px',
                                 marginBottom: '1px' // Reduced from 2px
                               }}>From Bucket</label>
                               <select
@@ -3730,6 +3751,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                 color: '#6b7280',
                                 fontWeight: '500',
                                 display: 'block',
+                                marginTop: '1px',
                                 marginBottom: '1px' // Reduced from 2px
                               }}>To Bucket</label>
                               <select
@@ -3879,7 +3901,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   />
                   <div>
                     <div style={{ 
-                      fontSize: '13px',
+                      fontSize: '14px',
                       color: '#5b21b6',
                       fontWeight: '500',
                       marginBottom: '1px'
@@ -3887,7 +3909,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       Enable personal split feature
                     </div>
                     <div style={{ 
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: '#7c3aed',
                       lineHeight: '1.2'
                     }}>
@@ -3897,8 +3919,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 </label>
                 
                 {personalSplitEnabled && (
-                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #c4b5fd' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <div style={{ marginTop: '8px', paddingTop: '0px', borderTop: '1px dashed #c4b5fd' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <label style={{ 
                           fontSize: '12px',
