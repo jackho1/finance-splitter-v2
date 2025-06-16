@@ -605,9 +605,10 @@ const App = () => {
   // Use the filtering function to get filtered transactions
   const chartFilteredTransactions = getChartFilteredTransactions();
   
-  // Then simplify the loop where you process the transactions:
+  // Process the transactions and only include categories with data
   uniqueCategories.forEach(category => {
     const categoryData = Array(12).fill(0); // Initialize an array for each month
+    let hasData = false; // Track if this category has any data points
     
     chartFilteredTransactions.forEach(transaction => {
       const month = new Date(transaction.date).getMonth();
@@ -621,15 +622,21 @@ const App = () => {
           amount = amount / 2;
         }
         
-        categoryData[month] += amount;
+        if (amount !== 0) {
+          categoryData[month] += amount;
+          hasData = true; // Mark that we found data for this category
+        }
       }
     });
   
-    data.datasets.push({
-      label: category,
-      data: categoryData,
-      backgroundColor: categoryColors.current[category],
-    });
+    // Only add to datasets if this category has data
+    if (hasData) {
+      data.datasets.push({
+        label: category,
+        data: categoryData,
+        backgroundColor: categoryColors.current[category],
+      });
+    }
   });
 
   const options = {
