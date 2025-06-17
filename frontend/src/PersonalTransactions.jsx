@@ -9,7 +9,7 @@ import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 
-// Add CSS styles for buttons
+// Add CSS styles for buttons and help text
 const buttonStyles = `
   .modern-button {
     background-color: #ffffff;
@@ -73,6 +73,37 @@ const buttonStyles = `
     color: #2c3e50;
   }
 
+  .help-text {
+    display: flex;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #4a90e2;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #505050;
+    line-height: 1.4;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .help-text-icon {
+    color: #4a90e2;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  
+  .help-text-content {
+    flex: 1;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+
   @keyframes modalSlideIn {
     from {
       opacity: 0;
@@ -91,7 +122,7 @@ const HelpText = ({ children, isVisible }) => {
   
   return (
     <div className="help-text">
-      <div className="help-text-icon">
+      <div className="help-text-icon" style={{ lineHeight: 0, marginBottom: 0 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
           <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
