@@ -84,7 +84,7 @@
 - [x] **Rename category_mapping table to shared_category**:
    - Rename it.
 
-- [ ] **Add foreign key to shared_transaction table for bank_category**:
+- [x] **Add foreign key to shared_transaction table for bank_category**:
    - Link this to shared_category table to ensure uniqueness. Errors exist today as it is currently not a F.K.
 
 - [x] **Test Add Transaction Functionality**:
@@ -114,7 +114,7 @@
 - [ ] **Consider alterantive to userConfig.js file**:
    - Fetching user label names should be fetched from the DB, not "hardcoded" in the src/config/userConfig.js file still.
 
-- [ ] **Minor Split Transaction View Fix**:
+- [x] **Minor Split Transaction View Fix**:
    - Some UI consistency on this pop up window can be made, particularly with the category field.
 
 - [x] **Add progress bar on Budgets**:
@@ -135,16 +135,16 @@
 - [x] **Center Transaction Table Values**:
    - Center all Transaction Rows including headers except for the description rows.
 
-- [ ] **Database Operation Enhancements**:
+- [x] **Database Operation Enhancements**:
    - If a cell was being edit has no changes made, do not perform an update database operation
 
 - [ ] **Transfer Savings Bucket**:
-   - Add functionality so users can transfer amounts from one savings bucket to another
+   - Add functionality so users can transfer amounts from one savings bucket to another. Intuitively, users should be able to just drag and drop one savings bucket to another and it will give a pop up window that asks how much to transfer over. 
 
 - [ ] **Table Filter Bug**:
    - Fix a bug in our table filters such that if the results are small or empty, the filtering options are cut-off.
 
-- [ ] **Total Monthly Spend Carry Forward**:
+- [x] **Total Monthly Spend Carry Forward**:
    - Add a feature that calculates total monthly spend, and have that number carry forward. Implement this logic for bills as well, and ideally have this automated somehow. 
 
 - [x] **Add Gift & Holiday Saving Buckets**:

@@ -9,7 +9,7 @@ import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 
-// Add CSS styles for buttons
+// Add CSS styles for buttons and help text
 const buttonStyles = `
   .modern-button {
     background-color: #ffffff;
@@ -72,6 +72,32 @@ const buttonStyles = `
     padding: 0 15px;
     color: #2c3e50;
   }
+
+  .help-text {
+    display: flex;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #4a90e2;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #505050;
+    line-height: 1.4;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .help-text-icon {
+    color: #4a90e2;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  
+  .help-text-content {
+    flex: 1;
+    margin: 0;
+    padding: 0;
+  }
 `;
 
 // Help Text Component for consistent styling
@@ -80,7 +106,7 @@ const HelpText = ({ children, isVisible }) => {
   
   return (
     <div className="help-text">
-      <div className="help-text-icon">
+      <div className="help-text-icon" style={{ lineHeight: 0, marginBottom: 0 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
           <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -1892,12 +1918,6 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
                   Double-click on any category to show all transactions for that category across all months.
-                </HelpText>
-              </div>
-
-              <div style={{ marginBottom: '6px' }}>
-                <HelpText isVisible={helpTextVisible}>
-                  When buckets go negative, they're excluded from Categories Sum calculation and their negative amounts are deducted from your selected offset bucket.
                 </HelpText>
               </div>
             </div>
