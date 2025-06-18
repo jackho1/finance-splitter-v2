@@ -3987,10 +3987,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer',
-                          fontSize: '11px',
+                          fontSize: '13px',
                           fontWeight: '500',
                           transition: 'background-color 0.2s'
                         }}
+                        onMouseOver={e => e.target.style.backgroundColor = '#6d28d9'}
+                        onMouseOut={e => e.target.style.backgroundColor = '#7c3aed'}
                       >
                         Configure
                       </button>
@@ -4138,7 +4140,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </div>
       )}
 
-      {/* Personal Split Configuration Modal */}
+      {/* REFACTORED Personal Split Configuration Popup - Consistent with Settings Popup */}
       {showPersonalSplitConfig && (
         <div style={{
           position: 'fixed',
@@ -4154,10 +4156,10 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }}>
           <div style={{
             backgroundColor: 'white',
-            padding: '20px',
+            padding: '16px', // Reduced from 20px to match settings
             borderRadius: '12px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            width: '800px',
+            width: '700px', // Reduced from 800px
             maxWidth: '90%',
             maxHeight: '80vh',
             overflowY: 'auto'
@@ -4166,14 +4168,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
               display: 'flex', 
               justifyContent: 'space-between', 
               alignItems: 'center',
-              marginBottom: '20px',
+              marginBottom: '12px', // Reduced from 20px to match settings
               borderBottom: '1px solid #e5e7eb',
-              paddingBottom: '16px'
+              paddingBottom: '8px' // Reduced from 16px to match settings
             }}>
               <h2 style={{ 
                 margin: 0, 
                 color: '#1f2937',
-                fontSize: '24px',
+                fontSize: '20px', // Reduced from 24px to match settings
                 fontWeight: '600'
               }}>
                 Personal Split Configuration
@@ -4189,6 +4191,14 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   color: '#6b7280',
                   transition: 'all 0.2s ease'
                 }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  e.currentTarget.style.color = '#374151';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -4198,7 +4208,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             </div>
             
             {isLoadingPersonalSplitConfig ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ textAlign: 'center', padding: '30px' }}> {/* Reduced from 40px */}
                 <div style={{ 
                   width: '40px', 
                   height: '40px', 
@@ -4208,12 +4218,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                   animation: 'spin 1s linear infinite',
                   margin: '0 auto 16px'
                 }}></div>
-                <p>Loading split configuration...</p>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>Loading split configuration...</p>
               </div>
             ) : (
               <div>
-                <div style={{ marginBottom: '20px' }}>
-                  <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 16px 0' }}>
+                <div style={{ marginBottom: '16px' }}> {/* Reduced from 20px */}
+                  <p style={{ 
+                    color: '#6b7280', 
+                    fontSize: '13px', // Reduced from 14px
+                    margin: '0 0 12px 0', // Reduced from 16px
+                    lineHeight: '1.4'
+                  }}>
                     Configure how budget categories from shared transactions are grouped and mapped to your personal savings buckets.
                   </p>
                   
@@ -4221,141 +4236,115 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                     <button
                       onClick={() => setShowAddGroupForm(true)}
                       style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#7c3aed',
+                        padding: '6px 12px', // Reduced from 8px 16px to match settings buttons
+                        backgroundColor: '#3b82f6',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '14px',
+                        fontSize: '13px', // Reduced from 14px
                         fontWeight: '500',
-                        marginBottom: '16px'
+                        marginBottom: '12px', // Reduced from 16px
+                        transition: 'background-color 0.2s'
                       }}
+                      onMouseOver={e => e.target.style.backgroundColor = '#2563eb'}
+                      onMouseOut={e => e.target.style.backgroundColor = '#3b82f6'}
                     >
                       + Add Split Group
                     </button>
                   ) : (
                     <div style={{
-                      padding: '16px',
+                      padding: '12px',
                       backgroundColor: '#f8fafc',
                       borderRadius: '8px',
                       border: '1px solid #e2e8f0',
-                      marginBottom: '16px'
+                      marginBottom: '12px' // Reduced from 16px
                     }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: '#1e293b', fontSize: '16px' }}>
+                      <h4 style={{ 
+                        margin: '0 0 10px 0', // Reduced from 12px
+                        color: '#1e293b', 
+                        fontSize: '14px', // Reduced from 16px
+                        fontWeight: '600'
+                      }}>
                         Add New Split Group
                       </h4>
                       
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                      <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
+                        <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: '4px', 
+                            marginLeft: '0px',
+                            fontSize: '13px', // Reduced from 14px
+                            fontWeight: '500', 
+                            color: '#374151' 
+                          }}>
                             Group Name
                           </label>
                           <input
                             type="text"
                             value={newGroupForm.group_name}
                             onChange={(e) => handleNewGroupFormChange('group_name', e.target.value)}
-                            placeholder="e.g., Monthly Bills"
+                            placeholder="e.g., Bills Split"
                             style={{
                               width: '100%',
-                              padding: '8px',
+                              padding: '6px 8px', // Reduced from 8px
                               borderRadius: '6px',
                               border: '1px solid #cbd5e1',
-                              fontSize: '14px',
+                              fontSize: '13px', // Reduced from 14px
                               backgroundColor: 'white',
                               boxSizing: 'border-box'
                             }}
                           />
                         </div>
                         
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                        <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: '6px', // Reduced from 8px
+                            marginLeft: '0px',
+                            fontSize: '13px', // Reduced from 14px
+                            fontWeight: '500', 
+                            color: '#374151' 
+                          }}>
                             Budget Categories ({newGroupForm.budget_categories.length} selected)
                           </label>
+                          
+                          {/* Compact category selection - optimized for single category selection */}
                           <div style={{
-                            maxHeight: '200px',
-                            overflowY: 'auto',
                             border: '1px solid #cbd5e1',
                             borderRadius: '6px',
                             backgroundColor: 'white',
-                            padding: '6px'
+                            padding: '4px', // Reduced from 6px
+                            maxHeight: newGroupForm.budget_categories.length > 0 ? '120px' : '150px', // Dynamic height
+                            overflowY: 'auto'
                           }}>
-
-                            {availableBudgetCategories.map(category => {
-                              const isAvailable = isCategoryAvailable(category);
-                              const isSelected = newGroupForm.budget_categories.includes(category);
-                              const isDisabled = !isAvailable && !isSelected;
-                              
-                              return (
-                                <label key={category} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  padding: '3px 6px',
-                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                  borderRadius: '4px',
-                                  transition: 'background-color 0.2s',
-                                  opacity: isDisabled ? 0.5 : 1,
-                                  backgroundColor: isSelected ? '#f0f4ff' : 'transparent'
-                                }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={isDisabled}
-                                    onChange={(e) => {
-                                      const currentCategories = newGroupForm.budget_categories;
-                                      const updatedCategories = e.target.checked
-                                        ? [...currentCategories, category]
-                                        : currentCategories.filter(c => c !== category);
-                                      handleNewGroupFormChange('budget_categories', updatedCategories);
-                                    }}
-                                    style={{
-                                      marginRight: '8px',
-                                      cursor: isDisabled ? 'not-allowed' : 'pointer'
-                                    }}
-                                  />
-                                  <span style={{ 
-                                    fontSize: '14px', 
-                                    color: isDisabled ? '#9ca3af' : '#374151',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}>
-                                    {category}
-                                    {isDisabled && (
-                                      <span style={{
-                                        fontSize: '11px',
-                                        color: '#ef4444',
-                                        fontStyle: 'italic'
-                                      }}>
-                                        (already used)
-                                      </span>
-                                    )}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                          {newGroupForm.budget_categories.length > 0 && (
-                            <div style={{ marginTop: '8px' }}>
-                              <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
-                                Selected categories:
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {/* Show selected categories at top if any */}
+                            {newGroupForm.budget_categories.length > 0 && (
+                              <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '4px',
+                                padding: '4px',
+                                marginBottom: '4px',
+                                borderBottom: '1px solid #e5e7eb'
+                              }}>
                                 {newGroupForm.budget_categories.map(category => (
                                   <span key={category} style={{
-                                    padding: '3px 8px',
+                                    padding: '2px 8px', // Reduced from 3px 8px
                                     backgroundColor: '#ddd6fe',
                                     color: '#5b21b6',
                                     borderRadius: '12px',
-                                    fontSize: '12px',
+                                    fontSize: '11px', // Reduced from 12px
                                     fontWeight: '500',
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px'
                                   }}>
                                     {category}
                                     <button
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const updatedCategories = newGroupForm.budget_categories.filter(c => c !== category);
                                         handleNewGroupFormChange('budget_categories', updatedCategories);
                                       }}
@@ -4366,7 +4355,8 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                         cursor: 'pointer',
                                         padding: '0',
                                         fontSize: '14px',
-                                        lineHeight: '1'
+                                        lineHeight: '1',
+                                        marginLeft: '2px'
                                       }}
                                     >
                                       ×
@@ -4374,29 +4364,106 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                                   </span>
                                 ))}
                               </div>
+                            )}
+                            
+                            {/* Category checkboxes - ultra compact */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(2, 1fr)', // Two columns for better space usage
+                              gap: '1px' // Reduced from 2px
+                            }}>
+                              {availableBudgetCategories.map(category => {
+                                const isAvailable = isCategoryAvailable(category);
+                                const isSelected = newGroupForm.budget_categories.includes(category);
+                                const isDisabled = !isAvailable && !isSelected;
+                                
+                                return (
+                                  <label key={category} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '2px 4px', // Reduced from 4px 6px
+                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                    borderRadius: '3px',
+                                    transition: 'background-color 0.2s',
+                                    opacity: isDisabled ? 0.5 : 1,
+                                    backgroundColor: isSelected ? '#f0f4ff' : 'transparent',
+                                    fontSize: '12px', // Reduced from 13px
+                                    lineHeight: '1.2' // Tighter line height
+                                  }}
+                                  onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      disabled={isDisabled}
+                                      onChange={(e) => {
+                                        const currentCategories = newGroupForm.budget_categories;
+                                        const updatedCategories = e.target.checked
+                                          ? [...currentCategories, category]
+                                          : currentCategories.filter(c => c !== category);
+                                        handleNewGroupFormChange('budget_categories', updatedCategories);
+                                      }}
+                                      style={{
+                                        marginRight: '4px', // Reduced from 6px
+                                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                        width: '12px', // Reduced from 14px
+                                        height: '12px' // Reduced from 14px
+                                      }}
+                                    />
+                                    <span style={{ 
+                                      color: isDisabled ? '#9ca3af' : '#374151',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {category}
+                                    </span>
+                                    {isDisabled && (
+                                      <span style={{
+                                        fontSize: '11px',
+                                        color: '#ef4444',
+                                        fontStyle: 'italic',
+                                        marginLeft: '4px'
+                                      }}>
+                                        (used)
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
                             </div>
-                          )}
+                          </div>
                         </div>
                         
                         <div>
-                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                            Personal Category/Bucket
+                          <label style={{ 
+                            display: 'block', 
+                            marginTop: '20px',
+                            marginBottom: '0px',
+                            marginLeft: '0px',
+                            fontSize: '13px', // Reduced from 14px
+                            fontWeight: '500',
+                            color: '#374151' 
+                          }}>
+                            Personal Bucket
                           </label>
                           <select
                             value={newGroupForm.personal_category}
                             onChange={(e) => handleNewGroupFormChange('personal_category', e.target.value)}
                             style={{
-                              width: '100%',
-                              padding: '8px',
+                              width: '40%',
+                              padding: '6px 8px', // Reduced from 8px
                               borderRadius: '6px',
                               border: '1px solid #cbd5e1',
-                              fontSize: '14px',
+                              fontSize: '13px', // Reduced from 14px
                               backgroundColor: 'white',
-                              boxSizing: 'border-box'
+                              boxSizing: 'border-box',
+                              marginLeft: '0px',
+                              marginTop: '5px'
                             }}
                           >
-                            <option value="">Select personal category...</option>
-
+                            <option value="">Select personal bucket...</option>
                             {availablePersonalCategories.map(category => (
                               <option key={category.category} value={category.category}>
                                 {category.category}
@@ -4410,15 +4477,18 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                         <button
                           onClick={cancelAddGroup}
                           style={{
-                            padding: '6px 12px',
+                            padding: '6px 12px', // Consistent with other buttons
                             backgroundColor: '#f1f5f9',
                             color: '#475569',
                             border: '1px solid #cbd5e1',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '500'
+                            fontSize: '13px', // Reduced from 14px
+                            fontWeight: '500',
+                            transition: 'all 0.2s'
                           }}
+                          onMouseOver={e => e.target.style.backgroundColor = '#e2e8f0'}
+                          onMouseOut={e => e.target.style.backgroundColor = '#f1f5f9'}
                         >
                           Cancel
                         </button>
@@ -4426,14 +4496,25 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                           onClick={handleCreateGroup}
                           disabled={!newGroupForm.group_name.trim() || !newGroupForm.personal_category.trim() || newGroupForm.budget_categories.length === 0}
                           style={{
-                            padding: '6px 12px',
+                            padding: '6px 12px', // Consistent with other buttons
                             backgroundColor: (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) ? '#7c3aed' : '#9ca3af',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
                             cursor: (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) ? 'pointer' : 'not-allowed',
-                            fontSize: '14px',
-                            fontWeight: '500'
+                            fontSize: '13px', // Reduced from 14px
+                            fontWeight: '500',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => {
+                            if (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) {
+                              e.target.style.backgroundColor = '#6d28d9';
+                            }
+                          }}
+                          onMouseOut={e => {
+                            if (newGroupForm.group_name.trim() && newGroupForm.personal_category.trim() && newGroupForm.budget_categories.length > 0) {
+                              e.target.style.backgroundColor = '#7c3aed';
+                            }
                           }}
                         >
                           Create Group
@@ -4445,219 +4526,305 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                 
                 {personalSplitGroups.length === 0 ? (
                   <div style={{
-                    padding: '40px',
+                    padding: '30px', // Reduced from 40px
                     backgroundColor: '#f9fafb',
                     borderRadius: '8px',
                     textAlign: 'center',
                     color: '#6b7280'
                   }}>
-                    <p>No split groups configured yet.</p>
-                    <p style={{ fontSize: '14px' }}>Click "Add Split Group" to create your first group.</p>
+                    <p style={{ fontSize: '14px', marginBottom: '8px' }}>No split groups configured yet.</p>
+                    <p style={{ fontSize: '13px' }}>Click "Add Split Group" to create your first group.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '6px', // Reduced from 8px
+                    maxHeight: '400px', // Add max height for scrolling
+                    overflowY: 'auto'
+                  }}>
                     {personalSplitGroups.map((group) => (
                       <div key={group.id} style={{
-                        padding: '12px',
+                        padding: '10px', // Reduced from 12px
                         backgroundColor: '#f8fafc',
                         borderRadius: '6px',
                         border: '1px solid #e2e8f0'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                              <h4 style={{ margin: '0', color: '#1e293b', fontSize: '14px', fontWeight: '600' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'flex-start',
+                          marginBottom: '6px'
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}> {/* Added minWidth: 0 for text truncation */}
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '6px',
+                              marginBottom: '2px',
+                              flexWrap: 'wrap' // Allow wrapping on small screens
+                            }}>
+                              <h4 style={{ 
+                                margin: '0', 
+                                color: '#1e293b', 
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                lineHeight: '1.2'
+                              }}>
                                 {group.group_name}
                               </h4>
                               <span style={{ 
-                                fontSize: '11px', 
+                                fontSize: '12px',
                                 color: '#64748b',
                                 backgroundColor: '#e2e8f0',
-                                padding: '2px 6px',
+                                padding: '1px 5px',
                                 borderRadius: '8px',
-                                fontWeight: '500'
+                                fontWeight: '500',
+                                whiteSpace: 'nowrap'
                               }}>
-                                {group.mapped_categories ? group.mapped_categories.length : 0} categories
+                                {group.mapped_categories ? group.mapped_categories.length : 0} {group.mapped_categories?.length === 1 ? 'category' : 'categories'}
                               </span>
                             </div>
-                            <p style={{ margin: '0', color: '#64748b', fontSize: '13px' }}>
-                              → <strong>{group.personal_category}</strong>
+                            <p style={{ 
+                              margin: '0', 
+                              color: '#64748b', 
+                              fontSize: '12px', // Reduced from 13px
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              → <strong style={{ color: '#4b5563' }}>{group.personal_category}</strong>
                             </p>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            flexShrink: 0 // Prevent button shrinking
+                          }}>
                             {!editingGroups[group.id] ? (
-                              <button
-                                onClick={() => startEditingGroup(group.id)}
-                                style={{
-                                  padding: '3px 6px',
-                                  backgroundColor: '#f1f5f9',
-                                  color: '#475569',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: '3px',
-                                  cursor: 'pointer',
-                                  fontSize: '11px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Edit
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => startEditingGroup(group.id)}
+                                  style={{
+                                    padding: '4px 8px', // Reduced from 3px 6px
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#475569',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseOver={e => {
+                                    e.target.style.backgroundColor = '#e2e8f0';
+                                    e.target.style.borderColor = '#94a3b8';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.target.style.backgroundColor = '#f1f5f9';
+                                    e.target.style.borderColor = '#cbd5e1';
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`Delete split group "${group.group_name}"?`)) {
+                                      try {
+                                        await deletePersonalSplitGroup(group.id);
+                                      } catch (error) {
+                                        showErrorNotification('Failed to delete split group');
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#ef4444',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  title="Delete group"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"></path>
+                                  </svg>
+                                </button>
+                              </>
                             ) : (
                               <div style={{ display: 'flex', gap: '4px' }}>
                                 <button
                                   onClick={() => saveEditingGroup(group.id)}
                                   style={{
-                                    padding: '3px 6px',
+                                    padding: '4px 8px',
                                     backgroundColor: '#10b981',
                                     color: 'white',
                                     border: 'none',
-                                    borderRadius: '3px',
+                                    borderRadius: '4px',
                                     cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500'
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s',
+                                    whiteSpace: 'nowrap'
                                   }}
+                                  onMouseOver={e => e.target.style.backgroundColor = '#059669'}
+                                  onMouseOut={e => e.target.style.backgroundColor = '#10b981'}
                                 >
                                   Save
                                 </button>
                                 <button
                                   onClick={() => cancelEditingGroup(group.id)}
                                   style={{
-                                    padding: '3px 6px',
+                                    padding: '4px 8px',
                                     backgroundColor: '#f3f4f6',
                                     color: '#6b7280',
                                     border: '1px solid #d1d5db',
-                                    borderRadius: '3px',
+                                    borderRadius: '4px',
                                     cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: '500'
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  onMouseOver={e => {
+                                    e.target.style.backgroundColor = '#e5e7eb';
+                                    e.target.style.borderColor = '#9ca3af';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.target.style.backgroundColor = '#f3f4f6';
+                                    e.target.style.borderColor = '#d1d5db';
                                   }}
                                 >
                                   Cancel
                                 </button>
                               </div>
                             )}
-                            <button
-                              onClick={async () => {
-                                if (confirm(`Delete split group "${group.group_name}"?`)) {
-                                  try {
-                                    await deletePersonalSplitGroup(group.id);
-                                  } catch (error) {
-                                    showErrorNotification('Failed to delete split group');
-                                  }
-                                }
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#ef4444',
-                                padding: '3px'
-                              }}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="3,6 5,6 21,6"></polyline>
-                                <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"></path>
-                              </svg>
-                            </button>
                           </div>
                         </div>
                         
-                        <div style={{ 
-                          display: 'flex', 
-                          flexWrap: 'wrap', 
-                          gap: '3px', 
-                          marginBottom: '6px',
-                          maxHeight: '60px',
-                          overflowY: 'auto',
-                          padding: '4px',
-                          backgroundColor: 'white',
-                          borderRadius: '4px',
-                          border: '1px solid #e5e7eb'
-                        }}>
-                          {group.mapped_categories && group.mapped_categories.length > 0 ? (
-                            group.mapped_categories.map((mapping) => (
-                              <span key={mapping.id} style={{
-                                padding: '2px 6px',
-                                backgroundColor: '#ddd6fe',
-                                color: '#5b21b6',
-                                borderRadius: '8px',
+                        {/* Categories display */}
+                        {!editingGroups[group.id] ? (
+                          <div style={{ 
+                            display: 'flex', 
+                            flexWrap: 'wrap', 
+                            gap: '3px',
+                            maxHeight: group.mapped_categories?.length <= 3 ? 'auto' : '50px', // Auto height for 3 or fewer categories
+                            overflowY: group.mapped_categories?.length > 3 ? 'auto' : 'visible',
+                            padding: '4px',
+                            backgroundColor: 'white',
+                            borderRadius: '4px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            {group.mapped_categories && group.mapped_categories.length > 0 ? (
+                              group.mapped_categories.map((mapping) => (
+                                <span key={mapping.id} style={{
+                                  padding: '2px 6px',
+                                  backgroundColor: '#ddd6fe',
+                                  color: '#5b21b6',
+                                  borderRadius: '8px',
+                                  fontSize: '13px',
+                                  fontWeight: '500',
+                                  whiteSpace: 'nowrap',
+                                  display: 'inline-block',
+                                  lineHeight: '1.2'
+                                }}>
+                                  {mapping.budget_category}
+                                </span>
+                              ))
+                            ) : (
+                              <span style={{ 
+                                color: '#9ca3af', 
                                 fontSize: '11px',
-                                fontWeight: '500',
-                                whiteSpace: 'nowrap'
+                                fontStyle: 'italic',
+                                padding: '2px'
                               }}>
-                                {mapping.budget_category}
+                                No categories mapped
                               </span>
-                            ))
-                          ) : (
-                            <span style={{ 
-                              color: '#9ca3af', 
-                              fontSize: '12px', 
-                              fontStyle: 'italic',
-                              padding: '4px'
-                            }}>
-                              No categories mapped
-                            </span>
-                          )}
-                        </div>
-                        
-                        {editingGroups[group.id] && (
+                            )}
+                          </div>
+                        ) : (
                           <div style={{
-                            maxHeight: '150px',
+                            maxHeight: '120px', // Reduced from 150px
                             overflowY: 'auto',
                             border: '1px solid #cbd5e1',
-                            borderRadius: '4px',
+                            borderRadius: '6px', // Updated to match add form (was 4px)
                             backgroundColor: 'white',
                             padding: '4px',
-                            marginTop: '8px'
+                            marginTop: '6px'
                           }}>
-                            {availableBudgetCategories.map(category => {
-                              const isSelected = editingChanges[group.id] ? 
-                                editingChanges[group.id].includes(category) : false;
-                              const isAvailable = isCategoryAvailable(category, group.id);
-                              const isDisabled = !isAvailable && !isSelected;
-                              
-                              return (
-                                <label key={category} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  padding: '2px 4px',
-                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                  borderRadius: '3px',
-                                  backgroundColor: isSelected ? '#f0f4ff' : 'transparent',
-                                  opacity: isDisabled ? 0.5 : 1
-                                }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={isDisabled}
-                                    onChange={(e) => {
-                                      handleEditingCategoryChange(group.id, category, e.target.checked);
-                                    }}
-                                    style={{
-                                      marginRight: '6px',
-                                      cursor: isDisabled ? 'not-allowed' : 'pointer'
-                                    }}
-                                  />
-                                  <span style={{ 
-                                    fontSize: '13px', 
-                                    color: isDisabled ? '#9ca3af' : '#374151',
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(2, 1fr)', // Two columns
+                              gap: '1px' // Reduced from 2px
+                            }}>
+                              {availableBudgetCategories.map(category => {
+                                const isSelected = editingChanges[group.id] ? 
+                                  editingChanges[group.id].includes(category) : false;
+                                const isAvailable = isCategoryAvailable(category, group.id);
+                                const isDisabled = !isAvailable && !isSelected;
+                                
+                                return (
+                                  <label key={category} style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px'
-                                  }}>
-                                    {category}
+                                    padding: '2px 4px', // Updated to match add form (was 2px 3px)
+                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                    borderRadius: '3px',
+                                    backgroundColor: isSelected ? '#f0f4ff' : 'transparent',
+                                    opacity: isDisabled ? 0.5 : 1,
+                                    fontSize: '12px', // Updated to match add form (was 11px)
+                                    lineHeight: '1.2', // Tighter line height
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      disabled={isDisabled}
+                                      onChange={(e) => {
+                                        handleEditingCategoryChange(group.id, category, e.target.checked);
+                                      }}
+                                      style={{
+                                        marginRight: '4px', // Updated to match add form (was 3px)
+                                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                        width: '12px', // Updated to match add form (was 11px)
+                                        height: '12px' // Updated to match add form (was 11px)
+                                      }}
+                                    />
+                                    <span style={{ 
+                                      color: isDisabled ? '#9ca3af' : '#374151',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {category}
+                                    </span>
                                     {isDisabled && (
                                       <span style={{
-                                        fontSize: '10px',
+                                        fontSize: '9px',
                                         color: '#ef4444',
-                                        fontStyle: 'italic'
+                                        fontStyle: 'italic',
+                                        marginLeft: '4px' // Updated to match add form (was 1px)
                                       }}>
-                                        (used elsewhere)
+                                        (used)
                                       </span>
                                     )}
-                                  </span>
-                                </label>
-                              );
-                            })}
+                                  </label>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -4670,22 +4837,25 @@ const PersonalTransactions = ({ helpTextVisible }) => {
             <div style={{ 
               display: 'flex', 
               justifyContent: 'flex-end', 
-              marginTop: '24px',
-              paddingTop: '16px',
+              marginTop: '16px', // Reduced from 24px
+              paddingTop: '12px', // Reduced from 16px
               borderTop: '1px solid #e5e7eb'
             }}>
               <button
                 onClick={handleClosePersonalSplitConfig}
                 style={{
-                  padding: '10px 20px',
+                  padding: '8px 16px', // Reduced from 10px 20px
                   backgroundColor: '#4f46e5',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
+                  fontSize: '13px', // Reduced from 14px
+                  fontWeight: '500',
+                  transition: 'background-color 0.2s'
                 }}
+                onMouseOver={e => e.target.style.backgroundColor = '#4338ca'}
+                onMouseOut={e => e.target.style.backgroundColor = '#4f46e5'}
               >
                 Done
               </button>

@@ -276,3 +276,6 @@
 
 - [ ] **Add table for label names**:
    - Add table to store label names.
+
+- [ ] **Add projected savings**:
+   - This likely requires some additional tables to be created to store monthly saving amounts for each bucket
