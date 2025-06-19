@@ -2580,24 +2580,27 @@ const PersonalTransactions = ({ helpTextVisible }) => {
                       ref={autoRulesButtonRef}
                       onClick={() => {
                         if (!showDistributionSummary && autoRulesButtonRef.current) {
-                          // Calculate position to align with button's left edge
+                          // Calculate position to align popup's top-left with button's bottom-left
                           const buttonEl = autoRulesButtonRef.current;
                           const buttonRect = buttonEl.getBoundingClientRect();
-                          const container = buttonEl.offsetParent;
+                          const container = buttonEl.closest('.modern-table-wrapper') || buttonEl.offsetParent;
                           
                           if (container) {
                             const containerRect = container.getBoundingClientRect();
-                            const leftPosition = buttonRect.left - containerRect.left;
+                            // Calculate left position: button's left edge relative to container
+                            const leftPosition = buttonRect.left - containerRect.left + 20;
+                            // Calculate top position: button's bottom edge + small gap
+                            const topPosition = buttonRect.bottom - containerRect.top + 27;
                             
                             setPopupPosition({
-                              top: '50px', // Position below the button row
-                              left: `${leftPosition}px`  // Align with button's left edge
+                              top: `${topPosition}px`,
+                              left: `${leftPosition}px`
                             });
                           } else {
-                            // Fallback if container detection fails
+                            // Fallback: use button's position in the viewport
                             setPopupPosition({
-                              top: '50px',
-                              left: '40px'
+                              top: `${buttonRect.bottom + 8}px`,
+                              left: `${buttonRect.left}px`
                             });
                           }
                         }
