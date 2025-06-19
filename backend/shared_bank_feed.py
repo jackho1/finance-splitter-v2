@@ -83,16 +83,26 @@ def auto_label_bank_category(bank_category):
 def categorize_and_label_transactions(transactions):
     categorized_transactions = []
     
-    # First, get all existing transaction IDs and their labels from the database
-    existing_labels = {}
+    # Get all existing transaction data
+    existing_data = {}
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # Query to get existing transaction IDs and their labels
-        cursor.execute("SELECT id, label FROM shared_transactions")
+        # Query to get existing transaction IDs and their current values
+        cursor.execute("""
+            SELECT id, label, bank_category, category, date, description, amount
+            FROM shared_transactions_generalized
+        """)
         for row in cursor.fetchall():
-            existing_labels[row[0]] = row[1]
+            existing_data[row[0]] = {
+                'label': row[1],
+                'bank_category': row[2], 
+                'category': row[3],
+                'date': row[4],
+                'description': row[5],
+                'amount': row[6]
+            }
             
     except Exception as e:
         print(f"Error fetching existing transactions: {e}")
@@ -105,19 +115,37 @@ def categorize_and_label_transactions(transactions):
     for tx in transactions:
         description = tx['description']
         amount = tx['amount']
-        bank_category = tx['bank_category']
+        date = tx['date']
+        api_bank_category = tx['bank_category']  # This is from the API
         
-        # Check if this transaction already exists and has a label
-        if tx['id'] in existing_labels and existing_labels[tx['id']] is not None:
-            # Use the existing label
-            label = existing_labels[tx['id']]
+        # Check if this transaction already exists
+        if tx['id'] in existing_data:
+            existing = existing_data[tx['id']]
+            
+            # Preserve existing label if it exists
+            if existing['label'] is not None:
+                label = existing['label']
+            else:
+                # Auto-assign a label using the EXISTING bank_category (not the API one)
+                # If existing bank_category is None/empty, fall back to API bank_category
+                category_for_labeling = existing['bank_category'] or api_bank_category
+                label = auto_label_bank_category(category_for_labeling)
+            
+            # Preserve existing bank_category if it exists
+            if existing['bank_category'] is not None and existing['bank_category'] != '':
+                bank_category = existing['bank_category']
+            else:
+                # Use API bank_category only if there's no existing value
+                bank_category = api_bank_category
+                
         else:
-            # Auto-assign a label for new transactions
+            # New transaction - use API values and auto-assign label
+            bank_category = api_bank_category
             label = auto_label_bank_category(bank_category)
 
         categorized_transactions.append({
             'id': tx['id'],
-            'date': tx['date'],
+            'date': date,
             'description': description,
             'amount': amount,
             'bank_category': bank_category,
@@ -126,19 +154,43 @@ def categorize_and_label_transactions(transactions):
     
     return categorized_transactions
 
-# Function to insert transactions into PostgreSQL database
+# Function to insert/update transactions into PostgreSQL database
 def insert_transactions(transactions):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
         for tx in transactions:
+            # Use ON CONFLICT to handle both inserts and updates properly
+            # Preserve both label AND bank_category if they already exist
+            # Enhanced with conditional updates for better performance
             insert_query = sql.SQL("""
                 INSERT INTO shared_transactions (id, date, description, amount, bank_category, label)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    date = EXCLUDED.date,
+                    description = EXCLUDED.description,
+                    amount = EXCLUDED.amount,
+                    bank_category = CASE 
+                        WHEN shared_transactions.bank_category IS NOT NULL AND shared_transactions.bank_category != ''
+                        THEN shared_transactions.bank_category 
+                        ELSE EXCLUDED.bank_category 
+                    END,
+                    label = CASE 
+                        WHEN shared_transactions.label IS NOT NULL 
+                        THEN shared_transactions.label 
+                        ELSE EXCLUDED.label 
+                    END
+                WHERE 
+                    -- Only update if any of the important fields have actually changed
+                    shared_transactions.date != EXCLUDED.date OR
+                    shared_transactions.description != EXCLUDED.description OR
+                    shared_transactions.amount != EXCLUDED.amount OR
+                    (shared_transactions.bank_category IS NULL OR shared_transactions.bank_category = '') AND EXCLUDED.bank_category IS NOT NULL OR
+                    shared_transactions.label IS NULL AND EXCLUDED.label IS NOT NULL
             """)
-            cursor.execute(insert_query, (
+            
+            result = cursor.execute(insert_query, (
                 tx['id'],
                 tx['date'],
                 tx['description'],
@@ -146,23 +198,40 @@ def insert_transactions(transactions):
                 tx['bank_category'],
                 tx['label']
             ))
-
         conn.commit()
-        print("Transactions inserted successfully.")
+        
+        # Enhanced logging: Verify transaction counts and provide detailed feedback
+        cursor.execute("""
+            SELECT COUNT(*) FROM shared_transactions 
+            WHERE id = ANY(%s)
+        """, ([tx['id'] for tx in transactions],))
 
     except Exception as e:
-        print(f"Error inserting transactions: {e}")
+        print(f"❌ Error inserting/updating transactions: {e}")
+        conn.rollback()
+        raise
     finally:
-        cursor.close()
-        conn.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
 
 # Main function to fetch, categorize, and save transactions
 def main():
     start_date = (datetime.now() - timedelta(days=DAYS_TO_FETCH)).strftime('%Y-%m-%d')
-    print(f"Fetching transactions starting from {start_date} to {datetime.now().strftime('%Y-%m-%d')} (spans {DAYS_TO_FETCH} days).")
+    print(f"📅 Fetching transactions from {start_date} to {datetime.now().strftime('%Y-%m-%d')} (spans {DAYS_TO_FETCH} days)")
 
+    # Fetch transactions from API
     transactions = fetch_transactions(start_date)
+    print(f"📥 Fetched {len(transactions)} transactions from PocketSmith API")
+    
+    if not transactions:
+        print("ℹ️  No transactions found for the specified date range.")
+        return
+    
     categorized_transactions = categorize_and_label_transactions(transactions)
+    
+    # Insert/update transactions in database
     insert_transactions(categorized_transactions)
 
 if __name__ == "__main__":

@@ -279,3 +279,6 @@
 
 - [ ] **Add projected savings**:
    - This likely requires some additional tables to be created to store monthly saving amounts for each bucket
+
+- [ ] **Create audit history logs for shared_transactions**:
+   - Triggers to be performed in the psql tables directly and not in python.
