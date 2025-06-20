@@ -161,50 +161,57 @@ def insert_transactions(transactions):
         cursor = conn.cursor()
 
         for tx in transactions:
-            # Use ON CONFLICT to handle both inserts and updates properly
-            # Preserve both label AND bank_category if they already exist
-            # Enhanced with conditional updates for better performance
+            # Simplified approach: Only update date and description from API
+            # All other fields are preserved if they already exist in the database
             insert_query = sql.SQL("""
-                INSERT INTO shared_transactions (id, date, description, amount, bank_category, label)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO shared_transactions (id, date, description, amount, bank_category, label, has_split, split_from_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
+                    -- Only these fields are always updated from the API
                     date = EXCLUDED.date,
                     description = EXCLUDED.description,
-                    amount = EXCLUDED.amount,
-                    bank_category = CASE 
-                        WHEN shared_transactions.bank_category IS NOT NULL AND shared_transactions.bank_category != ''
-                        THEN shared_transactions.bank_category 
-                        ELSE EXCLUDED.bank_category 
-                    END,
-                    label = CASE 
-                        WHEN shared_transactions.label IS NOT NULL 
-                        THEN shared_transactions.label 
-                        ELSE EXCLUDED.label 
-                    END
+                    
+                    -- All other fields are preserved if they exist in the database
+                    amount = COALESCE(shared_transactions.amount, EXCLUDED.amount),
+                    bank_category = COALESCE(NULLIF(shared_transactions.bank_category, ''), EXCLUDED.bank_category),
+                    label = COALESCE(shared_transactions.label, EXCLUDED.label),
+                    has_split = COALESCE(shared_transactions.has_split, EXCLUDED.has_split),
+                    split_from_id = COALESCE(shared_transactions.split_from_id, EXCLUDED.split_from_id)
                 WHERE 
-                    -- Only update if any of the important fields have actually changed
+                    -- Only update if any of these fields have changed
                     shared_transactions.date != EXCLUDED.date OR
-                    shared_transactions.description != EXCLUDED.description OR
-                    shared_transactions.amount != EXCLUDED.amount OR
-                    (shared_transactions.bank_category IS NULL OR shared_transactions.bank_category = '') AND EXCLUDED.bank_category IS NOT NULL OR
-                    shared_transactions.label IS NULL AND EXCLUDED.label IS NOT NULL
+                    shared_transactions.description != EXCLUDED.description
             """)
             
-            result = cursor.execute(insert_query, (
+            cursor.execute(insert_query, (
                 tx['id'],
                 tx['date'],
                 tx['description'],
                 tx['amount'],
                 tx['bank_category'],
-                tx['label']
+                tx['label'],
+                False,  # has_split default
+                None    # split_from_id default
             ))
         conn.commit()
         
         # Enhanced logging: Verify transaction counts and provide detailed feedback
         cursor.execute("""
-            SELECT COUNT(*) FROM shared_transactions 
+            SELECT 
+                COUNT(CASE WHEN bank_category IS NOT NULL THEN 1 END) as categorized,
+                COUNT(CASE WHEN label IS NOT NULL THEN 1 END) as labeled,
+                COUNT(CASE WHEN has_split = TRUE THEN 1 END) as split,
+                COUNT(*) as total
+            FROM shared_transactions 
             WHERE id = ANY(%s)
         """, ([tx['id'] for tx in transactions],))
+        
+        stats = cursor.fetchone()
+        print(f"✅ Successfully processed {len(transactions)} shared transactions:")
+        print(f"   - {stats[0]} categorized")
+        print(f"   - {stats[1]} labeled")
+        print(f"   - {stats[2]} split transactions")
+        print(f"   - {stats[3]} total in database")
 
     except Exception as e:
         print(f"❌ Error inserting/updating transactions: {e}")

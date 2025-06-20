@@ -282,3 +282,9 @@
 
 - [ ] **Create audit history logs for shared_transactions**:
    - Triggers to be performed in the psql tables directly and not in python.
+
+- [ ] **Refactor PocketSmith API fetch from the 3 _bank_feed.py files**:
+   - Abstract all duplicate code into a base and config file to reduce overhead in maintainenance. 
+
+- [ ] **Workaround fix for id changing based on transaction description name change (pending > fulfilled)**:
+   - Currently, there are some transactions in pending state with one primary key id, but when it updates its description name into a processed state, the primary key id is also changed. This needs to be accounted for. 
