@@ -43,32 +43,52 @@ def fetch_transactions(start_date=None):
         if not transactions:  # If there are no transactions, we stop fetching
             break
         
-        # Parse transactions to match our format
         for tx in transactions:
             all_transactions.append({
                 'id': tx['id'],
                 'date': tx['date'],
                 'description': tx['payee'],
                 'amount': tx['amount'],
-                'closing_balance': tx.get('closing_balance', None)  # New field
+                'closing_balance': tx.get('closing_balance', None)
             })
 
         page += 1  # Move to the next page for the next iteration
     
     return all_transactions
 
-# Function to insert transactions into PostgreSQL database
+
+
+# Function to insert/update transactions into PostgreSQL database
 def insert_transactions(transactions):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
         for tx in transactions:
+            # Simplified approach: Only update date, description, and closing_balance from API
+            # All other fields are preserved if they already exist in the database
             insert_query = sql.SQL("""
                 INSERT INTO offset_transactions (id, date, description, amount, category, label, closing_balance, has_split, split_from_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    -- Only these fields are always updated from the API
+                    date = EXCLUDED.date,
+                    description = EXCLUDED.description,
+                    closing_balance = EXCLUDED.closing_balance,
+                    
+                    -- All other fields are preserved if they exist in the database
+                    amount = COALESCE(offset_transactions.amount, EXCLUDED.amount),
+                    category = COALESCE(offset_transactions.category, EXCLUDED.category),
+                    label = COALESCE(offset_transactions.label, EXCLUDED.label),
+                    has_split = COALESCE(offset_transactions.has_split, EXCLUDED.has_split),
+                    split_from_id = COALESCE(offset_transactions.split_from_id, EXCLUDED.split_from_id)
+                WHERE 
+                    -- Only update if any of these fields have changed
+                    offset_transactions.date != EXCLUDED.date OR
+                    offset_transactions.description != EXCLUDED.description OR
+                    offset_transactions.closing_balance IS DISTINCT FROM EXCLUDED.closing_balance
             """)
+            
             cursor.execute(insert_query, (
                 tx['id'],
                 tx['date'],
@@ -82,27 +102,51 @@ def insert_transactions(transactions):
             ))
 
         conn.commit()
-        print(f"Successfully processed {len(transactions)} offset transactions.")
+        
+        # Enhanced logging: Count actual updates/inserts
+        cursor.execute("""
+            SELECT 
+                COUNT(CASE WHEN category IS NOT NULL THEN 1 END) as categorized,
+                COUNT(CASE WHEN label IS NOT NULL THEN 1 END) as labeled,
+                COUNT(CASE WHEN has_split = TRUE THEN 1 END) as split,
+                COUNT(*) as total
+            FROM offset_transactions 
+            WHERE id = ANY(%s)
+        """, ([tx['id'] for tx in transactions],))
+        
+        stats = cursor.fetchone()
+        print(f"✅ Successfully processed {len(transactions)} offset transactions:")
+        print(f"   - {stats[0]} categorized")
+        print(f"   - {stats[1]} labeled")
+        print(f"   - {stats[2]} split transactions")
+        print(f"   - {stats[3]} total in database")
 
     except Exception as e:
-        print(f"Error inserting transactions: {e}")
-        conn.rollback()
+        print(f"❌ Error inserting/updating transactions: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+        raise
     finally:
-        cursor.close()
-        conn.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
 
-# Main function to fetch and save transactions
+# Main function to fetch, categorize, and save transactions
 def main():
     start_date = (datetime.now() - timedelta(days=DAYS_TO_FETCH)).strftime('%Y-%m-%d')
-    print(f"Fetching offset transactions from {start_date} to {datetime.now().strftime('%Y-%m-%d')} (spans {DAYS_TO_FETCH} days).")
+    print(f"📅 Fetching offset transactions from {start_date} to {datetime.now().strftime('%Y-%m-%d')} (spans {DAYS_TO_FETCH} days)")
 
+    # Fetch transactions from API
     transactions = fetch_transactions(start_date)
+    print(f"📥 Fetched {len(transactions)} transactions from PocketSmith API")
     
-    if transactions:
-        insert_transactions(transactions)
-        print(f"Processed {len(transactions)} offset transactions.")
-    else:
-        print("No transactions found to process.")
+    if not transactions:
+        print("ℹ️  No transactions found for the specified date range.")
+        return
+    
+    # Insert/update transactions in database
+    insert_transactions(transactions)
 
 if __name__ == "__main__":
-    main() 
+    main()
