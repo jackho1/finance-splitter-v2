@@ -291,3 +291,6 @@
 
 - [ ] **Use logger.xx for print statemnets**:
    - Replace all print statements to use logging instead. 
+
+- [ ] **Fix dropdown menu options**:
+   - Date option is cut-off and we can remove the redundant "Apply" button. We can also reduce whitespacing and font sizes slightly as well to make it more concise.  
