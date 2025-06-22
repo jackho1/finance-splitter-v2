@@ -669,17 +669,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   return (
     <div style={{ padding: '15px', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ 
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-        marginBottom: '15px'
-      }}>
-        <div style={{ 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-start'
-        }}>
+      <div className="table-navigation-container">
+        <div className="table-navigation-left">
           <button 
             className="modern-button navigation prev" 
             onClick={handlePrevMonth}
@@ -708,11 +699,11 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           </button>
         </div>
         
-        <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>
-          Monthly Expenditure
-        </h2>
-        
-        <div></div>
+        <div className="table-navigation-right">
+          <h2 className="section-title" style={{ margin: 0 }}>
+            Monthly Expenditure
+          </h2>
+        </div>
       </div>
       
       <HelpText isVisible={helpTextVisible}>
@@ -1053,11 +1044,11 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         <table className="modern-table">
           <thead>
             <tr>
-              <th style={{ textAlign: 'left' }}>Category</th>
-              <th style={{ textAlign: 'left' }}>Budget</th>
-              <th style={{ textAlign: 'left' }}>Actual Spend</th>
-              <th style={{ textAlign: 'left' }}>Remaining</th>
-              <th style={{ textAlign: 'left', minWidth: '120px' }}>Progress</th>
+              <th className="col-budget-category" style={{ textAlign: 'left' }}>Category</th>
+              <th className="col-budget" style={{ textAlign: 'left' }}>Budget</th>
+              <th className="col-spend" style={{ textAlign: 'left' }}>Actual Spend</th>
+              <th className="col-remaining" style={{ textAlign: 'left' }}>Remaining</th>
+              <th className="col-progress" style={{ textAlign: 'left', minWidth: '120px' }}>Progress</th>
             </tr>
           </thead>
           <tbody>
@@ -1110,7 +1101,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                     onDragLeave={handleDragLeave}
                     onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(e, category)}
-                    className="category-name-cell"
+                    className="category-name-cell col-budget-category"
                   >
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <div className="category-indicator" style={{ backgroundColor: categoryColor }} />
@@ -1118,7 +1109,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                     </div>
                   </td>
                   <td 
-                    className="budget-cell"
+                    className="budget-cell col-budget"
                     onDoubleClick={() => handleBudgetDoubleClick(category, budget)}
                   >
                     {editingBudget === category ? (
@@ -1137,17 +1128,17 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                       </span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'left' }}>
+                  <td className="col-spend" style={{ textAlign: 'left' }}>
                     <span className="amount-negative">
                       {formatCurrency(totalSpend)}
                     </span>
                   </td>
-                  <td>
+                  <td className="col-remaining">
                     <span className={remainingBalance < 0 ? 'amount-negative' : 'amount-positive'}>
                       {formatCurrency(remainingBalance)}
                     </span>
                   </td>
-                  <td>
+                  <td className="col-progress">
                     <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', width: '100%' }}>
                       <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
