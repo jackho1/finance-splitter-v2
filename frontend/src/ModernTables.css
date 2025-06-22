@@ -191,6 +191,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative; /* Ensure the header is a positioning context */
 }
 
 .filter-button {
@@ -220,9 +221,9 @@
 .filter-dropdown {
   position: absolute;
   top: 100%;
-  left: 0;
+  right: 0; /* Position from right edge instead of left */
   z-index: 1000;
-  min-width: 280px;
+  width: 250px; /* Fixed width for consistency */
   background-color: white;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -248,6 +249,7 @@
   max-height: 250px;
   overflow-y: auto;
   margin-bottom: 0.75rem;
+  text-align: left; /* Ensure alignment consistency */
 }
 
 .filter-option {
@@ -255,6 +257,15 @@
   align-items: center;
   padding: 0.5rem 0;
   cursor: pointer;
+  text-align: left;
+  white-space: normal; /* Allow text to wrap */
+  word-break: break-word;
+}
+
+/* Ensure checkbox and label are properly aligned */
+.filter-option span {
+  text-align: left;
+  display: block;
 }
 
 .filter-option:hover {
@@ -263,6 +274,9 @@
 
 .modern-checkbox {
   margin-right: 0.5rem;
+  align-self: flex-start; /* Align checkbox at the top when text wraps */
+  margin-top: 0.25rem; /* Add a slight top margin for better alignment */
+  flex-shrink: 0; /* Prevent checkbox from shrinking */
 }
 
 .filter-actions {
@@ -271,6 +285,17 @@
   margin-top: 0.75rem;
   border-top: 1px solid #eaecef;
   padding-top: 0.75rem;
+}
+
+/* Check for dropdown overflow detection */
+.modern-table-container {
+  position: relative;
+  overflow: visible;
+}
+
+/* Let the container be a positioning context */
+.modern-table {
+  position: relative;
 }
 
 .btn-primary {
@@ -375,6 +400,34 @@
 .col-spend { width: 80px; }
 .col-remaining { width: 120px; }
 .col-progress { width: 150px; }
+
+/* Special handling for column dropdowns */
+.col-label .filter-dropdown {
+  width: 150px; /* Smaller width for short options like "Ruby", "Jack", "Both" */
+}
+
+/* Handle right-aligned dropdowns for right-most columns */
+th:last-child .filter-dropdown,
+th:nth-last-child(1) .filter-dropdown,
+th:nth-last-child(2) .filter-dropdown {
+  right: 0;
+  left: auto;
+}
+
+/* Handle left-aligned dropdowns for left-side columns */
+th:first-child .filter-dropdown,
+th:nth-child(2) .filter-dropdown,
+th:nth-child(3) .filter-dropdown {
+  left: 0;
+  right: auto;
+}
+
+/* Ensure dropdowns don't overflow the viewport */
+@media screen and (max-width: 768px) {
+  .filter-dropdown {
+    width: 200px;
+  }
+}
 
 /* Allow description column's cell to wrap */
 .modern-table td.col-description {
