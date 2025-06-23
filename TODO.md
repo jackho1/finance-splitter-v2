@@ -294,3 +294,12 @@
 
 - [ ] **Fix dropdown menu options**:
    - Date option is cut-off and we can remove the redundant "Apply" button. We can also reduce whitespacing and font sizes slightly as well to make it more concise.  
+
+- [ ] **Reorder the transaction dates based on the JSON data sequence (primary key)**:
+   - Add above.
+
+- [ ] **Table filter scroll fix**:
+   - Fix an issue when selecting a table dropdown filter option, the webpage is scrolled to the top automatically.
+   - Fix issue with label column dropdown menu being excessively large
+   - Potentially move the dropdown menu option cancel/clear button to left-align only
+   - Expand bank category dropdown menu to be slightly larger to fit large texts.

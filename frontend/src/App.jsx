@@ -27,6 +27,7 @@ import {
 } from './utils/updateHandlers';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
+import './CompactDropdown.css';
 
 // Add CSS styles for buttons and help text
 const buttonStyles = `
@@ -145,44 +146,371 @@ const HelpText = ({ children, isVisible }) => {
   );
 };
 
-// Modern filter button component
-const FilterButton = ({ isActive, onClick, children }) => (
+// Refactored FilterButton component for more streamlined appearance
+const FilterButton = ({ isActive, onClick, count = 0 }) => (
   <button 
-    className={`filter-button ${isActive ? 'active' : ''}`}
+    className={`filter-button compact ${isActive ? 'active' : ''}`}
     onClick={onClick}
     title="Filter"
   >
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
     </svg>
-    {children}
+    {count > 0 && (
+      <span className="filter-badge">{count}</span>
+    )}
   </button>
 );
+
+// Refactored table dropdown menu component
+const TableDropdownMenu = ({ 
+  isActive, 
+  onClose, 
+  availableOptions,
+  selectedOptions,
+  onChange,
+  onClear,
+  emptyLabel = '(Empty/Null)',
+  width = '220px',
+  maxHeight = '280px',
+  skipSearch = false,
+}) => {
+  // Stop clicks from propagating and closing the dropdown
+  const handleClick = (e) => e.stopPropagation();
+  
+  if (!isActive) return null;
+  
+  return (
+    <div 
+      className="filter-dropdown"
+      onClick={handleClick}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        zIndex: 1000,
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        width: width === '220px' ? '220px' : width, // Increase default width
+        marginTop: '5px',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: maxHeight
+      }}
+    >
+      {/* Search field - optional enhancement */}
+      {availableOptions.length > 10 && !skipSearch && (
+        <div className="filter-search" style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+          <input
+            type="text"
+            placeholder="Search..."
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              fontSize: '13px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '4px',
+            }}
+          />
+        </div>
+      )}
+      
+      <div className="filter-options" style={{ 
+        overflowY: 'auto', 
+        flex: '1 1 auto',
+        padding: '0px 0' 
+      }}>
+        {/* Display non-null options */}
+        {availableOptions
+          .filter(option => option !== null && option !== undefined && option !== '')
+          .map(option => (
+            <div 
+              key={option} 
+              className="filter-option"
+              style={{ 
+                padding: '3px 1px',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(option, e);
+              }}
+            >
+              <input 
+                type="checkbox" 
+                checked={selectedOptions.includes(option)}
+                onChange={() => {}} // Handled by parent div onClick
+                style={{ marginRight: '6px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '13px' }}>
+                {option}
+              </span>
+            </div>
+          ))
+        }
+        
+        {/* Display null/empty option at the bottom if it exists */}
+        {availableOptions.some(option => option === null || option === undefined || option === '') && (
+          <div 
+            className="filter-option"
+            style={{ 
+              padding: '6px 4px',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              borderTop: '1px solid #f0f0f0',
+              marginTop: '4px',
+              paddingTop: '8px',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(null, e);
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={selectedOptions.includes(null)}
+              onChange={() => {}} // Handled by parent div onClick
+              style={{ marginRight: '6px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '13px', fontStyle: 'italic', color: '#6b7280' }}>
+              {emptyLabel}
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Footer with clear button only */}
+      {selectedOptions.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-start', 
+          padding: '3px 4px',
+          borderTop: '1px solid #f0f0f0',
+          backgroundColor: 'white',
+          borderBottomLeftRadius: '6px',
+          borderBottomRightRadius: '6px',
+          position: 'sticky',
+          bottom: 0,
+          flex: '0 0 auto'
+        }}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            style={{ 
+              padding: '3px 6px',
+              backgroundColor: 'transparent',
+              color: '#6b7280',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.color = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = '#6b7280';
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Specialized date filter dropdown component
+const DateFilterDropdown = ({ 
+  isActive, 
+  dateFilter,
+  onChange,
+  onClear,
+  dateRange,
+  width = '220px',
+}) => {
+  // Stop clicks from propagating and closing the dropdown
+  const handleClick = (e) => e.stopPropagation();
+  
+  if (!isActive) return null;
+  
+  return (
+    <div 
+      className="filter-dropdown"
+      onClick={handleClick}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        zIndex: 1000,
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        width: width,
+        marginTop: '5px',
+        padding: '12px',
+      }}
+    >
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '12px', 
+          fontWeight: '500', 
+          color: '#374151', 
+          marginBottom: '4px' 
+        }}>
+          From:
+        </label>
+        <input 
+          type="date" 
+          name="startDate"
+          value={dateFilter.startDate}
+          onChange={onChange}
+          min={dateRange.min}
+          max={dateRange.max}
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '13px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '12px', 
+          fontWeight: '500', 
+          color: '#374151', 
+          marginBottom: '4px' 
+        }}>
+          To:
+        </label>
+        <input 
+          type="date" 
+          name="endDate"
+          value={dateFilter.endDate}
+          onChange={onChange}
+          min={dateRange.min}
+          max={dateRange.max}
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '13px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+      {(dateFilter.startDate || dateFilter.endDate) && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          paddingTop: '8px',
+          borderTop: '1px solid #f0f0f0'
+        }}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            style={{ 
+              padding: '4px 8px',
+              backgroundColor: 'transparent',
+              color: '#6b7280',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.color = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = '#6b7280';
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Sortable header component
 const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, onFilterToggle, isFilterActive }) => {
   const isActive = sortBy.startsWith(column);
   const isDesc = sortBy === `${column}-desc`;
 
-  return (
-    <div className={`modern-filter-header ${hasFilter ? 'sortable' : ''}`}>
-      <div className="sortable-column-content" onClick={() => onSort(column)}>
-        <span className="sortable-header">
-          <div className="header-content">{children}</div>
+  // For headers without filters, use a simpler structure
+  if (!hasFilter) {
+    return (
+      <div 
+        className="modern-filter-header"
+      >
+        <div 
+          className="header-content"
+          onClick={() => onSort(column)}
+        >
+          <span>{children}</span>
           <span className={`sort-indicator ${isActive ? 'active' : ''}`}>
             <span className={`sort-arrow up ${isActive && !isDesc ? 'active' : ''}`}></span>
             <span className={`sort-arrow down ${isActive && isDesc ? 'active' : ''}`}></span>
           </span>
-        </span>
+        </div>
       </div>
-      {hasFilter && (
-        <FilterButton
-          isActive={isFilterActive}
-          onClick={onFilterToggle}
-        />
-      )}
-    </div>
   );
+  }
+
+  // For headers with filters
+    return (
+      <div 
+      className="modern-filter-header sortable"
+    >
+      <div 
+        className="sortable-header"
+        onClick={() => onSort(column)}
+        style={{ width: 'calc(100% - 30px)' }}
+      >
+        <div className="header-content">
+          <span>{children}</span>
+          <span className={`sort-indicator ${isActive ? 'active' : ''}`}>
+            <span className={`sort-arrow up ${isActive && !isDesc ? 'active' : ''}`}></span>
+            <span className={`sort-arrow down ${isActive && isDesc ? 'active' : ''}`}></span>
+          </span>
+        </div>
+      </div>
+      <FilterButton
+        isActive={isFilterActive}
+        onClick={(e) => {
+          e.stopPropagation();
+          onFilterToggle();
+        }}
+      />
+      </div>
+    );
 };
 
 const App = () => {
@@ -913,8 +1241,8 @@ const App = () => {
       transaction[field] === undefined || 
       transaction[field] === '';
     
-    return (
-      <div 
+  return (
+    <div 
         className="cell-content editable-cell"
         onDoubleClick={() => handleDoubleClick(transaction.id, field, transaction[field] || '')}
       >
@@ -1292,48 +1620,13 @@ const App = () => {
                 >
                   Date
                 </SortableHeader>
-                {activeFilterColumn === 'date' && (
-                  <div ref={filterPopupRef} className="filter-dropdown">
-                    <div className="filter-group">
-                      <label>From:</label>
-                      <input 
-                        type="date" 
-                        name="startDate"
-                        className="modern-input"
-                        value={dateFilter.startDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                      />
-                    </div>
-                    <div className="filter-group">
-                      <label>To:</label>
-                      <input 
-                        type="date" 
-                        name="endDate"
-                        className="modern-input"
-                        value={dateFilter.endDate}
-                        onChange={handleDateFilterChange}
-                        min={dateRange.min}
-                        max={dateRange.max}
-                      />
-                    </div>
-                    <div className="filter-actions">
-                      <button 
-                        className="btn-secondary"
-                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        className="btn-primary"
-                        onClick={() => setActiveFilterColumn(null)}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <DateFilterDropdown
+                  isActive={activeFilterColumn === 'date'}
+                  dateFilter={dateFilter}
+                  onChange={handleDateFilterChange}
+                  onClear={() => setDateFilter({ startDate: '', endDate: '' })}
+                  dateRange={dateRange}
+                />
               </th>
               <th className="col-description">
                 <SortableHeader
@@ -1364,49 +1657,15 @@ const App = () => {
                 >
                   Bank Category
                 </SortableHeader>
-                {activeFilterColumn === 'bankCategory' && (
-                  <div ref={filterPopupRef} className="filter-dropdown">
-                    <div className="filter-options">
-                      {availableBankCategories
-                        .filter(category => category !== null && category !== undefined && category !== '')
-                        .map(category => (
-                          <label key={category} className="filter-option">
-                            <input 
-                              type="checkbox"
-                              className="modern-checkbox"
-                              checked={bankCategoryFilter.includes(category)}
-                              onChange={() => handleBankCategoryFilterChange(category)}
-                            />
-                            <span>{category}</span>
-                          </label>
-                        ))
-                      }
-                      <label className="filter-option">
-                        <input 
-                          type="checkbox"
-                          className="modern-checkbox"
-                          checked={bankCategoryFilter.includes(null)}
-                          onChange={() => handleBankCategoryFilterChange(null)}
-                        />
-                        <span>(Empty/Null)</span>
-                      </label>
-                    </div>
-                    <div className="filter-actions">
-                      <button 
-                        className="btn-secondary"
-                        onClick={() => setBankCategoryFilter([])}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        className="btn-primary"
-                        onClick={() => setActiveFilterColumn(null)}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <TableDropdownMenu
+                  isActive={activeFilterColumn === 'bankCategory'}
+                  onClose={() => setActiveFilterColumn(null)}
+                  availableOptions={availableBankCategories}
+                  selectedOptions={bankCategoryFilter}
+                  onChange={handleBankCategoryFilterChange}
+                  onClear={() => setBankCategoryFilter([])}
+                  skipSearch={true}
+                />
               </th>
               <th className="col-label">
                 <SortableHeader
@@ -1419,37 +1678,15 @@ const App = () => {
                 >
                   Label
                 </SortableHeader>
-                {activeFilterColumn === 'label' && (
-                  <div ref={filterPopupRef} className="filter-dropdown">
-                    <div className="filter-options">
-                      {labels.map(label => (
-                        <label key={label} className="filter-option">
-                          <input 
-                            type="checkbox"
-                            className="modern-checkbox"
-                            checked={labelFilter.includes(label)}
-                            onChange={() => handleLabelFilterChange(label)}
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="filter-actions">
-                      <button 
-                        className="btn-secondary"
-                        onClick={() => setLabelFilter([])}
-                      >
-                        Clear
-                      </button>
-                      <button 
-                        className="btn-primary"
-                        onClick={() => setActiveFilterColumn(null)}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <TableDropdownMenu
+                  isActive={activeFilterColumn === 'label'}
+                  onClose={() => setActiveFilterColumn(null)}
+                  availableOptions={labels}
+                  selectedOptions={labelFilter}
+                  onChange={handleLabelFilterChange}
+                  onClear={() => setLabelFilter([])}
+                  width="75px"
+                />
               </th>
             </tr>
           </thead>
@@ -1507,8 +1744,8 @@ const App = () => {
                           </div>
                         </div>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+          onClick={(e) => {
+            e.stopPropagation();
                             setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
                           }}
                           style={{
@@ -2295,7 +2532,7 @@ const App = () => {
         }
         
         .modern-table th {
-          padding: 2px 8px;
+          padding: 6px;
           font-weight: 600;
           background-color: #f8fafc;
           text-align: center;
@@ -2305,6 +2542,13 @@ const App = () => {
           height: 20px;
           border-bottom: 1px solid #eaecef;
           line-height: 1;
+        }
+        
+        /* Add extra right padding for specific columns with filter buttons */
+        .modern-table th:nth-child(1),
+        .modern-table th:nth-child(4),
+        .modern-table th:nth-child(5) {
+          padding-right: 24px;
         }
         
         .modern-table tr {
@@ -2360,22 +2604,87 @@ const App = () => {
         
         /* Filter header */
         .modern-filter-header {
-          display: flex;
-          align-items: center;
-          justify-content: center;
           position: relative;
-          padding: 0 16px;
+          padding: 0;
           line-height: 1;
+          width: 100%;
+          text-align: center;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        
+        /* Headers without filter buttons should be perfectly centered */
+        .modern-filter-header:not(.sortable) {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        
+        /* Headers with filter buttons need special alignment */
+        .modern-filter-header.sortable {
+          justify-content: space-between;
+        }
+        
+        .sortable-header {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          width: 100%;
         }
         
         /* Filter button */
         .filter-button {
           position: absolute;
-          right: 2px;
+          right: 6px;
           top: 50%;
           transform: translateY(-50%);
           width: 20px;
           height: 20px;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        
+        /* Center align header content */
+        .modern-filter-header .header-content {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 5px;
+          cursor: pointer;
+          transition: color 0.2s ease;
+          gap: 6px;
+          white-space: nowrap;
+          width: 100%;
+          text-align: center;
+        }
+        
+        /* Center the text within the header content */
+        .modern-filter-header .header-content > span:first-child {
+          flex: 1;
+          text-align: center;
+        }
+        
+        /* Add hover effect to all header content */
+        .modern-filter-header .header-content:hover {
+          color: #3498db;
+        }
+        
+        /* Special styling for non-filterable headers */
+        .modern-filter-header:not(.sortable) .header-content {
+          display: flex;
+          width: 100%;
+          justify-content: center;
+        }
+        
+        /* Ensure the clickable area covers the entire header */
+        .sortable-header {
+          cursor: pointer;
+          padding: 2px 0;
         }
         
         /* Responsive adjustments */
@@ -2557,6 +2866,48 @@ const App = () => {
         
         .modern-table th:nth-child(2) .modern-filter-header {
           justify-content: center;
+        }
+        
+        /* Ensure Amount column is properly centered */
+        .modern-table th:nth-child(3) {
+          text-align: center;
+        }
+        
+        .modern-table th:nth-child(3) .modern-filter-header {
+          justify-content: center;
+        }
+        
+        /* Ensure filter buttons don't overlap with text */
+        .modern-table th {
+          position: relative;
+        }
+        
+        /* Properly position sort indicators */
+        .sort-indicator {
+          display: inline-flex;
+          align-items: center;
+          margin-left: 4px;
+          position: relative;
+          top: auto;
+          right: auto;
+          transform: none;
+        }
+        
+        /* Additional spacing for filter buttons */
+        .modern-filter-header.sortable {
+          padding-right: 20px;
+        }
+        
+        /* Ensure proper spacing in sortable headers */
+        .modern-filter-header.sortable .sortable-header {
+          padding-right: 0;
+          margin-right: 10px;
+          flex: 1;
+        }
+        
+        /* Ensure header content is centered without accounting for filter button */
+        .modern-filter-header.sortable {
+          position: relative;
         }
       `}
       </style>
@@ -2876,7 +3227,7 @@ const App = () => {
                                   />
                                   {category}
                                 </label>
-                              </div>
+      </div>
                             ))
                           }
                           

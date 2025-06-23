@@ -1,0 +1,84 @@
+/* Compact dropdown menu styling */
+.compact-filter-dropdown {
+  font-size: 13px;
+  animation: fadeIn 0.2s ease;
+}
+
+.compact-filter-dropdown .filter-option {
+  padding: 6px 10px;
+}
+
+.compact-filter-dropdown .filter-option:hover {
+  background-color: #f9fafb;
+}
+
+.compact-filter-dropdown .filter-option:active {
+  background-color: #f3f4f6;
+}
+
+.compact-filter-dropdown .filter-option label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.compact-filter-dropdown .filter-search {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+/* Animation for dropdown appearance */
+@media (prefers-reduced-motion: no-preference) {
+  .compact-filter-dropdown {
+    transform-origin: top right;
+    animation: scaleIn 0.15s ease;
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+/* Streamlined dropdown button */
+.filter-button.compact {
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+}
+
+.filter-button.compact:hover,
+.filter-button.compact.active {
+  opacity: 1;
+}
+
+.filter-button.compact svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Badge for active filters */
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 9px;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
