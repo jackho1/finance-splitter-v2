@@ -79,7 +79,7 @@ export const filterByLabel = (transactions, labelFilter) => {
 };
 
 /**
- * Sort transactions by date
+ * Sort transactions by date, then by ID for same date transactions
  * @param {Array} transactions - Original transactions array
  * @param {string} sortDirection - Sorting direction ('asc' or 'desc')
  * @returns {Array} - Sorted transactions
@@ -88,9 +88,25 @@ export const sortByDate = (transactions, sortDirection) => {
   return [...transactions].sort((a, b) => {
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
-    return sortDirection === 'asc' 
+    
+    // First compare by date
+    const dateComparison = sortDirection === 'asc' 
       ? dateA - dateB 
       : dateB - dateA;
+    
+    // If dates are equal (same day), sort by ID
+    if (dateComparison === 0) {
+      // Assuming ID is numeric or can be converted to numeric
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      
+      // For same date, maintain the same sort direction for IDs
+      return sortDirection === 'asc' 
+        ? idA - idB 
+        : idB - idA;
+    }
+    
+    return dateComparison;
   });
 };
 
