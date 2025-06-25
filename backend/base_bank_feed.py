@@ -379,10 +379,11 @@ ACCOUNT_CONFIGS = {
             'bank_category': {'type': 'text', 'nullable': True},
             'label': {'type': 'text', 'nullable': True},
             'has_split': {'type': 'boolean', 'default': False},
-            'split_from_id': {'type': 'text', 'nullable': True, 'default': None}
+            'split_from_id': {'type': 'text', 'nullable': True, 'default': None},
+            'mark': {'type': 'boolean', 'default': False}
         },
         'api_update_fields': ['date', 'description'],
-        'preserve_fields': ['amount', 'bank_category', 'label', 'has_split', 'split_from_id'],
+        'preserve_fields': ['amount', 'bank_category', 'label', 'has_split', 'split_from_id', 'mark'],
         'additional_processing': True
     },
     

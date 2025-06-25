@@ -289,7 +289,7 @@
 - [ ] **Workaround fix for id changing based on transaction description name change (pending > fulfilled)**:
    - Currently, there are some transactions in pending state with one primary key id, but when it updates its description name into a processed state, the primary key id is also changed. This needs to be accounted for. 
 
-- [ ] **Use logger.xx for print statemnets**:
+- [x] **Use logger.xx for print statemnets**:
    - Replace all print statements to use logging instead. 
 
 - [x] **Fix dropdown menu options**:
