@@ -2711,46 +2711,73 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         </div>
       )}
 
-      {/* Active filters display */}
+      {/* Active Filters Display */}
       {(dateFilter.startDate || dateFilter.endDate || categoryFilter.length > 0) && (
         <div style={{ 
           margin: '10px 0', 
-          padding: '10px', 
+          padding: '12px', 
           backgroundColor: '#e8f4fd', 
-          borderRadius: '6px',
+          borderRadius: '8px',
           border: '1px solid #d0e8f9',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <strong>Active Filters:</strong>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <strong style={{ color: '#1e40af', fontSize: '14px' }}>Active Filters:</strong>
               {(dateFilter.startDate || dateFilter.endDate) && (
-                <span style={{ margin: '0 10px' }}>
-                  Date: {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'End'}
+                <span style={{ 
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  border: '1px solid #bfdbfe'
+                }}>
+                  📅 {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'Today'}
                 </span>
               )}
               {categoryFilter.length > 0 && (
-                <span style={{ margin: '0 10px' }}>
-                  {categoryFilter.length === 1 ? 'Category' : 'Categories'}: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
+                <span style={{ 
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  border: '1px solid #fde68a'
+                }}>
+                  📋 Categories: {categoryFilter.slice(0, 3).map(cat => cat === null ? '(empty)' : cat).join(', ')}{categoryFilter.length > 3 ? ` +${categoryFilter.length - 3} more` : ''}
                 </span>
               )}
+              <span style={{ 
+                fontSize: '13px', 
+                color: '#4b5563',
+                fontWeight: '500'
+              }}>
+                ({filteredTransactions.length} transactions)
+              </span>
             </div>
-            <button 
-              onClick={clearFilters}
-              style={{ 
-                padding: '8px 12px',
-                backgroundColor: 'white',
-                color: '#333',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'normal',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-              }}
-            >
-              Clear All Filters
-            </button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                onClick={clearFilters}
+                style={{ 
+                  padding: '8px 14px',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '13px',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}
+              >
+                Clear All Filters
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -5853,6 +5880,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           </div>
         </div>
       )}
+
       
       {/* Transactions table with modern styling */}
       {renderTransactionsTable()}

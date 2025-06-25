@@ -580,6 +580,9 @@ const App = () => {
   
   // Add expanded row state
   const [expandedRow, setExpandedRow] = useState(null);
+  
+  // Add bulk update state
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -1258,6 +1261,32 @@ const App = () => {
           <span className={transaction[field] < 0 ? 'amount-negative' : 'amount-positive'}>
             {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
           </span>
+        ) : field === 'description' ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', width: '100%' }}>
+            <span style={{ flex: 1, textAlign: 'left', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+              {transaction[field]}
+            </span>
+            {transaction.mark && (
+              <div 
+                className="paid-indicator"
+                title="Paid Off"
+                style={{
+                  fontSize: '9px',
+                  width: '14px',
+                  height: '14px',
+                  marginLeft: '6px',
+                  flexShrink: 0,
+                  backgroundColor: '#f8fafc',
+                  color: '#64748b',
+                  border: '1px solid #cbd5e1',
+                  opacity: 0.85,
+                  fontWeight: '600'
+                }}
+              >
+                ✓
+              </div>
+            )}
+          </div>
         ) : (
           transaction[field]
         )}
@@ -1803,7 +1832,7 @@ const App = () => {
                           justifyContent: 'space-between',
                           alignItems: 'center'
                         }}>
-                          <div style={{ display: 'flex', gap: '20px' }}>
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1820,15 +1849,62 @@ const App = () => {
                                 borderRadius: '6px',
                                 cursor: 'pointer',
                                 fontSize: '14px',
-                                transition: 'background-color 0.2s'
+                                transition: 'background-color 0.2s',
+                                fontWeight: '500'
                               }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
                               </svg>
                               Split Transaction
                             </button>
-                            {/* Add other actions here if needed */}
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleTransactionPaidStatus(transaction.id, transaction.mark);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: transaction.mark === true ? '#dc2626' : '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s',
+                                fontWeight: '500'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (transaction.mark === true) {
+                                  e.target.style.backgroundColor = '#b91c1c';
+                                } else {
+                                  e.target.style.backgroundColor = '#047857';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (transaction.mark === true) {
+                                  e.target.style.backgroundColor = '#dc2626';
+                                } else {
+                                  e.target.style.backgroundColor = '#059669';
+                                }
+                              }}
+                              title={transaction.mark === true ? 'Click to unmark as paid' : 'Click to mark as paid off'}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                {transaction.mark === true ? (
+                                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/>
+                                ) : (
+                                  <path d="M20 6L9 17l-5-5"/>
+                                )}
+                              </svg>
+                              {transaction.mark === true ? 'Unmark as Paid' : 'Mark as Paid'}
+                            </button>
                           </div>
                           
                           {/* Show related transaction details when expanded */}
@@ -2015,9 +2091,30 @@ const App = () => {
                     marginRight: '8px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                    textOverflow: 'ellipsis',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
                     {transaction.description}
+                    {transaction.mark && (
+                      <div 
+                        className="paid-indicator"
+                        title="Paid Off"
+                        style={{
+                          fontSize: '9px',
+                          width: '14px',
+                          height: '14px',
+                          marginLeft: '6px',
+                          flexShrink: 0,
+                          backgroundColor: '#e8f5e8',
+                          color: '#4a7c59',
+                          border: '1px solid #c8e6c9',
+                          opacity: 0.7
+                        }}
+                      >
+                        ✓
+                      </div>
+                    )}
                   </span>
                   <div style={{ 
                     display: 'flex', 
@@ -2426,6 +2523,252 @@ const App = () => {
     }]);
   };
 
+  // Bulk update function to mark transactions as paid off
+  const handleBulkMarkAsPaid = async () => {
+    try {
+      setIsBulkUpdating(true);
+      
+      // Get the IDs of all currently filtered transactions
+      const transactionIds = filteredTransactions.map(t => t.id);
+      
+      if (transactionIds.length === 0) {
+        // Show warning notification
+        const notification = document.createElement('div');
+        notification.textContent = 'No transactions found to mark as paid off';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#fff3cd';
+        notification.style.color = '#856404';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #ffeaa7';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        setIsBulkUpdating(false);
+        return;
+      }
+      
+      // Prepare bulk update data - simplified approach using just transaction IDs
+      const bulkUpdateData = {
+        mark_value: true,
+        transaction_ids: transactionIds
+      };
+      
+      console.log('Sending bulk update data:', bulkUpdateData);
+      console.log('Number of transactions to update:', transactionIds.length);
+      
+      const response = await axios.put('http://localhost:5000/transactions/bulk-update-mark', bulkUpdateData);
+      
+      if (response.data.success) {
+        // Update local state to reflect the changes
+        setTransactions(prevTransactions => 
+          prevTransactions.map(transaction => 
+            transactionIds.includes(transaction.id) 
+              ? { ...transaction, mark: true }
+              : transaction
+          )
+        );
+        
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(transaction => 
+            transactionIds.includes(transaction.id) 
+              ? { ...transaction, mark: true }
+              : transaction
+          )
+        );
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = `Successfully marked ${response.data.updated_count} transactions as paid off!`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #c3e6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 4000);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = response.data.error || 'Failed to mark transactions as paid off';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error in bulk mark as paid:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Show error notification with more details
+      const errorMessage = error.response?.data?.error || 
+                           error.response?.data?.details || 
+                           error.message || 
+                           'Failed to mark transactions as paid off. Please try again.';
+      
+      const notification = document.createElement('div');
+      notification.textContent = errorMessage;
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      notification.style.maxWidth = '400px';
+      notification.style.wordWrap = 'break-word';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 8000);
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  // Function to toggle transaction paid status (mark/unmark as paid)
+  const handleToggleTransactionPaidStatus = async (transactionId, currentMarkStatus) => {
+    try {
+      setIsUpdating(true);
+      
+      // Toggle the mark value (opposite of current status)
+      const newMarkValue = !currentMarkStatus;
+      
+      // Prepare the data for updating single transaction
+      const updateData = {
+        mark_value: newMarkValue,
+        transaction_ids: [transactionId]
+      };
+      
+      const response = await axios.put('http://localhost:5000/transactions/bulk-update-mark', updateData);
+      
+      if (response.data.success) {
+        // Update local state to reflect the changes
+        setTransactions(prevTransactions => 
+          prevTransactions.map(transaction => 
+            transaction.id === transactionId 
+              ? { ...transaction, mark: newMarkValue }
+              : transaction
+          )
+        );
+        
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(transaction => 
+            transaction.id === transactionId 
+              ? { ...transaction, mark: newMarkValue }
+              : transaction
+          )
+        );
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = newMarkValue 
+          ? 'Transaction marked as paid off!' 
+          : 'Transaction unmarked as paid off!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #c3e6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Close the expanded row
+        setExpandedRow(null);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = response.data.error || 'Failed to update transaction status';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error updating transaction paid status:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Failed to update transaction status. Please try again.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 className="dashboard-title">Finance Dashboard</h1>
@@ -2822,6 +3165,38 @@ const App = () => {
           font-weight: 500;
         }
         
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        .paid-indicator {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          height: 14px;
+          background-color: #f8fafc;
+          color: #64748b;
+          border: 1px solid #cbd5e1;
+          border-radius: 50%;
+          font-size: 9px;
+          font-weight: 600;
+          margin-left: 6px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          flex-shrink: 0;
+          opacity: 0.85;
+          transition: all 0.2s ease;
+          title: "Paid Off";
+        }
+        
+        .paid-indicator:hover {
+          background-color: #e2e8f0;
+          color: #475569;
+          opacity: 1;
+          border-color: #94a3b8;
+        }
+        
         .editable-cell {
           position: relative;
           cursor: pointer;
@@ -3043,52 +3418,134 @@ const App = () => {
             {(dateFilter.startDate || dateFilter.endDate ||bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
               <div style={{ 
                 margin: '10px 0', 
-                padding: '10px', 
+                padding: '12px', 
                 backgroundColor: '#e8f4fd', 
-                borderRadius: '6px',
+                borderRadius: '8px',
                 border: '1px solid #d0e8f9',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <strong>Active Filters:</strong>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <strong style={{ color: '#1e40af', fontSize: '14px' }}>Active Filters:</strong>
                     {(dateFilter.startDate || dateFilter.endDate) && (
-                      <span style={{ margin: '0 10px' }}>
-                        Date: {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'End'}
+                      <span style={{ 
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        📅 {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'Today'}
                       </span>
                     )}
-                    {bankCategoryFilter.length > 0 && (
-                      <span style={{ margin: '0 10px' }}>
-                        Bank Categories: {bankCategoryFilter.join(', ')}
-                      </span>
-                    )}
-                    {categoryFilter.length > 0 && (
-                      <span style={{ margin: '0 10px' }}>
-                        Categories: {categoryFilter.map(cat => cat === null ? 'null' : cat).join(', ')}
-                      </span>
-                    )}
-                    {labelFilter.length > 0 && (
-                      <span style={{ margin: '0 10px' }}>
-                        Labels: {labelFilter.join(', ')}
-                      </span>
-                    )}
+                                         {bankCategoryFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#f0fdf4',
+                         color: '#166534',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #bbf7d0'
+                       }}>
+                         🏷️ Bank: {bankCategoryFilter.slice(0, 3).join(', ')}{bankCategoryFilter.length > 3 ? ` +${bankCategoryFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                                         {categoryFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#fef3c7',
+                         color: '#92400e',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #fde68a'
+                       }}>
+                         📋 Categories: {categoryFilter.slice(0, 3).map(cat => cat === null ? '(empty)' : cat).join(', ')}{categoryFilter.length > 3 ? ` +${categoryFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                                         {labelFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#fce7f3',
+                         color: '#be185d',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #f9a8d4'
+                       }}>
+                         👤 Labels: {labelFilter.slice(0, 3).join(', ')}{labelFilter.length > 3 ? ` +${labelFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                    <span style={{ 
+                      fontSize: '13px', 
+                      color: '#4b5563',
+                      fontWeight: '500'
+                    }}>
+                      ({filteredTransactions.length} transactions)
+                    </span>
                   </div>
-                  <button 
-                    onClick={clearFilters}
-                    style={{ 
-                      padding: '8px 12px',
-                      backgroundColor: 'white',
-                      color: '#333',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 'normal',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    Clear All Filters
-                  </button>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button 
+                      onClick={handleBulkMarkAsPaid}
+                      disabled={isBulkUpdating || filteredTransactions.length === 0}
+                      style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        backgroundColor: isBulkUpdating ? '#9ca3af' : '#059669',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: isBulkUpdating || filteredTransactions.length === 0 ? 'not-allowed' : 'pointer',
+                        fontWeight: '500',
+                        fontSize: '13px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        opacity: isBulkUpdating || filteredTransactions.length === 0 ? 0.7 : 1
+                      }}
+                      title={filteredTransactions.length === 0 ? 'No transactions to mark' : 'Mark all filtered transactions as paid off'}
+                    >
+                      {isBulkUpdating ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                            style={{ animation: 'spin 1s linear infinite' }}>
+                            <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
+                          </svg>
+                          Marking...
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M20 6L9 17l-5-5"/>
+                          </svg>
+                          Mark as Paid Off
+                        </>
+                      )}
+                    </button>
+                    
+                    <button 
+                      onClick={clearFilters}
+                      style={{ 
+                        padding: '8px 14px',
+                        backgroundColor: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        fontSize: '13px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

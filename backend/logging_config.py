@@ -25,6 +25,7 @@ class FileLoggingConfig:
         # Configuration from environment variables
         self.enable_file_logging = os.getenv('ENABLE_FILE_LOGGING', 'false').lower() == 'true'
         self.log_file_path = os.getenv('LOG_FILE_PATH', 'logs/finance_splitter.log')
+        # Log level options: DEBUG, INFO, WARNING, ERROR, CRITICAL
         self.log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
         self.max_log_file_size = int(os.getenv('MAX_LOG_FILE_SIZE_MB', '10')) * 1024 * 1024  # Convert MB to bytes
         self.backup_count = int(os.getenv('LOG_BACKUP_COUNT', '5'))

@@ -247,7 +247,7 @@ app.use(cors());
 app.use(express.json()); // For parsing JSON request bodies
 
 // Allowed columns for filtering and field selection
-const allowedFields = ['id', 'date', 'description', 'amount', 'category', 'bank_category', 'label', 'has_split', 'split_from_id'];
+const allowedFields = ['id', 'date', 'description', 'amount', 'category', 'bank_category', 'label', 'has_split', 'split_from_id', 'mark'];
 
 /**
  * Helper function to normalize values for comparison
@@ -277,6 +277,14 @@ const normalizeValue = (value, fieldType = 'string') => {
       } catch (e) {
         return null;
       }
+    case 'boolean':
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        if (value.trim() === '') return null;
+        return value.toLowerCase() === 'true' || value === '1';
+      }
+      return Boolean(value);
     default:
       return typeof value === 'string' ? value.trim() || null : value;
   }
@@ -313,6 +321,9 @@ const getFieldType = (fieldName) => {
       return 'number';
     case 'date':
       return 'date';
+    case 'mark':
+    case 'has_split':
+      return 'boolean';
     default:
       return 'string';
   }
@@ -631,6 +642,190 @@ app.get('/transactions', async (req, res) => {
 });
 
 /**
+ * PUT /transactions/bulk-update-mark - Bulk update mark field for multiple transactions
+ */
+app.put('/transactions/bulk-update-mark', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { transaction_ids, mark_value, date_from, date_to, filters } = req.body;
+    
+    // Validate that mark_value is provided and is boolean
+    if (mark_value === undefined || mark_value === null) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'mark_value is required and must be a boolean (true/false)'
+      });
+    }
+    
+    // Convert mark_value to boolean
+    const markBoolean = Boolean(mark_value);
+    
+    // Build WHERE clause based on provided criteria
+    const whereConditions = [];
+    const queryParams = [markBoolean]; // First parameter is always the mark value
+    let paramIndex = 2;
+    
+    // Filter by specific transaction IDs if provided
+    if (transaction_ids && Array.isArray(transaction_ids) && transaction_ids.length > 0) {
+      // Convert IDs to integers to match the database column type
+      const intIds = transaction_ids.map(id => parseInt(id, 10));
+      whereConditions.push(`id = ANY($${paramIndex}::integer[])`);
+      queryParams.push(intIds);
+      paramIndex++;
+    }
+    
+    // Filter by date range if provided
+    if (date_from) {
+      whereConditions.push(`date >= $${paramIndex}`);
+      queryParams.push(date_from);
+      paramIndex++;
+    }
+    
+    if (date_to) {
+      whereConditions.push(`date <= $${paramIndex}`);
+      queryParams.push(date_to);
+      paramIndex++;
+    }
+    
+    // Apply additional filters if provided
+    if (filters && typeof filters === 'object') {
+      for (const [key, value] of Object.entries(filters)) {
+        if (allowedFields.includes(key) && key !== 'mark') { // Don't filter by mark since we're updating it
+          whereConditions.push(`${key} = $${paramIndex}`);
+          queryParams.push(value);
+          paramIndex++;
+        }
+      }
+    }
+    
+    // Ensure we have at least one condition to prevent updating all records
+    if (whereConditions.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'At least one filter condition is required (transaction_ids, date_from, date_to, or filters)'
+      });
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // First, get the transactions that will be updated for logging
+    // Build separate query params for the SELECT (without mark_value)
+    const selectQueryParams = [];
+    const selectWhereConditions = [];
+    let selectParamIndex = 1;
+    
+    // Rebuild WHERE clause for SELECT query (without mark_value parameter)
+    if (transaction_ids && Array.isArray(transaction_ids) && transaction_ids.length > 0) {
+      const intIds = transaction_ids.map(id => parseInt(id, 10));
+      selectWhereConditions.push(`id = ANY($${selectParamIndex}::integer[])`);
+      selectQueryParams.push(intIds);
+      selectParamIndex++;
+    }
+    
+    if (date_from) {
+      selectWhereConditions.push(`date >= $${selectParamIndex}`);
+      selectQueryParams.push(date_from);
+      selectParamIndex++;
+    }
+    
+    if (date_to) {
+      selectWhereConditions.push(`date <= $${selectParamIndex}`);
+      selectQueryParams.push(date_to);
+      selectParamIndex++;
+    }
+    
+    if (filters && typeof filters === 'object') {
+      for (const [key, value] of Object.entries(filters)) {
+        if (allowedFields.includes(key) && key !== 'mark') {
+          selectWhereConditions.push(`${key} = $${selectParamIndex}`);
+          selectQueryParams.push(value);
+          selectParamIndex++;
+        }
+      }
+    }
+    
+    const selectWhereClause = selectWhereConditions.join(' AND ');
+    const selectQuery = `SELECT id, date, description, amount, mark FROM shared_transactions WHERE ${selectWhereClause}`;
+    
+    const selectResult = await client.query(selectQuery, selectQueryParams);
+    const transactionsToUpdate = selectResult.rows;
+    
+    if (transactionsToUpdate.length === 0) {
+      await client.query('ROLLBACK');
+      return res.json({
+        success: true,
+        message: 'No transactions found matching the specified criteria',
+        updated_count: 0,
+        transactions: []
+      });
+    }
+    
+    // Count how many will actually change
+    const transactionsToChange = transactionsToUpdate.filter(tx => tx.mark !== markBoolean);
+    
+    if (transactionsToChange.length === 0) {
+      await client.query('ROLLBACK');
+      return res.json({
+        success: true,
+        message: `All ${transactionsToUpdate.length} matching transactions already have mark=${markBoolean}`,
+        updated_count: 0,
+        transactions: transactionsToUpdate,
+        optimized: true
+      });
+    }
+    
+    // Execute the bulk update
+    const updateQuery = `
+      UPDATE shared_transactions 
+      SET mark = $1 
+      WHERE ${whereClause} 
+      AND mark != $1
+      RETURNING id, date, description, amount, mark
+    `;
+    
+    console.log('Update query:', updateQuery);
+    console.log('Update query params:', queryParams);
+    const updateResult = await client.query(updateQuery, queryParams);
+    const updatedTransactions = updateResult.rows;
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ Bulk updated ${updatedTransactions.length} transactions with mark=${markBoolean}`);
+    
+    res.json({
+      success: true,
+      message: `Successfully updated ${updatedTransactions.length} transactions`,
+      updated_count: updatedTransactions.length,
+      mark_value: markBoolean,
+      transactions: updatedTransactions,
+      filters_applied: {
+        transaction_ids: transaction_ids?.length || 0,
+        date_from,
+        date_to,
+        additional_filters: filters ? Object.keys(filters).length : 0
+      }
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error in bulk update mark:', err);
+    console.error('Stack trace:', err.stack);
+    res.status(500).json({
+      success: false,
+      error: 'Server error during bulk update',
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * PUT /transactions/:id - Updates a transaction by ID (OPTIMIZED)
  */
 app.put('/transactions/:id', async (req, res) => {
@@ -706,6 +901,21 @@ app.put('/transactions/:id', async (req, res) => {
         case 'label':
           // Allow empty labels (null), which can be edited later
           processedValue = value === '' ? null : value;
+          break;
+          
+        case 'mark':
+          // Handle boolean mark field
+          if (value === null || value === undefined || value === '') {
+            processedValue = false; // Default to false for empty values
+          } else if (typeof value === 'boolean') {
+            processedValue = value;
+          } else if (typeof value === 'string') {
+            // Convert string representations to boolean
+            processedValue = value.toLowerCase() === 'true' || value === '1';
+          } else {
+            // Convert other truthy/falsy values
+            processedValue = Boolean(value);
+          }
           break;
           
         default:
@@ -1373,6 +1583,21 @@ app.post('/transactions', async (req, res) => {
         case 'label':
           // Allow empty labels (null), which can be edited later
           validFields[key] = value === '' ? null : value;
+          break;
+          
+        case 'mark':
+          // Handle boolean mark field for new transactions
+          if (value === null || value === undefined || value === '') {
+            validFields[key] = false; // Default to false for empty values
+          } else if (typeof value === 'boolean') {
+            validFields[key] = value;
+          } else if (typeof value === 'string') {
+            // Convert string representations to boolean
+            validFields[key] = value.toLowerCase() === 'true' || value === '1';
+          } else {
+            // Convert other truthy/falsy values
+            validFields[key] = Boolean(value);
+          }
           break;
           
         default:
@@ -2832,14 +3057,15 @@ app.post('/transactions/split', async (req, res) => {
     // Insert split transactions (insert into base table)
     for (const splitTransaction of splitTransactions) {
       await client.query(
-        'INSERT INTO shared_transactions (date, description, amount, bank_category, label, split_from_id) VALUES ($1, $2, $3, $4, $5, $6)',
+        'INSERT INTO shared_transactions (date, description, amount, bank_category, label, split_from_id, mark) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [
           originalTransaction.date,
           splitTransaction.description,
           splitTransaction.amount,
           splitTransaction.bank_category || originalTransaction.bank_category,
           splitTransaction.label || originalTransaction.label,
-          originalTransactionId
+          originalTransactionId,
+          splitTransaction.mark !== undefined ? splitTransaction.mark : originalTransaction.mark || false
         ]
       );
     }

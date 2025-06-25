@@ -47,7 +47,8 @@ class SharedBankFeed(BaseBankFeed):
             'date': transaction['date'],
             'description': transaction['payee'],
             'bank_category': category_title,
-            'amount': transaction['amount']
+            'amount': transaction['amount'],
+            'mark': False  # Default value for new transactions
         }
     
     def auto_label_bank_category(self, bank_category: str) -> Optional[str]:
@@ -98,7 +99,8 @@ class SharedBankFeed(BaseBankFeed):
             # Check if this transaction already exists
             if tx['id'] in existing_data:
                 existing = existing_data[tx['id']]
-                
+                # Preserve existing mark value if it exists
+                mark = existing.get('mark', False)
                 # Preserve existing label if it exists
                 if existing.get('label') is not None:
                     label = existing['label']
@@ -118,6 +120,7 @@ class SharedBankFeed(BaseBankFeed):
                 # New transaction - use API values and auto-assign label
                 bank_category = api_bank_category
                 label = self.auto_label_bank_category(bank_category)
+                mark = False  # Default value for new transactions
             
             categorized_transactions.append({
                 'id': tx['id'],
@@ -127,7 +130,8 @@ class SharedBankFeed(BaseBankFeed):
                 'bank_category': bank_category,
                 'label': label,
                 'has_split': False,  # Default value
-                'split_from_id': None  # Default value
+                'split_from_id': None,  # Default value
+                'mark': mark  # Preserve existing or set default
             })
         
         return categorized_transactions
