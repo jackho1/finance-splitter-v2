@@ -8,6 +8,10 @@ using the abstracted base framework. Very minimal code required!
 import os
 from typing import Dict, Optional, Any
 from base_bank_feed import BaseBankFeed, BankFeedFactory
+from logging_config import get_logger
+
+# Get logger using the new logging system
+logger = get_logger(__name__)
 
 
 class SavingsBankFeed(BaseBankFeed):
@@ -100,7 +104,7 @@ def main():
     config['account_id'] = os.getenv('SAVINGS_ACCOUNT_ID')
     
     if not config['account_id']:
-        print("❌ Error: SAVINGS_ACCOUNT_ID environment variable not set")
+        logger.error("❌ Error: SAVINGS_ACCOUNT_ID environment variable not set")
         return
     
     # Create and run the bank feed - that's it!

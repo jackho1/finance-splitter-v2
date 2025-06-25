@@ -283,7 +283,7 @@
 - [ ] **Create audit history logs for shared_transactions**:
    - Triggers to be performed in the psql tables directly and not in python.
 
-- [ ] **Refactor PocketSmith API fetch from the 3 _bank_feed.py files**:
+- [x] **Refactor PocketSmith API fetch from the 3 _bank_feed.py files**:
    - Abstract all duplicate code into a base and config file to reduce overhead in maintainenance. 
 
 - [ ] **Workaround fix for id changing based on transaction description name change (pending > fulfilled)**:
@@ -292,10 +292,10 @@
 - [ ] **Use logger.xx for print statemnets**:
    - Replace all print statements to use logging instead. 
 
-- [ ] **Fix dropdown menu options**:
+- [x] **Fix dropdown menu options**:
    - Date option is cut-off and we can remove the redundant "Apply" button. We can also reduce whitespacing and font sizes slightly as well to make it more concise.  
 
-- [ ] **Reorder the transaction dates based on the JSON data sequence (primary key)**:
+- [x] **Reorder the transaction dates based on the JSON data sequence (primary key)**:
    - Add above.
 
 - [ ] **Table filter scroll fix**:
