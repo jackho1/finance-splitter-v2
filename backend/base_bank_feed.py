@@ -15,6 +15,14 @@ from dotenv import load_dotenv
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Tuple
 
+# Import the new logging configuration
+from logging_config import setup_logging, get_logger, log_configuration_info
+
+# Set up logging with file logging support
+setup_logging()
+log_configuration_info()
+
+
 class BaseBankFeed(ABC):
     """
     Abstract base class for bank feed implementations.
@@ -28,6 +36,9 @@ class BaseBankFeed(ABC):
         Args:
             config: Configuration dictionary containing account details and settings
         """
+        # Set up logger using the new logging system
+        self.logger = get_logger(f"{self.__class__.__name__}")
+        
         # Load environment variables
         load_dotenv()
         
@@ -83,7 +94,7 @@ class BaseBankFeed(ABC):
                 "X-Developer-Key": self.api_key
             }
             
-            print(f"Fetching {self.account_name} transactions from PocketSmith API - Page {page}...")
+            self.logger.info(f"Fetching {self.account_name} transactions from PocketSmith API - Page {page}...")
             
             try:
                 response = requests.get(url, headers=headers, params=params)
@@ -92,7 +103,7 @@ class BaseBankFeed(ABC):
                     transactions = response.json()
                     
                     if not transactions:  # No more transactions (empty page)
-                        print(f"✅ Reached end of transactions at page {page}")
+                        self.logger.info(f"✅ Reached end of transactions at page {page}")
                         break
                     
                     # Process each transaction using the specific implementation
@@ -104,15 +115,15 @@ class BaseBankFeed(ABC):
                     page += 1
                 elif response.status_code == 404 and page > 1:
                     # This is likely just the end of pagination
-                    print(f"✅ Reached end of transactions at page {page}")
+                    self.logger.info(f"✅ Reached end of transactions at page {page}")
                     break
                 else:
                     # This is an actual error
-                    print(f"⚠️  API request failed with status {response.status_code}: {response.text}")
+                    self.logger.warning(f"⚠️  API request failed with status {response.status_code}: {response.text}")
                     break
                 
             except requests.RequestException as e:
-                print(f"❌ Error fetching transactions: {e}")
+                self.logger.error(f"❌ Error fetching transactions: {e}")
                 break
         
         return all_transactions
@@ -158,7 +169,7 @@ class BaseBankFeed(ABC):
                         existing_data[row_data['id']] = row_data
                         
         except Exception as e:
-            print(f"Error fetching existing transactions: {e}")
+            self.logger.error(f"Error fetching existing transactions: {e}")
         
         return existing_data
     
@@ -240,15 +251,15 @@ class BaseBankFeed(ABC):
                     conn.commit()
                     
                     # Generate statistics
-                    self.print_statistics(cursor, [tx['id'] for tx in transactions])
+                    self.log_statistics(cursor, [tx['id'] for tx in transactions])
                     
         except Exception as e:
-            print(f"❌ Error inserting/updating transactions: {e}")
+            self.logger.error(f"❌ Error inserting/updating transactions: {e}")
             raise
     
-    def print_statistics(self, cursor: psycopg2_cursor, transaction_ids: List[str]) -> None:
+    def log_statistics(self, cursor: psycopg2_cursor, transaction_ids: List[str]) -> None:
         """
-        Print processing statistics for the transactions.
+        Log processing statistics for the transactions.
         
         Args:
             cursor: Database cursor
@@ -280,23 +291,23 @@ class BaseBankFeed(ABC):
         cursor.execute(stats_query, (transaction_ids,))
         stats = cursor.fetchone()
         
-        print(f"✅ Successfully processed {len(transaction_ids)} {self.account_name} transactions:")
+        self.logger.info(f"✅ Successfully processed {len(transaction_ids)} {self.account_name} transactions:")
         
-        # Print relevant statistics
+        # Log relevant statistics
         i = 0
         if 'category' in self.transaction_fields:
-            print(f"   - {stats[i]} categorized")
+            self.logger.info(f"   - {stats[i]} categorized")
             i += 1
         if 'label' in self.transaction_fields:
-            print(f"   - {stats[i]} labeled")
+            self.logger.info(f"   - {stats[i]} labeled")
             i += 1
         if 'bank_category' in self.transaction_fields:
-            print(f"   - {stats[i]} bank categorized")
+            self.logger.info(f"   - {stats[i]} bank categorized")
             i += 1
         if 'has_split' in self.transaction_fields:
-            print(f"   - {stats[i]} split transactions")
+            self.logger.info(f"   - {stats[i]} split transactions")
             i += 1
-        print(f"   - {stats[i]} total in database")
+        self.logger.info(f"   - {stats[i]} total in database")
     
     def run(self) -> None:
         """
@@ -305,14 +316,14 @@ class BaseBankFeed(ABC):
         start_date = (datetime.now() - timedelta(days=self.days_to_fetch)).strftime('%Y-%m-%d')
         end_date = datetime.now().strftime('%Y-%m-%d')
         
-        print(f"📅 Fetching {self.account_name} transactions from {start_date} to {end_date} (spans {self.days_to_fetch} days)")
+        self.logger.info(f"📅 Fetching {self.account_name} transactions from {start_date} to {end_date} (spans {self.days_to_fetch} days)")
         
         # Fetch transactions from API
         transactions = self.fetch_transactions(start_date)
-        print(f"📥 Fetched {len(transactions)} transactions from PocketSmith API")
+        self.logger.info(f"📥 Fetched {len(transactions)} transactions from PocketSmith API")
         
         if not transactions:
-            print("ℹ️  No transactions found for the specified date range.")
+            self.logger.info("ℹ️  No transactions found for the specified date range.")
             return
         
         # Perform additional processing if specified

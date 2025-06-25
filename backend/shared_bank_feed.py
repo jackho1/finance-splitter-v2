@@ -8,6 +8,10 @@ Inherits from BaseBankFeed and adds specific categorization and labeling logic.
 import os
 from typing import Dict, List, Optional, Any
 from base_bank_feed import BaseBankFeed, BankFeedFactory, ACCOUNT_CONFIGS
+from logging_config import get_logger
+
+# Get logger using the new logging system
+logger = get_logger(__name__)
 
 
 class SharedBankFeed(BaseBankFeed):
@@ -150,7 +154,7 @@ def main():
     config['account_id'] = os.getenv('ULTIMATE_AWARDS_CC_ID')
     
     if not config['account_id']:
-        print("❌ Error: ULTIMATE_AWARDS_CC_ID environment variable not set")
+        logger.error("❌ Error: ULTIMATE_AWARDS_CC_ID environment variable not set")
         return
     
     # Create and run the bank feed
