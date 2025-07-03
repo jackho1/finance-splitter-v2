@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
@@ -649,7 +650,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       
       try {
         // Single API call to get all offset initial data
-        const response = await axios.get('http://localhost:5000/offset-initial-data');
+        const response = await axios.get(getApiUrl('/offset-initial-data'));
         
         if (response.data.success) {
           const { offsetTransactions, offsetCategories, labels } = response.data.data;
@@ -787,7 +788,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     try {
       setIsRefreshing(true);
       
-      const response = await axios.post('http://localhost:5000/refresh-offset-bank-feeds');
+      const response = await axios.post(getApiUrl('/refresh-offset-bank-feeds'));
       
       if (response.data.success) {
         // Show success notification
@@ -810,7 +811,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         }, 3000);
         
         // Refresh the transactions data
-        const transactionsResponse = await axios.get('http://localhost:5000/offset-transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/offset-transactions'));
         setTransactions(transactionsResponse.data);
         
         // Reapply filters to new data
@@ -1587,7 +1588,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         return;
       }
       
-      const response = await axios.post('http://localhost:5000/offset-transactions', transactionData);
+      const response = await axios.post(getApiUrl('/offset-transactions'), transactionData);
       
       if (response.data.success) {
         const addedTransaction = response.data.data;
@@ -1916,11 +1917,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         }))
       };
       
-      const response = await axios.post('http://localhost:5000/offset-transactions/split', splitData);
+      const response = await axios.post(getApiUrl('/offset-transactions/split'), splitData);
       
       if (response.data.success) {
         // Refresh the transactions
-        const transactionsResponse = await axios.get('http://localhost:5000/offset-transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/offset-transactions'));
         setTransactions(transactionsResponse.data);
         
         // Show success notification

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 
 // Import utility functions
 import { calculateTotals } from './utils/calculateTotals';
@@ -590,7 +591,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Database API functions for auto distribution rules
   const loadAutoDistributionRules = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/auto-distribution-rules/${userId}`);
+      const response = await axios.get(getApiUrlWithParams('/auto-distribution-rules/:userId', { userId }));
       if (response.data.success) {
         const rules = response.data.data.map(rule => ({
           id: rule.id,
@@ -608,7 +609,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   const savePersonalSettings = async (settingsUpdate) => {
     try {
-      await axios.put(`http://localhost:5000/personal-settings/${userId}`, settingsUpdate);
+      await axios.put(getApiUrlWithParams('/personal-settings/:userId', { userId }), settingsUpdate);
     } catch (error) {
       console.error('Error saving personal settings:', error);
     }
@@ -621,9 +622,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       // Load split groups, budget categories, and personal categories
       const [groupsResponse, budgetCategoriesResponse, personalCategoriesResponse] = await Promise.all([
-        axios.get(`http://localhost:5000/personal-split-groups/${userId}`),
-        axios.get('http://localhost:5000/budget-categories'),
-        axios.get('http://localhost:5000/personal-categories')
+        axios.get(getApiUrlWithParams('/personal-split-groups/:userId', { userId })),
+        axios.get(getApiUrl('/budget-categories')),
+        axios.get(getApiUrl('/personal-categories'))
       ]);
       
 
@@ -652,7 +653,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   const createPersonalSplitGroup = async (groupData) => {
     try {
-      const response = await axios.post('http://localhost:5000/personal-split-groups', {
+      const response = await axios.post(getApiUrl('/personal-split-groups'), {
         user_id: userId,
         ...groupData
       });
@@ -669,7 +670,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   const updatePersonalSplitGroup = async (groupId, updates) => {
     try {
-      const response = await axios.put(`http://localhost:5000/personal-split-groups/${groupId}`, updates);
+      const response = await axios.put(getApiUrlWithParams('/personal-split-groups/:groupId', { groupId }), updates);
       
       if (response.data.success) {
         await loadPersonalSplitConfig(); // Reload configuration
@@ -683,7 +684,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   const deletePersonalSplitGroup = async (groupId) => {
     try {
-      const response = await axios.delete(`http://localhost:5000/personal-split-groups/${groupId}`);
+      const response = await axios.delete(getApiUrlWithParams('/personal-split-groups/:groupId', { groupId }));
       
       if (response.data.success) {
         await loadPersonalSplitConfig(); // Reload configuration
@@ -699,7 +700,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       // First, delete existing mappings for this group
       const existingMappings = personalSplitGroups.find(g => g.id === groupId)?.mapped_categories || [];
       if (existingMappings.length > 0) {
-        await axios.delete(`http://localhost:5000/personal-split-mapping/bulk/${userId}`, {
+        await axios.delete(getApiUrlWithParams('/personal-split-mapping/bulk/:userId', { userId }), {
           data: {
             personal_split_group_id: groupId,
             budget_categories: existingMappings.map(m => m.budget_category)
@@ -709,7 +710,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       // Then, create new mappings
       if (budgetCategories.length > 0) {
-        await axios.post('http://localhost:5000/personal-split-mapping', {
+        await axios.post(getApiUrl('/personal-split-mapping'), {
           user_id: userId,
           personal_split_group_id: groupId,
           budget_categories: budgetCategories
@@ -725,7 +726,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   const loadPersonalSettings = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/personal-settings/${userId}`);
+      const response = await axios.get(getApiUrlWithParams('/personal-settings/:userId', { userId }));
       if (response.data.success) {
         const settings = response.data.data;
         setHideZeroBalanceBuckets(settings.hide_zero_balance_buckets || false);
@@ -905,7 +906,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       const monthYearStr = `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
       
       // Use the backend endpoint for atomic distribution
-      const response = await axios.post('http://localhost:5000/auto-distribution/apply', {
+      const response = await axios.post(getApiUrl('/auto-distribution/apply'), {
         user_id: userId,
         month_year: monthYearStr
       });
@@ -919,7 +920,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         // Note: Backend already updates personal settings
         
         // Refresh transactions
-        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
         
         // Show success notification
@@ -1043,7 +1044,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       
       try {
         // Single API call to get all personal initial data
-        const response = await axios.get('http://localhost:5000/personal-initial-data');
+        const response = await axios.get(getApiUrl('/personal-initial-data'));
         
         if (response.data.success) {
           const { personalTransactions, personalCategories, autoDistributionRules, personalSettings } = response.data.data;
@@ -1203,7 +1204,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     try {
       setIsRefreshing(true);
       
-      const response = await axios.post('http://localhost:5000/refresh-personal-bank-feeds');
+      const response = await axios.post(getApiUrl('/refresh-personal-bank-feeds'));
       
       if (response.data.success) {
         // Show success notification
@@ -1226,7 +1227,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }, 3000);
         
         // Refresh the transactions data
-        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
         
         // Reapply filters to new data
@@ -1920,7 +1921,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         return;
       }
       
-      const response = await axios.post('http://localhost:5000/personal-transactions', transactionData);
+      const response = await axios.post(getApiUrl('/personal-transactions'), transactionData);
       
       if (response.data.success) {
         const addedTransaction = response.data.data;
@@ -2155,7 +2156,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
     
     try {
       setIsLoadingSmartSplit(true);
-      const response = await axios.get('http://localhost:5000/shared-transactions-filtered', {
+      const response = await axios.get(getApiUrl('/shared-transactions-filtered'), {
         params: { ...effectiveFilters, userId }
       });
       
@@ -2328,11 +2329,11 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         }))
       };
       
-      const response = await axios.post('http://localhost:5000/personal-transactions/split', splitData);
+      const response = await axios.post(getApiUrl('/personal-transactions/split'), splitData);
       
       if (response.data.success) {
         // Refresh the transactions
-        const transactionsResponse = await axios.get('http://localhost:5000/personal-transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
         
         // Show success notification
@@ -2630,7 +2631,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
         destBucket: ''
       };
       
-      const response = await axios.post('http://localhost:5000/auto-distribution-rules', newRule);
+      const response = await axios.post(getApiUrl('/auto-distribution-rules'), newRule);
       if (response.data.success) {
         await loadAutoDistributionRules(); // Reload to get updated rules with database IDs
       }
@@ -2642,7 +2643,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   // Remove a distribution rule
   const removeDistributionRule = async (id) => {
     try {
-      const response = await axios.delete(`http://localhost:5000/auto-distribution-rules/${id}`);
+      const response = await axios.delete(getApiUrlWithParams('/auto-distribution-rules/:id', { id }));
       if (response.data.success) {
         await loadAutoDistributionRules(); // Reload to get updated rules
       }
@@ -2663,7 +2664,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       };
       
       const dbField = fieldMap[field] || field;
-      const response = await axios.put(`http://localhost:5000/auto-distribution-rules/${id}`, {
+      const response = await axios.put(getApiUrlWithParams('/auto-distribution-rules/:id', { id }), {
         [dbField]: value
       });
       

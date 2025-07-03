@@ -44,7 +44,7 @@ const ensureSplitColumnsExist = async () => {
         WHERE table_name = 'shared_transactions' 
         AND column_name = 'has_split'
       `);
-      
+
       if (checkSharedHasSplitColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE shared_transactions 
@@ -52,14 +52,14 @@ const ensureSplitColumnsExist = async () => {
         `);
         console.log("Added has_split column to shared_transactions table");
       }
-      
+
       const checkSharedSplitFromColumn = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'shared_transactions' 
         AND column_name = 'split_from_id'
       `);
-      
+
       if (checkSharedSplitFromColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE shared_transactions 
@@ -70,7 +70,7 @@ const ensureSplitColumnsExist = async () => {
     } catch (err) {
       console.error("Error checking/adding columns to shared_transactions:", err);
     }
-    
+
     // Check and add columns for personal_transactions
     try {
       const checkPersonalHasSplitColumn = await client.query(`
@@ -79,7 +79,7 @@ const ensureSplitColumnsExist = async () => {
         WHERE table_name = 'personal_transactions' 
         AND column_name = 'has_split'
       `);
-      
+
       if (checkPersonalHasSplitColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE personal_transactions 
@@ -87,14 +87,14 @@ const ensureSplitColumnsExist = async () => {
         `);
         console.log("Added has_split column to personal_transactions table");
       }
-      
+
       const checkPersonalSplitFromColumn = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'personal_transactions' 
         AND column_name = 'split_from_id'
       `);
-      
+
       if (checkPersonalSplitFromColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE personal_transactions 
@@ -105,7 +105,7 @@ const ensureSplitColumnsExist = async () => {
     } catch (err) {
       console.error("Error checking/adding columns to personal_transactions:", err);
     }
-    
+
     // Check and add columns for offset_transactions
     try {
       const checkOffsetHasSplitColumn = await client.query(`
@@ -114,7 +114,7 @@ const ensureSplitColumnsExist = async () => {
         WHERE table_name = 'offset_transactions' 
         AND column_name = 'has_split'
       `);
-      
+
       if (checkOffsetHasSplitColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE offset_transactions 
@@ -122,14 +122,14 @@ const ensureSplitColumnsExist = async () => {
         `);
         console.log("Added has_split column to offset_transactions table");
       }
-      
+
       const checkOffsetSplitFromColumn = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'offset_transactions' 
         AND column_name = 'split_from_id'
       `);
-      
+
       if (checkOffsetSplitFromColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE offset_transactions 
@@ -190,10 +190,10 @@ const ensureBudgetCategoriesExist = async () => {
     // Check if budget_category table has any data
     const countResult = await client.query('SELECT COUNT(*) as count FROM budget_category');
     const count = parseInt(countResult.rows[0].count);
-    
+
     if (count === 0) {
       console.log('📊 Budget category table is empty, populating with default categories...');
-      
+
       // Common budget categories with default budgets
       const defaultCategories = [
         { category: 'Vehicle', budget: 100.00 },
@@ -210,14 +210,14 @@ const ensureBudgetCategoriesExist = async () => {
         { category: 'Gifts', budget: 150.00 },
         { category: 'Holidays', budget: 300.00 }
       ];
-      
+
       for (const { category, budget } of defaultCategories) {
         await client.query(
           'INSERT INTO budget_category (category, budget) VALUES ($1, $2) ON CONFLICT (category) DO NOTHING',
           [category, budget]
         );
       }
-      
+
       console.log(`✅ Populated budget_category table with ${defaultCategories.length} default categories`);
     } else {
       console.log(`✅ Budget category table already has ${count} categories`);
@@ -258,12 +258,12 @@ const normalizeValue = (value, fieldType = 'string') => {
   if (value === null || value === undefined) {
     return null;
   }
-  
+
   // Handle empty string cases
   if (value === '') {
     return null;
   }
-  
+
   // Handle specific field types
   switch (fieldType) {
     case 'number':
@@ -297,17 +297,17 @@ const normalizeValue = (value, fieldType = 'string') => {
 const valuesAreEqual = (oldValue, newValue, fieldType = 'string') => {
   const normalizedOld = normalizeValue(oldValue, fieldType);
   const normalizedNew = normalizeValue(newValue, fieldType);
-  
+
   // Both are null/undefined/empty - considered equal
   if (normalizedOld === null && normalizedNew === null) {
     return true;
   }
-  
+
   // One is null, other is not - not equal
   if ((normalizedOld === null) !== (normalizedNew === null)) {
     return false;
   }
-  
+
   // Both have values - compare them
   return normalizedOld === normalizedNew;
 };
@@ -343,16 +343,16 @@ const arraysAreEqual = (arr1, arr2) => {
  */
 const resolveCategoryToId = async (client, categoryName, categoryTable) => {
   if (!categoryName || categoryName === '') return null;
-  
+
   const result = await client.query(
     `SELECT id FROM ${categoryTable} WHERE category = $1`,
     [categoryName]
   );
-  
+
   if (result.rows.length === 0) {
     throw new Error(`Category '${categoryName}' not found in ${categoryTable}`);
   }
-  
+
   return result.rows[0].id;
 };
 
@@ -365,22 +365,22 @@ const resolveCategoryNameOrIdToId = async (client, categoryValue, categoryTable)
   if (!categoryValue || categoryValue === '') {
     return null;
   }
-  
+
   // Check if category is already an ID (number)
   if (typeof categoryValue === 'number' || /^\d+$/.test(categoryValue)) {
     return parseInt(categoryValue);
   }
-  
+
   // It's a category name, need to look up the ID
   const result = await client.query(
     `SELECT id FROM ${categoryTable} WHERE category = $1`,
     [categoryValue]
   );
-  
+
   if (result.rows.length === 0) {
     throw new Error(`Category '${categoryValue}' not found in ${categoryTable}`);
   }
-  
+
   return result.rows[0].id;
 };
 
@@ -390,22 +390,22 @@ const resolveCategoryIdToName = async (client, categoryValue, categoryTable) => 
   if (!categoryValue || categoryValue === '') {
     return null;
   }
-  
+
   // Check if it's already a category name (string that's not a number)
   if (typeof categoryValue === 'string' && !/^\d+$/.test(categoryValue)) {
     return categoryValue;
   }
-  
+
   // It's a number/ID, so resolve to name
   const result = await client.query(
     `SELECT category FROM ${categoryTable} WHERE id = $1`,
     [parseInt(categoryValue)]
   );
-  
+
   if (result.rows.length === 0) {
     throw new Error(`Category ID '${categoryValue}' not found in ${categoryTable}`);
   }
-  
+
   return result.rows[0].category;
 };
 
@@ -416,7 +416,7 @@ app.get('/initial-data', async (req, res) => {
   const client = await pool.connect();
   try {
     console.log('Fetching all initial data in single transaction...');
-    
+
     // Execute all queries in parallel using the same connection
     const [
       categoryMappingsResult,
@@ -429,20 +429,20 @@ app.get('/initial-data', async (req, res) => {
       client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC'),
       client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category')
     ]);
-    
+
     // Process the results
     const categoryMappings = {};
     categoryMappingsResult.rows.forEach(row => {
       categoryMappings[row.bank_category] = row.category;
     });
-    
+
     const bankCategories = bankCategoriesResult.rows.map(row => row.bank_category);
     bankCategories.push(null); // Add null as a valid option
-    
+
     const labels = labelsResult.rows.map(row => row.label);
-    
+
     console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories`);
-    
+
     res.json({
       success: true,
       data: {
@@ -454,10 +454,10 @@ app.get('/initial-data', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching initial data:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -469,7 +469,7 @@ app.get('/personal-initial-data', async (req, res) => {
   const client = await pool.connect();
   try {
     console.log('Fetching all personal initial data in single transaction...');
-    
+
     const [
       personalTransactionsResult,
       personalCategoriesResult,
@@ -481,25 +481,25 @@ app.get('/personal-initial-data', async (req, res) => {
       client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', ['default']),
       client.query('SELECT * FROM personal_settings WHERE user_id = $1', ['default'])
     ]);
-    
+
     // Resolve category IDs back to category names for auto distribution rules
     const rulesWithNames = await Promise.all(autoDistributionRulesResult.rows.map(async (rule) => {
-      const sourceBucket = rule.source_bucket ? 
-        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') : 
+      const sourceBucket = rule.source_bucket ?
+        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') :
         null;
-      const destBucket = rule.dest_bucket ? 
-        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') : 
+      const destBucket = rule.dest_bucket ?
+        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') :
         null;
-      
+
       return {
         ...rule,
         source_bucket: sourceBucket,
         dest_bucket: destBucket
       };
     }));
-    
+
     console.log(`Successfully fetched personal data: ${personalTransactionsResult.rows.length} transactions, ${personalCategoriesResult.rows.length} categories, ${autoDistributionRulesResult.rows.length} rules`);
-    
+
     res.json({
       success: true,
       data: {
@@ -511,10 +511,10 @@ app.get('/personal-initial-data', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching personal initial data:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -526,7 +526,7 @@ app.get('/offset-initial-data', async (req, res) => {
   const client = await pool.connect();
   try {
     console.log('Fetching all offset initial data in single transaction...');
-    
+
     const [
       offsetTransactionsResult,
       offsetCategoriesResult,
@@ -537,7 +537,7 @@ app.get('/offset-initial-data', async (req, res) => {
       client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC')
     ]);
     console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories`);
-    
+
     res.json({
       success: true,
       data: {
@@ -548,10 +548,10 @@ app.get('/offset-initial-data', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching offset initial data:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -563,7 +563,7 @@ app.get('/budget-initial-data', async (req, res) => {
   const client = await pool.connect();
   try {
     console.log('Fetching all budget initial data in single transaction...');
-    
+
     const [
       budgetCategoriesResult,
       transactionsResult,
@@ -573,15 +573,15 @@ app.get('/budget-initial-data', async (req, res) => {
       client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM shared_category ORDER BY bank_category')
     ]);
-    
+
     // Process category mappings
     const categoryMappings = {};
     categoryMappingsResult.rows.forEach(row => {
       categoryMappings[row.bank_category] = row.category;
     });
-    
+
     console.log(`Successfully fetched budget data: ${budgetCategoriesResult.rows.length} budget categories, ${transactionsResult.rows.length} transactions`);
-    
+
     res.json({
       success: true,
       data: {
@@ -592,10 +592,10 @@ app.get('/budget-initial-data', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching budget initial data:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -610,10 +610,10 @@ app.get('/transactions', async (req, res) => {
     // Fields to select
     const fields = req.query.fields
       ? req.query.fields
-          .split(',')
-          .map(f => f.trim())
-          .filter(f => allowedFields.includes(f))
-          .join(', ')
+        .split(',')
+        .map(f => f.trim())
+        .filter(f => allowedFields.includes(f))
+        .join(', ')
       : '*';
 
     // Dynamic filtering
@@ -631,7 +631,7 @@ app.get('/transactions', async (req, res) => {
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
     const query = `SELECT ${fields} FROM shared_transactions_generalized ${whereClause}`;
-    
+
     const { rows } = await pool.query(query, values);
 
     res.json(rows);
@@ -648,9 +648,9 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const { transaction_ids, mark_value, date_from, date_to, filters } = req.body;
-    
+
     // Validate that mark_value is provided and is boolean
     if (mark_value === undefined || mark_value === null) {
       await client.query('ROLLBACK');
@@ -659,15 +659,15 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         error: 'mark_value is required and must be a boolean (true/false)'
       });
     }
-    
+
     // Convert mark_value to boolean
     const markBoolean = Boolean(mark_value);
-    
+
     // Build WHERE clause based on provided criteria
     const whereConditions = [];
     const queryParams = [markBoolean]; // First parameter is always the mark value
     let paramIndex = 2;
-    
+
     // Filter by specific transaction IDs if provided
     if (transaction_ids && Array.isArray(transaction_ids) && transaction_ids.length > 0) {
       // Convert IDs to integers to match the database column type
@@ -676,20 +676,20 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
       queryParams.push(intIds);
       paramIndex++;
     }
-    
+
     // Filter by date range if provided
     if (date_from) {
       whereConditions.push(`date >= $${paramIndex}`);
       queryParams.push(date_from);
       paramIndex++;
     }
-    
+
     if (date_to) {
       whereConditions.push(`date <= $${paramIndex}`);
       queryParams.push(date_to);
       paramIndex++;
     }
-    
+
     // Apply additional filters if provided
     if (filters && typeof filters === 'object') {
       for (const [key, value] of Object.entries(filters)) {
@@ -700,7 +700,7 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         }
       }
     }
-    
+
     // Ensure we have at least one condition to prevent updating all records
     if (whereConditions.length === 0) {
       await client.query('ROLLBACK');
@@ -709,15 +709,15 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         error: 'At least one filter condition is required (transaction_ids, date_from, date_to, or filters)'
       });
     }
-    
+
     const whereClause = whereConditions.join(' AND ');
-    
+
     // First, get the transactions that will be updated for logging
     // Build separate query params for the SELECT (without mark_value)
     const selectQueryParams = [];
     const selectWhereConditions = [];
     let selectParamIndex = 1;
-    
+
     // Rebuild WHERE clause for SELECT query (without mark_value parameter)
     if (transaction_ids && Array.isArray(transaction_ids) && transaction_ids.length > 0) {
       const intIds = transaction_ids.map(id => parseInt(id, 10));
@@ -725,19 +725,19 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
       selectQueryParams.push(intIds);
       selectParamIndex++;
     }
-    
+
     if (date_from) {
       selectWhereConditions.push(`date >= $${selectParamIndex}`);
       selectQueryParams.push(date_from);
       selectParamIndex++;
     }
-    
+
     if (date_to) {
       selectWhereConditions.push(`date <= $${selectParamIndex}`);
       selectQueryParams.push(date_to);
       selectParamIndex++;
     }
-    
+
     if (filters && typeof filters === 'object') {
       for (const [key, value] of Object.entries(filters)) {
         if (allowedFields.includes(key) && key !== 'mark') {
@@ -747,13 +747,13 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         }
       }
     }
-    
+
     const selectWhereClause = selectWhereConditions.join(' AND ');
     const selectQuery = `SELECT id, date, description, amount, mark FROM shared_transactions WHERE ${selectWhereClause}`;
-    
+
     const selectResult = await client.query(selectQuery, selectQueryParams);
     const transactionsToUpdate = selectResult.rows;
-    
+
     if (transactionsToUpdate.length === 0) {
       await client.query('ROLLBACK');
       return res.json({
@@ -763,10 +763,10 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         transactions: []
       });
     }
-    
+
     // Count how many will actually change
     const transactionsToChange = transactionsToUpdate.filter(tx => tx.mark !== markBoolean);
-    
+
     if (transactionsToChange.length === 0) {
       await client.query('ROLLBACK');
       return res.json({
@@ -777,7 +777,7 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         optimized: true
       });
     }
-    
+
     // Execute the bulk update
     const updateQuery = `
       UPDATE shared_transactions 
@@ -786,16 +786,16 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
       AND mark != $1
       RETURNING id, date, description, amount, mark
     `;
-    
+
     console.log('Update query:', updateQuery);
     console.log('Update query params:', queryParams);
     const updateResult = await client.query(updateQuery, queryParams);
     const updatedTransactions = updateResult.rows;
-    
+
     await client.query('COMMIT');
-    
+
     console.log(`✅ Bulk updated ${updatedTransactions.length} transactions with mark=${markBoolean}`);
-    
+
     res.json({
       success: true,
       message: `Successfully updated ${updatedTransactions.length} transactions`,
@@ -809,7 +809,7 @@ app.put('/transactions/bulk-update-mark', async (req, res) => {
         additional_filters: filters ? Object.keys(filters).length : 0
       }
     });
-    
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error in bulk update mark:', err);
@@ -832,33 +832,33 @@ app.put('/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
+
     // Validate the transaction exists first and get current values from the generalized view
     const checkResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
       });
     }
-    
+
     const currentTransaction = checkResult.rows[0];
-    
+
     // Process and validate field updates
     const validUpdates = {};
     const errors = [];
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       // Only process allowed fields
       if (!allowedFields.includes(key)) {
         errors.push(`Field "${key}" is not allowed for updates`);
         continue;
       }
-      
+
       const fieldType = getFieldType(key);
       let processedValue = value;
-      
+
       // Type validation and conversions based on field type
       switch (key) {
         case 'amount':
@@ -876,7 +876,7 @@ app.put('/transactions/:id', async (req, res) => {
             }
           }
           break;
-          
+
         case 'date':
           // Handle empty values
           if (value === null || value === undefined || value === '') {
@@ -897,12 +897,12 @@ app.put('/transactions/:id', async (req, res) => {
             }
           }
           break;
-          
+
         case 'label':
           // Allow empty labels (null), which can be edited later
           processedValue = value === '' ? null : value;
           break;
-          
+
         case 'mark':
           // Handle boolean mark field
           if (value === null || value === undefined || value === '') {
@@ -917,7 +917,7 @@ app.put('/transactions/:id', async (req, res) => {
             processedValue = Boolean(value);
           }
           break;
-          
+
         default:
           // Basic validation for other fields
           if (typeof value === 'string') {
@@ -927,7 +927,7 @@ app.put('/transactions/:id', async (req, res) => {
             processedValue = value;
           }
       }
-      
+
       // OPTIMIZATION: Check if the value has actually changed
       if (!valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
         validUpdates[key] = processedValue;
@@ -937,15 +937,15 @@ app.put('/transactions/:id', async (req, res) => {
         console.log(`Field '${key}' unchanged: '${currentTransaction[key]}' (skipping update)`);
       }
     }
-    
+
     // If there are validation errors, return them
     if (errors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors 
+      return res.status(400).json({
+        success: false,
+        errors: errors
       });
     }
-    
+
     // OPTIMIZATION: If no fields actually changed, return early without database operation
     if (!hasChanges) {
       console.log(`No changes detected for transaction ${id}, skipping database update`);
@@ -956,38 +956,38 @@ app.put('/transactions/:id', async (req, res) => {
         optimized: true // Flag to indicate this was an optimized response
       });
     }
-    
+
     // If no valid updates after validation, return error
     if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     // Build query for database update (update the base table)
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
-    
+
     const values = [...Object.values(validUpdates), id];
     const query = `UPDATE shared_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
-    
+
     console.log(`Executing database update for transaction ${id} with changes:`, validUpdates);
-    
+
     // Execute the update
     const { rows } = await pool.query(query, values);
-    
+
     if (rows.length === 0) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Update failed' 
+      return res.status(500).json({
+        success: false,
+        error: 'Update failed'
       });
     }
-    
+
     // Get the updated transaction from the generalized view to return complete data
     const updatedResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [id]);
-    
+
     // Return success with updated transaction data from generalized view
     res.json({
       success: true,
@@ -997,10 +997,10 @@ app.put('/transactions/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -1014,66 +1014,66 @@ app.put('/personal-transactions/:id', async (req, res) => {
     await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
-    
+
     const allowedFields = ['date', 'description', 'amount', 'category'];
-    
+
     // Get current transaction for comparison
     const checkResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
       });
     }
-    
+
     const currentTransaction = checkResult.rows[0];
     const validUpdates = {};
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         const fieldType = getFieldType(key);
         let processedValue = value;
-        
+
         // Special handling for category field
         if (key === 'category') {
           try {
             processedValue = await resolveCategoryNameOrIdToId(client, value, 'personal_category');
-            
+
             // For comparison, compare the category name, not the ID  
             if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
               validUpdates[key] = processedValue;  // Store category ID in updates
               hasChanges = true;
               console.log(`Personal transaction field '${key}' changed: '${currentTransaction[key]}' -> '${value}' (ID: ${processedValue})`);
             }
-            
+
             // Skip the general comparison for category
             continue;
           } catch (err) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ 
-              success: false, 
-              error: err.message 
+            return res.status(400).json({
+              success: false,
+              error: err.message
             });
           }
         } else {
           // Process the value based on field type for non-category fields
           if (fieldType === 'number') {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : parseFloat(value);
           } else if (fieldType === 'date') {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : new Date(value).toISOString().split('T')[0];
           } else {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : (typeof value === 'string' ? value.trim() || null : value);
           }
         }
-        
+
         // OPTIMIZATION: Check if the value has actually changed (skip for category as it's handled above)
         if (key !== 'category' && !valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
           validUpdates[key] = processedValue;
@@ -1082,7 +1082,7 @@ app.put('/personal-transactions/:id', async (req, res) => {
         }
       }
     }
-    
+
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
       await client.query('ROLLBACK');
@@ -1094,40 +1094,40 @@ app.put('/personal-transactions/:id', async (req, res) => {
         optimized: true
       });
     }
-    
+
     if (Object.keys(validUpdates).length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
-    
+
     const values = [...Object.values(validUpdates), id];
     const query = `UPDATE personal_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
-    
+
     console.log(`Executing database update for personal transaction ${id} with changes:`, validUpdates);
-    
+
     const updateResult = await client.query(query, values);
-    
+
     if (updateResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
       });
     }
-    
+
     // Fetch updated data from the generalized view to return to the client
     const updatedResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [id]);
     const updatedTransaction = updatedResult.rows[0];
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       data: updatedTransaction,
@@ -1137,10 +1137,10 @@ app.put('/personal-transactions/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error updating personal transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -1156,66 +1156,66 @@ app.put('/offset-transactions/:id', async (req, res) => {
     await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
-    
+
     const allowedFields = ['date', 'description', 'amount', 'category', 'label'];
-    
+
     // Get current transaction for comparison
     const checkResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
       });
     }
-    
+
     const currentTransaction = checkResult.rows[0];
     const validUpdates = {};
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         const fieldType = getFieldType(key);
         let processedValue = value;
-        
+
         // Special handling for category field
         if (key === 'category') {
           try {
             processedValue = await resolveCategoryNameOrIdToId(client, value, 'offset_category');
-            
+
             // For comparison, compare the category name, not the ID
             if (!valuesAreEqual(currentTransaction[key], value, fieldType)) {
               validUpdates[key] = processedValue;  // Store category ID in updates
               hasChanges = true;
               console.log(`Offset transaction field '${key}' changed: '${currentTransaction[key]}' -> '${value}' (ID: ${processedValue})`);
             }
-            
+
             // Skip the general comparison for category
             continue;
           } catch (err) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ 
-              success: false, 
-              error: err.message 
+            return res.status(400).json({
+              success: false,
+              error: err.message
             });
           }
         } else {
           // Process the value based on field type for non-category fields
           if (fieldType === 'number') {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : parseFloat(value);
           } else if (fieldType === 'date') {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : new Date(value).toISOString().split('T')[0];
           } else {
-            processedValue = value === null || value === undefined || value === '' 
-              ? null 
+            processedValue = value === null || value === undefined || value === ''
+              ? null
               : (typeof value === 'string' ? value.trim() || null : value);
           }
         }
-        
+
         // OPTIMIZATION: Check if the value has actually changed (skip for category as it's handled above)
         if (key !== 'category' && !valuesAreEqual(currentTransaction[key], processedValue, fieldType)) {
           validUpdates[key] = processedValue;
@@ -1224,7 +1224,7 @@ app.put('/offset-transactions/:id', async (req, res) => {
         }
       }
     }
-    
+
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
       await client.query('ROLLBACK');
@@ -1236,40 +1236,40 @@ app.put('/offset-transactions/:id', async (req, res) => {
         optimized: true
       });
     }
-    
+
     if (Object.keys(validUpdates).length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
-    
+
     const values = [...Object.values(validUpdates), id];
     const query = `UPDATE offset_transactions SET ${setClause} WHERE id = $${values.length} RETURNING *`;
-    
+
     console.log(`Executing database update for offset transaction ${id} with changes:`, validUpdates);
-    
+
     const updateResult = await client.query(query, values);
-    
+
     if (updateResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Transaction not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
       });
     }
-    
+
     // Fetch updated data from the generalized view to return to the client
     const updatedResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [id]);
     const updatedTransaction = updatedResult.rows[0];
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       data: updatedTransaction,
@@ -1279,10 +1279,10 @@ app.put('/offset-transactions/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error updating offset transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -1296,28 +1296,28 @@ app.put('/budget-categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { budget } = req.body;
-    
+
     // Validate budget is a number
     if (budget === undefined || budget === null || isNaN(parseFloat(budget))) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Budget amount is required and must be a valid number' 
+      return res.status(400).json({
+        success: false,
+        error: 'Budget amount is required and must be a valid number'
       });
     }
-    
+
     const budgetValue = parseFloat(budget);
-    
+
     // Get current budget for comparison
     const checkResult = await pool.query('SELECT * FROM budget_category WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Budget category not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Budget category not found'
       });
     }
-    
+
     const currentBudget = checkResult.rows[0];
-    
+
     // OPTIMIZATION: Check if the budget value has actually changed
     if (valuesAreEqual(currentBudget.budget, budgetValue, 'number')) {
       console.log(`No changes detected for budget category ${id} (${budgetValue}), skipping database update`);
@@ -1328,15 +1328,15 @@ app.put('/budget-categories/:id', async (req, res) => {
         optimized: true
       });
     }
-    
+
     console.log(`Budget category ${id} changed: ${currentBudget.budget} -> ${budgetValue}`);
-    
+
     // Update the budget amount
     const { rows } = await pool.query(
       'UPDATE budget_category SET budget = $1 WHERE id = $2 RETURNING id, category, budget',
       [budgetValue, id]
     );
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -1344,10 +1344,10 @@ app.put('/budget-categories/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating budget category:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -1359,10 +1359,10 @@ app.put('/personal-settings/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const updates = req.body;
-    
+
     const allowedFields = [
       'hide_zero_balance_buckets',
-      'enable_negative_offset_bucket', 
+      'enable_negative_offset_bucket',
       'selected_negative_offset_bucket',
       'category_order',
       'auto_distribution_enabled',
@@ -1370,11 +1370,11 @@ app.put('/personal-settings/:userId', async (req, res) => {
       'personal_split_enabled',
       'personal_split_default_days'
     ];
-    
+
     // Check if settings exist for this user and get current values
     const checkQuery = 'SELECT * FROM personal_settings WHERE user_id = $1';
     const checkResult = await pool.query(checkQuery, [userId]);
-    
+
     let currentSettings = null;
     if (checkResult.rows.length > 0) {
       currentSettings = checkResult.rows[0];
@@ -1387,18 +1387,18 @@ app.put('/personal-settings/:userId', async (req, res) => {
         }
       }
     }
-    
+
     const validUpdates = {};
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         let processedValue = value;
-        
+
         // Special handling for category_order to ensure it's properly stored as JSON
         if (key === 'category_order' && Array.isArray(value)) {
           processedValue = JSON.stringify(value);
-          
+
           // For comparison, we need to compare the actual arrays
           const currentArrayValue = currentSettings ? currentSettings.category_order : [];
           if (!arraysAreEqual(currentArrayValue, value)) {
@@ -1417,11 +1417,11 @@ app.put('/personal-settings/:userId', async (req, res) => {
         }
       }
     }
-    
+
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
       console.log(`No changes detected for user settings ${userId}, skipping database update`);
-      
+
       let responseData = currentSettings || {
         user_id: userId,
         hide_zero_balance_buckets: false,
@@ -1433,7 +1433,7 @@ app.put('/personal-settings/:userId', async (req, res) => {
         personal_split_enabled: false,
         personal_split_default_days: 7
       };
-      
+
       return res.json({
         success: true,
         data: responseData,
@@ -1441,35 +1441,35 @@ app.put('/personal-settings/:userId', async (req, res) => {
         optimized: true
       });
     }
-    
+
     if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     let query, values;
-    
+
     if (checkResult.rows.length === 0) {
       // Insert new settings
       const fields = ['user_id', ...Object.keys(validUpdates)];
       const placeholders = fields.map((field, index) => `$${index + 1}`);
       values = [userId, ...Object.values(validUpdates)];
-      
+
       query = `
         INSERT INTO personal_settings (${fields.join(', ')})
         VALUES (${placeholders.join(', ')})
         RETURNING *
       `;
-      
+
       console.log(`Creating new personal settings for user ${userId} with:`, validUpdates);
     } else {
       // Update existing settings
       const setClause = Object.entries(validUpdates).map(
         ([key, _], index) => `${key} = $${index + 1}`
       ).join(', ');
-      
+
       values = [...Object.values(validUpdates), userId];
       query = `
         UPDATE personal_settings 
@@ -1477,12 +1477,12 @@ app.put('/personal-settings/:userId', async (req, res) => {
         WHERE user_id = $${values.length} 
         RETURNING *
       `;
-      
+
       console.log(`Executing database update for personal settings ${userId} with changes:`, validUpdates);
     }
-    
+
     const { rows } = await pool.query(query, values);
-    
+
     // Parse JSON fields back to objects/arrays before returning
     const settings = rows[0];
     if (settings.category_order && typeof settings.category_order === 'string') {
@@ -1492,7 +1492,7 @@ app.put('/personal-settings/:userId', async (req, res) => {
         settings.category_order = [];
       }
     }
-    
+
     res.json({
       success: true,
       data: settings,
@@ -1501,10 +1501,10 @@ app.put('/personal-settings/:userId', async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating personal settings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -1515,35 +1515,35 @@ app.put('/personal-settings/:userId', async (req, res) => {
 app.post('/transactions', async (req, res) => {
   try {
     const transaction = req.body;
-    
+
     // List of required fields for validation
     const requiredFields = ['date', 'description', 'amount'];
-    
+
     // Validation: Ensure all required fields are present
     const validFields = {};
     const errors = [];
-    
+
     for (const field of requiredFields) {
       if (!transaction.hasOwnProperty(field)) {
         errors.push(`Field "${field}" is required`);
       }
     }
-    
+
     // If there are missing fields, return validation error
     if (errors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors 
+      return res.status(400).json({
+        success: false,
+        errors: errors
       });
     }
-    
+
     // Process and validate each field
     for (const [key, value] of Object.entries(transaction)) {
       // Only process allowed fields
       if (!allowedFields.includes(key)) {
         continue;
       }
-      
+
       // Type validation and conversions based on field type
       switch (key) {
         case 'amount':
@@ -1560,7 +1560,7 @@ app.post('/transactions', async (req, res) => {
             }
           }
           break;
-          
+
         case 'date':
           // Handle empty values
           if (value === null || value === undefined || value === '') {
@@ -1579,12 +1579,12 @@ app.post('/transactions', async (req, res) => {
             }
           }
           break;
-          
+
         case 'label':
           // Allow empty labels (null), which can be edited later
           validFields[key] = value === '' ? null : value;
           break;
-          
+
         case 'mark':
           // Handle boolean mark field for new transactions
           if (value === null || value === undefined || value === '') {
@@ -1599,7 +1599,7 @@ app.post('/transactions', async (req, res) => {
             validFields[key] = Boolean(value);
           }
           break;
-          
+
         default:
           // Basic validation for other fields
           if (typeof value === 'string') {
@@ -1610,40 +1610,40 @@ app.post('/transactions', async (req, res) => {
           }
       }
     }
-    
+
     // If there are validation errors, return them
     if (errors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors 
+      return res.status(400).json({
+        success: false,
+        errors: errors
       });
     }
-    
+
     // Build query for inserting the new transaction (insert into base table)
     const fields = Object.keys(validFields);
     const placeholders = fields.map((field, index) => `$${index + 1}`);
     const values = Object.values(validFields);
-    
+
     const query = `
       INSERT INTO shared_transactions (${fields.join(', ')})
       VALUES (${placeholders.join(', ')})
       RETURNING *
     `;
-    
+
     // Execute the insert
     const { rows } = await pool.query(query, values);
-    
+
     if (rows.length === 0) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Insert failed' 
+      return res.status(500).json({
+        success: false,
+        error: 'Insert failed'
       });
     }
-    
+
     // Get the complete transaction data from the generalized view
     const newTransactionId = rows[0].id;
     const completeResult = await pool.query('SELECT * FROM shared_transactions_generalized WHERE id = $1', [newTransactionId]);
-    
+
     // Return success with new transaction data from generalized view
     res.status(201).json({
       success: true,
@@ -1652,10 +1652,10 @@ app.post('/transactions', async (req, res) => {
     });
   } catch (err) {
     console.error('Error creating transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -1686,13 +1686,13 @@ app.get('/category-mappings', async (req, res) => {
       WHERE bank_category IS NOT NULL AND category IS NOT NULL
       ORDER BY bank_category
     `);
-    
+
     // Convert the rows to a mapping object for easier consumption by the frontend
     const mappings = {};
     rows.forEach(row => {
       mappings[row.bank_category] = row.category;
     });
-    
+
     res.json(mappings);
   } catch (err) {
     console.error('Error fetching category mappings:', err);
@@ -1717,18 +1717,18 @@ app.get('/bank-categories', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category');
     const bankCategories = rows.map(row => row.bank_category);
-    
+
     // Add null as a valid option
     bankCategories.push(null);
-    
+
     console.log(`Successfully fetched ${bankCategories.length} bank categories`);
     res.json(bankCategories);
   } catch (err) {
     console.error('Error fetching bank categories:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -1740,18 +1740,18 @@ app.post('/refresh-shared-bank-feeds', async (req, res) => {
   try {
     // Path to the Python script
     const scriptPath = path.join(__dirname, 'shared_bank_feed.py');
-    
+
     console.log('Refreshing bank feeds data...');
-    
+
     // Execute the Python script using the promisified exec function
     const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
-    
+
     if (stderr) {
       console.warn(`Python script warnings: ${stderr}`);
     }
-    
+
     console.log(`Python script output: ${stdout}`);
-    
+
     // Check if there's a success message in the output
     if (stdout.includes('Transactions inserted successfully')) {
       return res.status(200).json({
@@ -1784,18 +1784,18 @@ app.post('/refresh-personal-bank-feeds', async (req, res) => {
   try {
     // Path to the Python script
     const scriptPath = path.join(__dirname, 'personal_bank_feed.py');
-    
+
     console.log('Refreshing personal bank feeds data...');
-    
+
     // Execute the Python script using the promisified exec function
     const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
-    
+
     if (stderr) {
       console.warn(`Python script warnings: ${stderr}`);
     }
-    
+
     console.log(`Python script output: ${stdout}`);
-    
+
     // Check if there's a success message in the output
     if (stdout.includes('Successfully processed') && stdout.includes('personal transactions')) {
       return res.status(200).json({
@@ -1857,41 +1857,41 @@ app.post('/personal-transactions', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { date, description, amount, category } = req.body;
-    
+
     if (!date || !description || amount === undefined) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        errors: ['Date, description, and amount are required'] 
+      return res.status(400).json({
+        success: false,
+        errors: ['Date, description, and amount are required']
       });
     }
-    
+
     // Handle category conversion from name to ID
     let categoryId;
     try {
       categoryId = await resolveCategoryNameOrIdToId(client, category, 'personal_category');
     } catch (err) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: err.message 
+      return res.status(400).json({
+        success: false,
+        error: err.message
       });
     }
-    
+
     const query = `
       INSERT INTO personal_transactions (date, description, amount, category)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
-    
+
     const { rows } = await client.query(query, [date, description, amount, categoryId]);
-    
+
     // Get the complete transaction data from the generalized view
     const newTransactionId = rows[0].id;
     const completeResult = await client.query('SELECT * FROM personal_transactions_generalized WHERE id = $1', [newTransactionId]);
-    
+
     await client.query('COMMIT');
-    
+
     res.status(201).json({
       success: true,
       data: completeResult.rows[0],
@@ -1900,10 +1900,10 @@ app.post('/personal-transactions', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error creating personal transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -1915,12 +1915,12 @@ app.post('/personal-transactions', async (req, res) => {
  */
 app.post('/personal-transactions/split', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
-    
+
     // Validate input data
     if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
       return res.status(400).json({
@@ -1928,13 +1928,13 @@ app.post('/personal-transactions/split', async (req, res) => {
         error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
       });
     }
-    
+
     // Check if the original transaction exists
     const originalResult = await client.query(
       'SELECT * FROM personal_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
-    
+
     if (originalResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({
@@ -1942,20 +1942,20 @@ app.post('/personal-transactions/split', async (req, res) => {
         error: 'Original transaction not found'
       });
     }
-    
+
     const originalTransaction = originalResult.rows[0];
     const originalAmount = parseFloat(originalTransaction.amount);
     const isNegative = originalAmount < 0; // Track if original amount is negative
-    
+
     // Validate split transactions
     let splitTotal = 0;
     const errors = [];
-    
+
     splitTransactions.forEach((split, index) => {
       if (!split.description || !split.amount || !split.category) {
         errors.push(`Split #${index + 1}: Description, amount, and category are required`);
       }
-      
+
       // Convert amount to absolute value for validation
       const amount = Math.abs(parseFloat(split.amount));
       if (isNaN(amount) || amount <= 0) {
@@ -1964,7 +1964,7 @@ app.post('/personal-transactions/split', async (req, res) => {
         splitTotal += amount;
       }
     });
-    
+
     // Check if there are validation errors
     if (errors.length > 0) {
       await client.query('ROLLBACK');
@@ -1973,14 +1973,14 @@ app.post('/personal-transactions/split', async (req, res) => {
         errors: errors
       });
     }
-    
+
     // Calculate the total of splits + remaining amount
     const totalSplitAndRemaining = Math.abs(remainingAmount) + splitTotal;
-    
+
     // Verify that the splits + remaining amount match the original transaction amount (within a small tolerance)
     const tolerance = 0.01; // 1 cent tolerance for floating-point issues
     const absOriginalAmount = Math.abs(originalAmount);
-    
+
     if (Math.abs(totalSplitAndRemaining - absOriginalAmount) > tolerance) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -1988,27 +1988,27 @@ app.post('/personal-transactions/split', async (req, res) => {
         error: `The total of splits and remaining amount (${totalSplitAndRemaining.toFixed(2)}) does not match the original transaction amount (${absOriginalAmount.toFixed(2)})`
       });
     }
-    
+
     // Create the split transactions
     const createdTransactions = [];
-    
+
     for (const split of splitTransactions) {
       const splitAmount = parseFloat(split.amount);
       // Ensure the split amount has the correct sign
       const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
-      
+
       // Handle category conversion from name to ID
       let categoryId;
       try {
         categoryId = await resolveCategoryNameOrIdToId(client, split.category, 'personal_category');
       } catch (err) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          success: false, 
-          error: err.message 
+        return res.status(400).json({
+          success: false,
+          error: err.message
         });
       }
-      
+
       const insertResult = await client.query(
         `INSERT INTO personal_transactions 
          (date, description, amount, category, split_from_id)
@@ -2022,19 +2022,19 @@ app.post('/personal-transactions/split', async (req, res) => {
           originalTransactionId // Set the split_from_id to the original transaction id
         ]
       );
-      
+
       if (insertResult.rows.length === 0) {
         throw new Error(`Failed to create split transaction #${createdTransactions.length + 1}`);
       }
-      
+
       createdTransactions.push(insertResult.rows[0]);
     }
-    
+
     // Update the original transaction amount if there's a remaining amount
     if (Math.abs(remainingAmount) > 0) {
       // Ensure the remaining amount has the same sign as the original transaction
       const newAmount = isNegative ? -Math.abs(remainingAmount) : Math.abs(remainingAmount);
-      
+
       const updateResult = await client.query(
         `UPDATE personal_transactions 
          SET amount = $1, has_split = $2
@@ -2046,7 +2046,7 @@ app.post('/personal-transactions/split', async (req, res) => {
           originalTransactionId
         ]
       );
-      
+
       if (updateResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(500).json({
@@ -2063,9 +2063,9 @@ app.post('/personal-transactions/split', async (req, res) => {
         [0, true, originalTransactionId]
       );
     }
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       message: 'Transaction split successfully',
@@ -2076,7 +2076,7 @@ app.post('/personal-transactions/split', async (req, res) => {
         remainingAmount: isNegative ? -Math.abs(remainingAmount) : Math.abs(remainingAmount) // Ensure remaining amount has correct sign
       }
     });
-    
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error splitting transaction:', err);
@@ -2097,18 +2097,18 @@ app.post('/refresh-offset-bank-feeds', async (req, res) => {
   try {
     // Path to the Python script
     const scriptPath = path.join(__dirname, 'offset_bank_feed.py');
-    
+
     console.log('Refreshing offset bank feeds data...');
-    
+
     // Execute the Python script using the promisified exec function
     const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
-    
+
     if (stderr) {
       console.warn(`Python script warnings: ${stderr}`);
     }
-    
+
     console.log(`Python script output: ${stdout}`);
-    
+
     // Check if there's a success message in the output
     if (stdout.includes('Successfully processed') && stdout.includes('offset transactions')) {
       return res.status(200).json({
@@ -2170,41 +2170,41 @@ app.post('/offset-transactions', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { date, description, amount, category, label } = req.body;
-    
+
     if (!date || !description || amount === undefined) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        errors: ['Date, description, and amount are required'] 
+      return res.status(400).json({
+        success: false,
+        errors: ['Date, description, and amount are required']
       });
     }
-    
+
     // Handle category conversion from name to ID
     let categoryId;
     try {
       categoryId = await resolveCategoryNameOrIdToId(client, category, 'offset_category');
     } catch (err) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: err.message 
+      return res.status(400).json({
+        success: false,
+        error: err.message
       });
     }
-    
+
     const query = `
       INSERT INTO offset_transactions (date, description, amount, category, label)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
-    
+
     const { rows } = await client.query(query, [date, description, amount, categoryId, label]);
-    
+
     // Get the complete transaction data from the generalized view
     const newTransactionId = rows[0].id;
     const completeResult = await client.query('SELECT * FROM offset_transactions_generalized WHERE id = $1', [newTransactionId]);
-    
+
     await client.query('COMMIT');
-    
+
     res.status(201).json({
       success: true,
       data: completeResult.rows[0],
@@ -2213,10 +2213,10 @@ app.post('/offset-transactions', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error creating offset transaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -2228,12 +2228,12 @@ app.post('/offset-transactions', async (req, res) => {
  */
 app.post('/offset-transactions/split', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
-    
+
     // Validate input data
     if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
       return res.status(400).json({
@@ -2241,13 +2241,13 @@ app.post('/offset-transactions/split', async (req, res) => {
         error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
       });
     }
-    
+
     // Check if the original transaction exists
     const originalResult = await client.query(
       'SELECT * FROM offset_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
-    
+
     if (originalResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({
@@ -2255,20 +2255,20 @@ app.post('/offset-transactions/split', async (req, res) => {
         error: 'Original transaction not found'
       });
     }
-    
+
     const originalTransaction = originalResult.rows[0];
     const originalAmount = parseFloat(originalTransaction.amount);
     const isNegative = originalAmount < 0; // Track if original amount is negative
-    
+
     // Validate split transactions
     let splitTotal = 0;
     const errors = [];
-    
+
     splitTransactions.forEach((split, index) => {
       if (!split.description || !split.amount || !split.category) {
         errors.push(`Split #${index + 1}: Description, amount, and category are required`);
       }
-      
+
       // Convert amount to absolute value for validation
       const amount = Math.abs(parseFloat(split.amount));
       if (isNaN(amount) || amount <= 0) {
@@ -2277,7 +2277,7 @@ app.post('/offset-transactions/split', async (req, res) => {
         splitTotal += amount;
       }
     });
-    
+
     // Check if there are validation errors
     if (errors.length > 0) {
       await client.query('ROLLBACK');
@@ -2286,17 +2286,17 @@ app.post('/offset-transactions/split', async (req, res) => {
         errors: errors
       });
     }
-    
+
     // Convert remaining amount to absolute value for comparison
     const absRemainingAmount = Math.abs(parseFloat(remainingAmount));
-    
+
     // Calculate the total of splits + remaining amount
     const totalSplitAndRemaining = absRemainingAmount + splitTotal;
-    
+
     // Verify that the splits + remaining amount match the original transaction amount (within a small tolerance)
     const tolerance = 0.01; // 1 cent tolerance for floating-point issues
     const absOriginalAmount = Math.abs(originalAmount);
-    
+
     if (Math.abs(totalSplitAndRemaining - absOriginalAmount) > tolerance) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -2304,27 +2304,27 @@ app.post('/offset-transactions/split', async (req, res) => {
         error: `The total of splits and remaining amount (${totalSplitAndRemaining.toFixed(2)}) does not match the original transaction amount (${absOriginalAmount.toFixed(2)})`
       });
     }
-    
+
     // Create the split transactions
     const createdTransactions = [];
-    
+
     for (const split of splitTransactions) {
       const splitAmount = parseFloat(split.amount);
       // Ensure the split amount has the correct sign
       const adjustedAmount = isNegative ? -Math.abs(splitAmount) : Math.abs(splitAmount);
-      
+
       // Handle category conversion from name to ID
       let categoryId;
       try {
         categoryId = await resolveCategoryNameOrIdToId(client, split.category, 'offset_category');
       } catch (err) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          success: false, 
-          error: err.message 
+        return res.status(400).json({
+          success: false,
+          error: err.message
         });
       }
-      
+
       const insertResult = await client.query(
         `INSERT INTO offset_transactions 
          (date, description, amount, category, label, split_from_id)
@@ -2339,19 +2339,19 @@ app.post('/offset-transactions/split', async (req, res) => {
           originalTransactionId // Set the split_from_id to the original transaction id
         ]
       );
-      
+
       if (insertResult.rows.length === 0) {
         throw new Error(`Failed to create split transaction #${createdTransactions.length + 1}`);
       }
-      
+
       createdTransactions.push(insertResult.rows[0]);
     }
-    
+
     // Update the original transaction amount if there's a remaining amount
     if (absRemainingAmount > 0) {
       // Ensure the remaining amount has the same sign as the original transaction
       const newAmount = isNegative ? -absRemainingAmount : absRemainingAmount;
-      
+
       const updateResult = await client.query(
         `UPDATE offset_transactions 
          SET amount = $1, has_split = $2
@@ -2363,7 +2363,7 @@ app.post('/offset-transactions/split', async (req, res) => {
           originalTransactionId
         ]
       );
-      
+
       if (updateResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(500).json({
@@ -2380,9 +2380,9 @@ app.post('/offset-transactions/split', async (req, res) => {
         [0, true, originalTransactionId]
       );
     }
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       message: 'Transaction split successfully',
@@ -2393,7 +2393,7 @@ app.post('/offset-transactions/split', async (req, res) => {
         remainingAmount: isNegative ? -absRemainingAmount : absRemainingAmount // Ensure remaining amount has correct sign
       }
     });
-    
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error splitting transaction:', err);
@@ -2415,10 +2415,10 @@ app.post('/offset-transactions/split', async (req, res) => {
 app.get('/personal-settings/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const query = 'SELECT * FROM personal_settings WHERE user_id = $1';
     const { rows } = await pool.query(query, [userId]);
-    
+
     if (rows.length === 0) {
       // Return default settings if none exist
       return res.json({
@@ -2436,7 +2436,7 @@ app.get('/personal-settings/:userId', async (req, res) => {
         }
       });
     }
-    
+
     // Parse JSON fields back to objects/arrays
     const settings = rows[0];
     if (settings.category_order && typeof settings.category_order === 'string') {
@@ -2447,17 +2447,17 @@ app.get('/personal-settings/:userId', async (req, res) => {
         settings.category_order = [];
       }
     }
-    
+
     res.json({
       success: true,
       data: settings
     });
   } catch (err) {
     console.error('Error fetching personal settings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -2469,36 +2469,36 @@ app.get('/auto-distribution-rules/:userId', async (req, res) => {
   const client = await pool.connect();
   try {
     const { userId } = req.params;
-    
+
     const query = 'SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id';
     const { rows } = await client.query(query, [userId]);
-    
+
     // Resolve category IDs back to category names
     const rulesWithNames = await Promise.all(rows.map(async (rule) => {
-      const sourceBucket = rule.source_bucket ? 
-        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') : 
+      const sourceBucket = rule.source_bucket ?
+        await resolveCategoryIdToName(client, rule.source_bucket, 'personal_category') :
         null;
-      const destBucket = rule.dest_bucket ? 
-        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') : 
+      const destBucket = rule.dest_bucket ?
+        await resolveCategoryIdToName(client, rule.dest_bucket, 'personal_category') :
         null;
-      
+
       return {
         ...rule,
         source_bucket: sourceBucket,
         dest_bucket: destBucket
       };
     }));
-    
+
     res.json({
       success: true,
       data: rulesWithNames
     });
   } catch (err) {
     console.error('Error fetching auto distribution rules:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -2513,49 +2513,49 @@ app.post('/auto-distribution-rules', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { user_id, rule_name, amount, source_bucket, dest_bucket } = req.body;
-    
+
     if (!user_id || !rule_name) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User ID and rule name are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'User ID and rule name are required'
       });
     }
-    
+
     // Convert source_bucket from name to ID
     let sourceBucketId;
     try {
       sourceBucketId = await resolveCategoryNameOrIdToId(client, source_bucket, 'personal_category');
     } catch (err) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: err.message 
+      return res.status(400).json({
+        success: false,
+        error: err.message
       });
     }
-    
+
     // Convert dest_bucket from name to ID
     let destBucketId;
     try {
       destBucketId = await resolveCategoryNameOrIdToId(client, dest_bucket, 'personal_category');
     } catch (err) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: err.message 
+      return res.status(400).json({
+        success: false,
+        error: err.message
       });
     }
-    
+
     const query = `
       INSERT INTO auto_distribution_rules (user_id, rule_name, amount, source_bucket, dest_bucket)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
-    
+
     const { rows } = await client.query(query, [user_id, rule_name, amount, sourceBucketId, destBucketId]);
-    
+
     await client.query('COMMIT');
-    
+
     res.status(201).json({
       success: true,
       data: rows[0],
@@ -2564,10 +2564,10 @@ app.post('/auto-distribution-rules', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error creating auto distribution rule:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -2583,27 +2583,27 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
     await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
-    
+
     const allowedFields = ['rule_name', 'amount', 'source_bucket', 'dest_bucket'];
-    
+
     // Get current rule for comparison
     const checkResult = await client.query('SELECT * FROM auto_distribution_rules WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Auto distribution rule not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Auto distribution rule not found'
       });
     }
-    
+
     const currentRule = checkResult.rows[0];
     const validUpdates = {};
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         const fieldType = getFieldType(key);
-        
+
         // Handle category bucket conversions
         if (key === 'source_bucket' || key === 'dest_bucket') {
           let bucketId;
@@ -2611,12 +2611,12 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
             bucketId = await resolveCategoryNameOrIdToId(client, value, 'personal_category');
           } catch (err) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ 
-              success: false, 
-              error: err.message 
+            return res.status(400).json({
+              success: false,
+              error: err.message
             });
           }
-          
+
           if (!valuesAreEqual(currentRule[key], bucketId)) {
             validUpdates[key] = bucketId;
             hasChanges = true;
@@ -2632,7 +2632,7 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
         }
       }
     }
-    
+
     // OPTIMIZATION: If no fields actually changed, return early
     if (!hasChanges) {
       await client.query('ROLLBACK');
@@ -2644,19 +2644,19 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
         optimized: true
       });
     }
-    
+
     if (Object.keys(validUpdates).length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
-    
+
     const values = [...Object.values(validUpdates), id];
     const query = `
       UPDATE auto_distribution_rules 
@@ -2664,13 +2664,13 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
       WHERE id = $${values.length} 
       RETURNING *
     `;
-    
+
     console.log(`Executing database update for auto distribution rule ${id} with changes:`, validUpdates);
-    
+
     const { rows } = await client.query(query, values);
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -2680,10 +2680,10 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error updating auto distribution rule:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -2696,17 +2696,17 @@ app.put('/auto-distribution-rules/:id', async (req, res) => {
 app.delete('/auto-distribution-rules/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const query = 'DELETE FROM auto_distribution_rules WHERE id = $1 RETURNING *';
     const { rows } = await pool.query(query, [id]);
-    
+
     if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Auto distribution rule not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Auto distribution rule not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -2714,10 +2714,10 @@ app.delete('/auto-distribution-rules/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Error deleting auto distribution rule:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -2729,17 +2729,17 @@ app.post('/auto-distribution/apply', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const { user_id, month_year } = req.body;
-    
+
     if (!user_id) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User ID is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
       });
     }
-    
+
     // Get all auto distribution rules for the user  
     // First get the rules without joins, then resolve category names separately
     const rulesQuery = `
@@ -2753,16 +2753,16 @@ app.post('/auto-distribution/apply', async (req, res) => {
       WHERE adr.user_id = $1
       ORDER BY adr.id
     `;
-    
+
     const rulesResult = await client.query(rulesQuery, [user_id]);
     const rawRules = rulesResult.rows;
-    
+
     // Resolve category names for each rule separately to avoid JOIN type issues
     const rules = [];
     for (const rule of rawRules) {
       let sourceCategoryName = null;
       let destCategoryName = null;
-      
+
       // Get source category name - handle both IDs and names
       if (rule.source_bucket) {
         try {
@@ -2785,7 +2785,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
           sourceCategoryName = rule.source_bucket;
         }
       }
-      
+
       // Get destination category name - handle both IDs and names
       if (rule.dest_bucket) {
         try {
@@ -2808,14 +2808,14 @@ app.post('/auto-distribution/apply', async (req, res) => {
           destCategoryName = rule.dest_bucket;
         }
       }
-      
+
       rules.push({
         ...rule,
         source_category_name: sourceCategoryName,
         dest_category_name: destCategoryName
       });
     }
-    
+
     if (rules.length === 0) {
       await client.query('ROLLBACK');
       return res.json({
@@ -2824,20 +2824,20 @@ app.post('/auto-distribution/apply', async (req, res) => {
         appliedCount: 0
       });
     }
-    
+
     const currentDate = new Date();
     const monthYearStr = month_year || `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
-    
+
     let successCount = 0;
     let failureCount = 0;
     const createdTransactions = [];
-    
+
     for (const rule of rules) {
       try {
         // Validate rule data more robustly (check for null/undefined, but allow 0 as valid ID)
-        if (rule.source_bucket === null || rule.source_bucket === undefined || 
-            rule.dest_bucket === null || rule.dest_bucket === undefined || 
-            !rule.amount || rule.amount <= 0) {
+        if (rule.source_bucket === null || rule.source_bucket === undefined ||
+          rule.dest_bucket === null || rule.dest_bucket === undefined ||
+          !rule.amount || rule.amount <= 0) {
           failureCount++;
           console.log(`Skipping rule ${rule.id}: Invalid source/dest bucket or amount`, {
             source_bucket: rule.source_bucket,
@@ -2846,7 +2846,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
           });
           continue;
         }
-        
+
         // Convert category names or IDs to valid integer IDs
         let sourceBucketId, destBucketId;
         try {
@@ -2860,7 +2860,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
           });
           continue;
         }
-        
+
         if (sourceBucketId === null || destBucketId === null) {
           failureCount++;
           console.log(`Skipping rule ${rule.id}: Resolved category IDs are null`, {
@@ -2871,7 +2871,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
           });
           continue;
         }
-        
+
         // Create source transaction (negative amount) - using the validated integer category ID
         const sourceResult = await client.query(
           `INSERT INTO personal_transactions 
@@ -2885,7 +2885,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
             sourceBucketId // Use the validated integer ID
           ]
         );
-        
+
         // Create destination transaction (positive amount) - using the validated integer category ID
         const destResult = await client.query(
           `INSERT INTO personal_transactions 
@@ -2899,7 +2899,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
             destBucketId // Use the validated integer ID
           ]
         );
-        
+
         createdTransactions.push({
           rule_id: rule.id,
           rule_name: rule.rule_name,
@@ -2909,16 +2909,16 @@ app.post('/auto-distribution/apply', async (req, res) => {
           source_category: rule.source_category_name,
           dest_category: rule.dest_category_name
         });
-        
+
         successCount++;
       } catch (err) {
         console.error(`Error applying rule ${rule.id}:`, err);
         failureCount++;
       }
     }
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       message: `Auto distribution completed: ${successCount} rules applied successfully, ${failureCount} failed`,
@@ -2929,14 +2929,14 @@ app.post('/auto-distribution/apply', async (req, res) => {
         monthYear: monthYearStr
       }
     });
-    
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error applying auto distribution:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -2948,12 +2948,12 @@ app.post('/auto-distribution/apply', async (req, res) => {
  */
 app.post('/transactions/split', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     const { originalTransactionId, remainingAmount, splitTransactions } = req.body;
-    
+
     // Validate input data
     if (!originalTransactionId || remainingAmount === undefined || !splitTransactions || !Array.isArray(splitTransactions)) {
       return res.status(400).json({
@@ -2961,13 +2961,13 @@ app.post('/transactions/split', async (req, res) => {
         error: 'Invalid request data. Required: originalTransactionId, remainingAmount, splitTransactions array'
       });
     }
-    
+
     // Get the original transaction from the generalized view to verify it exists and extract data
     const originalTransactionResult = await client.query(
       'SELECT * FROM shared_transactions_generalized WHERE id = $1',
       [originalTransactionId]
     );
-    
+
     if (originalTransactionResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({
@@ -2975,20 +2975,20 @@ app.post('/transactions/split', async (req, res) => {
         error: 'Original transaction not found'
       });
     }
-    
+
     const originalTransaction = originalTransactionResult.rows[0];
     const originalAmount = parseFloat(originalTransaction.amount);
     const isNegative = originalAmount < 0; // Track if original amount is negative
-    
+
     // Validate split transactions
     let splitTotal = 0;
     const errors = [];
-    
+
     for (const split of splitTransactions) {
       if (!split.description || !split.amount) {
         errors.push('All split transactions must have a description and amount');
       }
-      
+
       const splitAmount = parseFloat(split.amount);
       if (isNaN(splitAmount)) {
         errors.push('All split amounts must be valid numbers');
@@ -2996,7 +2996,7 @@ app.post('/transactions/split', async (req, res) => {
         splitTotal += Math.abs(splitAmount);
       }
     }
-    
+
     if (errors.length > 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -3004,7 +3004,7 @@ app.post('/transactions/split', async (req, res) => {
         errors: errors
       });
     }
-    
+
     // Check that split total doesn't exceed original amount
     if (Math.abs(splitTotal) > Math.abs(originalAmount)) {
       await client.query('ROLLBACK');
@@ -3013,7 +3013,7 @@ app.post('/transactions/split', async (req, res) => {
         error: 'Split amounts exceed the original transaction amount'
       });
     }
-    
+
     // Check if has_split column exists, add it if it doesn't
     try {
       const checkColumn = await client.query(`
@@ -3022,21 +3022,21 @@ app.post('/transactions/split', async (req, res) => {
         WHERE table_name = 'shared_transactions' 
         AND column_name = 'has_split'
       `);
-      
+
       if (checkColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE shared_transactions 
           ADD COLUMN has_split BOOLEAN DEFAULT FALSE
         `);
       }
-      
+
       const checkSplitFromColumn = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'shared_transactions' 
         AND column_name = 'split_from_id'
       `);
-      
+
       if (checkSplitFromColumn.rows.length === 0) {
         await client.query(`
           ALTER TABLE shared_transactions 
@@ -3047,13 +3047,13 @@ app.post('/transactions/split', async (req, res) => {
       console.log('Note: Could not check/add columns:', columnErr.message);
       // Continue anyway, this is just a precaution
     }
-    
+
     // Update the original transaction with the remaining amount and mark it as split (update base table)
     await client.query(
       'UPDATE shared_transactions SET amount = $1, has_split = TRUE WHERE id = $2',
       [remainingAmount, originalTransactionId]
     );
-    
+
     // Insert split transactions (insert into base table)
     for (const splitTransaction of splitTransactions) {
       await client.query(
@@ -3069,9 +3069,9 @@ app.post('/transactions/split', async (req, res) => {
         ]
       );
     }
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       message: 'Transaction split successfully'
@@ -3096,35 +3096,35 @@ app.post('/transactions/split', async (req, res) => {
 app.get('/shared-transactions-filtered', async (req, res) => {
   try {
     const { startDate, endDate, user = 'Jack', userId = 'default' } = req.query;
-    
+
     // Build dynamic query with filters
     let query = 'SELECT * FROM shared_transactions_generalized WHERE 1=1';
     const values = [];
     let paramIndex = 1;
-    
+
     // Add date filters if provided (inclusive)
     if (startDate) {
       query += ` AND date >= $${paramIndex}`;
       values.push(startDate);
       paramIndex++;
     }
-    
+
     if (endDate) {
       query += ` AND date <= $${paramIndex}`;
       values.push(endDate);
       paramIndex++;
     }
-    
+
     // Filter by user (user's transactions and Both transactions)
     query += ` AND (label = $${paramIndex} OR label = 'Both')`;
     values.push(user);
     paramIndex++;
-    
+
     // Add ordering
     query += ' ORDER BY date DESC';
-    
+
     const { rows } = await pool.query(query, values);
-    
+
     // Get user's personal split configuration from database
     const splitConfigQuery = `
       SELECT psg.group_name, psg.personal_category, 
@@ -3135,27 +3135,27 @@ app.get('/shared-transactions-filtered', async (req, res) => {
       GROUP BY psg.id, psg.group_name, psg.personal_category, psg.display_order
       ORDER BY psg.display_order, psg.group_name
     `;
-    
+
     const splitConfigResult = await pool.query(splitConfigQuery, [userId]);
-    
+
     // Group transactions by budget category for splitting calculation
     const categoryTotals = {};
     let totalAmount = 0;
-    
+
     rows.forEach(transaction => {
       const category = transaction.category || 'Uncategorized';
       let amount = parseFloat(transaction.amount) || 0;
-      
+
       // Only process transactions with label "user" or "Both"
       if (transaction.label !== user && transaction.label !== 'Both') {
         return; // Skip this transaction
       }
-      
+
       // For "Both" transactions, divide by 2 to get user's portion
       if (transaction.label === 'Both') {
         amount = amount / 2;
       }
-      
+
       if (!categoryTotals[category]) {
         categoryTotals[category] = {
           total: 0,
@@ -3163,22 +3163,22 @@ app.get('/shared-transactions-filtered', async (req, res) => {
           transactions: []
         };
       }
-      
+
       // Keep the actual negative amounts for expenses
       categoryTotals[category].total += amount;
       categoryTotals[category].count += 1;
       categoryTotals[category].transactions.push(transaction);
       totalAmount += amount;
     });
-    
+
     // Initialize grouped totals based on user configuration
     const groupedTotals = {};
-    
+
     // Process user's split configuration
     splitConfigResult.rows.forEach(config => {
       const groupName = config.group_name;
       const categories = config.categories || [];
-      
+
       groupedTotals[groupName] = {
         total: 0,
         count: 0,
@@ -3187,14 +3187,14 @@ app.get('/shared-transactions-filtered', async (req, res) => {
         transactions: []
       };
     });
-    
+
     // Add a default group for unconfigured categories if none exists
-    const hasDefaultGroup = Object.keys(groupedTotals).some(groupName => 
-      groupedTotals[groupName].personalCategory === 'original' || 
+    const hasDefaultGroup = Object.keys(groupedTotals).some(groupName =>
+      groupedTotals[groupName].personalCategory === 'original' ||
       groupName.toLowerCase().includes('expenditure') ||
       groupName.toLowerCase().includes('default')
     );
-    
+
     if (!hasDefaultGroup) {
       groupedTotals['Uncategorized'] = {
         total: 0,
@@ -3204,11 +3204,11 @@ app.get('/shared-transactions-filtered', async (req, res) => {
         transactions: []
       };
     }
-    
+
     // Aggregate categories into groups based on user configuration
     Object.entries(categoryTotals).forEach(([category, data]) => {
       let assignedToGroup = false;
-      
+
       Object.entries(groupedTotals).forEach(([groupName, groupData]) => {
         if (groupData.categories.includes(category)) {
           groupData.total += data.total;
@@ -3217,16 +3217,16 @@ app.get('/shared-transactions-filtered', async (req, res) => {
           assignedToGroup = true;
         }
       });
-      
+
       // If category doesn't match any configured group, assign to default/uncategorized group
       if (!assignedToGroup) {
-        const defaultGroupName = Object.keys(groupedTotals).find(groupName => 
+        const defaultGroupName = Object.keys(groupedTotals).find(groupName =>
           groupedTotals[groupName].personalCategory === 'original' ||
           groupName.toLowerCase().includes('expenditure') ||
           groupName.toLowerCase().includes('default') ||
           groupName === 'Uncategorized'
         ) || 'Uncategorized';
-        
+
         if (groupedTotals[defaultGroupName]) {
           groupedTotals[defaultGroupName].total += data.total;
           groupedTotals[defaultGroupName].count += data.count;
@@ -3234,10 +3234,10 @@ app.get('/shared-transactions-filtered', async (req, res) => {
         }
       }
     });
-    
+
     // Calculate grand total
     const grandTotal = Object.values(groupedTotals).reduce((sum, group) => sum + group.total, 0);
-    
+
     res.json({
       success: true,
       data: {
@@ -3252,10 +3252,10 @@ app.get('/shared-transactions-filtered', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching filtered shared transactions:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3266,7 +3266,7 @@ app.get('/shared-transactions-filtered', async (req, res) => {
 app.get('/personal-split-groups/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const query = `
       SELECT psg.*, 
              array_agg(
@@ -3281,25 +3281,25 @@ app.get('/personal-split-groups/:userId', async (req, res) => {
       GROUP BY psg.id
       ORDER BY psg.display_order, psg.id
     `;
-    
+
     const { rows } = await pool.query(query, [userId]);
-    
+
     // Convert array_agg result to proper format
     const processedRows = rows.map(row => ({
       ...row,
       mapped_categories: row.mapped_categories && row.mapped_categories[0] ? row.mapped_categories : []
     }));
-    
+
     res.json({
       success: true,
       data: processedRows
     });
   } catch (err) {
     console.error('Error fetching personal split groups:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3310,22 +3310,22 @@ app.get('/personal-split-groups/:userId', async (req, res) => {
 app.post('/personal-split-groups', async (req, res) => {
   try {
     const { user_id, group_name, personal_category, display_order = 0 } = req.body;
-    
+
     if (!user_id || !group_name || !personal_category) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User ID, group name, and personal category are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'User ID, group name, and personal category are required'
       });
     }
-    
+
     const query = `
       INSERT INTO personal_split_groups (user_id, group_name, personal_category, display_order)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
-    
+
     const { rows } = await pool.query(query, [user_id, group_name, personal_category, display_order]);
-    
+
     res.status(201).json({
       success: true,
       data: rows[0],
@@ -3333,10 +3333,10 @@ app.post('/personal-split-groups', async (req, res) => {
     });
   } catch (err) {
     console.error('Error creating personal split group:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3348,22 +3348,22 @@ app.put('/personal-split-groups/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
+
     const allowedFields = ['group_name', 'personal_category', 'display_order', 'is_active'];
-    
+
     // Get current group for comparison
     const checkResult = await pool.query('SELECT * FROM personal_split_groups WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Personal split group not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Personal split group not found'
       });
     }
-    
+
     const currentGroup = checkResult.rows[0];
     const validUpdates = {};
     let hasChanges = false;
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         const fieldType = getFieldType(key);
@@ -3374,7 +3374,7 @@ app.put('/personal-split-groups/:id', async (req, res) => {
         }
       }
     }
-    
+
     if (!hasChanges) {
       return res.json({
         success: true,
@@ -3383,18 +3383,18 @@ app.put('/personal-split-groups/:id', async (req, res) => {
         optimized: true
       });
     }
-    
+
     if (Object.keys(validUpdates).length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No valid fields to update' 
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
       });
     }
-    
+
     const setClause = Object.entries(validUpdates).map(
       ([key, _], index) => `${key} = $${index + 1}`
     ).join(', ');
-    
+
     const values = [...Object.values(validUpdates), id];
     const query = `
       UPDATE personal_split_groups 
@@ -3402,9 +3402,9 @@ app.put('/personal-split-groups/:id', async (req, res) => {
       WHERE id = $${values.length} 
       RETURNING *
     `;
-    
+
     const { rows } = await pool.query(query, values);
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -3413,10 +3413,10 @@ app.put('/personal-split-groups/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating personal split group:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3428,27 +3428,27 @@ app.delete('/personal-split-groups/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const { id } = req.params;
-    
+
     // Check if the group exists
     const checkResult = await client.query('SELECT * FROM personal_split_groups WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Personal split group not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Personal split group not found'
       });
     }
-    
+
     // Delete associated mappings first
     await client.query('DELETE FROM personal_split_mapping WHERE personal_split_group_id = $1', [id]);
-    
+
     // Delete the group
     await client.query('DELETE FROM personal_split_groups WHERE id = $1', [id]);
-    
+
     await client.query('COMMIT');
-    
+
     res.json({
       success: true,
       message: 'Personal split group and associated mappings deleted successfully'
@@ -3456,10 +3456,10 @@ app.delete('/personal-split-groups/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error deleting personal split group:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -3472,7 +3472,7 @@ app.delete('/personal-split-groups/:id', async (req, res) => {
 app.get('/personal-split-mapping/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const query = `
       SELECT psm.*, psg.group_name, psg.personal_category
       FROM personal_split_mapping psm
@@ -3480,19 +3480,19 @@ app.get('/personal-split-mapping/:userId', async (req, res) => {
       WHERE psm.user_id = $1 AND psg.is_active = true
       ORDER BY psg.display_order, psg.group_name, psm.budget_category
     `;
-    
+
     const { rows } = await pool.query(query, [userId]);
-    
+
     res.json({
       success: true,
       data: rows
     });
   } catch (err) {
     console.error('Error fetching personal split mappings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3504,33 +3504,33 @@ app.post('/personal-split-mapping', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const { user_id, personal_split_group_id, budget_categories } = req.body;
-    
+
     if (!user_id || !personal_split_group_id || !Array.isArray(budget_categories)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User ID, personal split group ID, and budget categories array are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'User ID, personal split group ID, and budget categories array are required'
       });
     }
-    
+
     // Verify the group exists and belongs to the user
     const groupCheck = await client.query(
       'SELECT id FROM personal_split_groups WHERE id = $1 AND user_id = $2',
       [personal_split_group_id, user_id]
     );
-    
+
     if (groupCheck.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Personal split group not found or does not belong to user' 
+      return res.status(400).json({
+        success: false,
+        error: 'Personal split group not found or does not belong to user'
       });
     }
-    
+
     const insertedMappings = [];
-    
+
     // Insert each category mapping
     for (const budget_category of budget_categories) {
       try {
@@ -3540,7 +3540,7 @@ app.post('/personal-split-mapping', async (req, res) => {
           ON CONFLICT (user_id, personal_split_group_id, budget_category) DO NOTHING
           RETURNING *
         `, [user_id, personal_split_group_id, budget_category]);
-        
+
         if (result.rows.length > 0) {
           insertedMappings.push(result.rows[0]);
         }
@@ -3548,9 +3548,9 @@ app.post('/personal-split-mapping', async (req, res) => {
         console.warn(`Skipping duplicate mapping for category ${budget_category}:`, mappingErr.message);
       }
     }
-    
+
     await client.query('COMMIT');
-    
+
     res.status(201).json({
       success: true,
       data: insertedMappings,
@@ -3559,10 +3559,10 @@ app.post('/personal-split-mapping', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error creating personal split mappings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   } finally {
     client.release();
@@ -3575,28 +3575,28 @@ app.post('/personal-split-mapping', async (req, res) => {
 app.delete('/personal-split-mapping/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if the mapping exists
     const checkResult = await pool.query('SELECT * FROM personal_split_mapping WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Personal split mapping not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Personal split mapping not found'
       });
     }
-    
+
     await pool.query('DELETE FROM personal_split_mapping WHERE id = $1', [id]);
-    
+
     res.json({
       success: true,
       message: 'Personal split mapping deleted successfully'
     });
   } catch (err) {
     console.error('Error deleting personal split mapping:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3608,14 +3608,14 @@ app.delete('/personal-split-mapping/bulk/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { personal_split_group_id, budget_categories } = req.body;
-    
+
     if (!personal_split_group_id || !Array.isArray(budget_categories)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Personal split group ID and budget categories array are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Personal split group ID and budget categories array are required'
       });
     }
-    
+
     const placeholders = budget_categories.map((_, index) => `$${index + 3}`).join(', ');
     const query = `
       DELETE FROM personal_split_mapping 
@@ -3623,20 +3623,20 @@ app.delete('/personal-split-mapping/bulk/:userId', async (req, res) => {
       AND personal_split_group_id = $2 
       AND budget_category IN (${placeholders})
     `;
-    
+
     const values = [userId, personal_split_group_id, ...budget_categories];
     const result = await pool.query(query, values);
-    
+
     res.json({
       success: true,
       message: `${result.rowCount} personal split mappings deleted successfully`
     });
   } catch (err) {
     console.error('Error bulk deleting personal split mappings:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3652,19 +3652,19 @@ app.get('/budget-categories', async (req, res) => {
       WHERE category IS NOT NULL 
       ORDER BY category
     `;
-    
+
     const { rows } = await pool.query(query);
-    
+
     res.json({
       success: true,
       data: rows.map(row => row.category)
     });
   } catch (err) {
     console.error('Error fetching budget categories:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error', 
-      details: err.message 
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
     });
   }
 });
@@ -3674,6 +3674,25 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Finance Dashboard API! Use /transactions to get transaction data and ?column_name= to filter available data.');
 });
 
-app.listen(port, () => {
-  console.log(`✅ Server running on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  // Dynamically fetch BASE_URL from frontend/src/config/apiConfig.js
+  const fs = require('fs');
+  const path = require('path');
+
+  function getFrontendBaseUrl() {
+    try {
+      const apiConfigPath = path.join(__dirname, '../frontend/src/config/apiConfig.js');
+      const fileContent = fs.readFileSync(apiConfigPath, 'utf8');
+      const match = fileContent.match(/BASE_URL:\s*['"`](.*?)['"`]/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    } catch (e) {
+      // fallback or error
+    }
+    return `http://0.0.0.0:${port}`;
+  }
+
+  const frontendBaseUrl = getFrontendBaseUrl();
+  console.log(`✅ Server running on ${frontendBaseUrl}`);
 });

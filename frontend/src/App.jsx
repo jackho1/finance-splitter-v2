@@ -25,6 +25,8 @@ import {
   valuesAreEqual, 
   getFieldType 
 } from './utils/updateHandlers';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
@@ -605,7 +607,7 @@ const App = () => {
         console.log('Fetching initial data using optimized endpoint...');
         
         // Single API call to get all initial data
-        const response = await axios.get('http://localhost:5000/initial-data');
+        const response = await axios.get(getApiUrl('/initial-data'));
         
         if (response.data.success) {
           const { transactions, categoryMappings, labels, bankCategories } = response.data.data;
@@ -738,7 +740,7 @@ const App = () => {
     try {
       setIsRefreshing(true);
       
-      const response = await axios.post('http://localhost:5000/refresh-shared-bank-feeds');
+      const response = await axios.post(getApiUrl('/refresh-shared-bank-feeds'));
       
       if (response.data.success) {
         // Show success notification
@@ -762,7 +764,7 @@ const App = () => {
         }, 3000);
         
         // Refresh the transactions data
-        const transactionsResponse = await axios.get('http://localhost:5000/transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/transactions'));
         setTransactions(transactionsResponse.data);
         
         // Reapply filters to new data
@@ -1365,7 +1367,7 @@ const App = () => {
       }
       
       // Send data to backend
-      const response = await axios.post('http://localhost:5000/transactions', transactionData);
+      const response = await axios.post(getApiUrl('/transactions'), transactionData);
       
       if (response.data.success) {
         // Add the new transaction to state
@@ -2389,11 +2391,11 @@ const App = () => {
         }))
       };
       
-      const response = await axios.post('http://localhost:5000/transactions/split', splitData);
+      const response = await axios.post(getApiUrl('/transactions/split'), splitData);
       
       if (response.data.success) {
         // Refresh the transactions
-        const transactionsResponse = await axios.get('http://localhost:5000/transactions');
+        const transactionsResponse = await axios.get(getApiUrl('/transactions'));
         setTransactions(transactionsResponse.data);
         
         // Show success notification
@@ -2565,7 +2567,7 @@ const App = () => {
       console.log('Sending bulk update data:', bulkUpdateData);
       console.log('Number of transactions to update:', transactionIds.length);
       
-      const response = await axios.put('http://localhost:5000/transactions/bulk-update-mark', bulkUpdateData);
+      const response = await axios.put(getApiUrl('/transactions/bulk-update-mark'), bulkUpdateData);
       
       if (response.data.success) {
         // Update local state to reflect the changes
@@ -2676,7 +2678,7 @@ const App = () => {
         transaction_ids: [transactionId]
       };
       
-      const response = await axios.put('http://localhost:5000/transactions/bulk-update-mark', updateData);
+      const response = await axios.put(getApiUrl('/transactions/bulk-update-mark'), updateData);
       
       if (response.data.success) {
         // Update local state to reflect the changes
