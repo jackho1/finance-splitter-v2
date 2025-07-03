@@ -39,3 +39,5 @@ prompt.txt
 *.sql
 *.sqlite
 *.code-workspace
+# Ignore node_modules in any directory
+**/node_modules/
