@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+
 import { 
   normalizeValue, 
   valuesAreEqual, 
@@ -207,7 +209,7 @@ describe('Update Handler Functions', () => {
 
       const calls = getAxiosCalls();
       expect(calls.length).toBe(1);
-      expect(calls[0].url).toBe('http://localhost:5000/transactions/1');
+      expect(calls[0].url).toBe(getApiUrl('/transactions/1'));
       expect(calls[0].data).toEqual({ description: 'Updated Test' });
     });
 
@@ -337,7 +339,7 @@ describe('Update Handler Functions', () => {
 
       const calls = getAxiosCalls();
       expect(calls.length).toBe(1);
-      expect(calls[0].url).toBe('http://localhost:5000/personal-transactions/1');
+      expect(calls[0].url).toBe(getApiUrl('/personal-transactions/1'));
       expect(calls[0].data).toEqual({ category: 'Entertainment' });
     });
 
@@ -402,7 +404,7 @@ describe('Update Handler Functions', () => {
 
       const calls = getAxiosCalls();
       expect(calls.length).toBe(1);
-      expect(calls[0].url).toBe('http://localhost:5000/offset-transactions/1');
+      expect(calls[0].url).toBe(getApiUrl('/offset-transactions/1'));
       expect(calls[0].data).toEqual({ description: 'Updated Test' });
     });
 

@@ -25,6 +25,11 @@ coverage/
 */**/.env.*
 !*/**/.env.template
 
+# API configuration files
+frontend/src/config/apiConfig.js
+*/**/apiConfig.js
+!*/**/apiConfig.template.js
+
 # Prompt files
 prompt.txt
 */**/prompt.txt

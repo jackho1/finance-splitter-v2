@@ -1,6 +1,7 @@
 // Budgets.jsx
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { Bar } from 'react-chartjs-2';
 import { USER_CONFIG } from './config/userConfig';
 import { valuesAreEqual } from './utils/updateHandlers';
@@ -109,7 +110,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       
       try {
         // Single API call to get all budget initial data
-        const response = await axios.get('http://localhost:5000/budget-initial-data');
+        const response = await axios.get(getApiUrl('/budget-initial-data'));
         
         if (response.data.success) {
           const { budgetCategories, transactions, categoryMappings } = response.data.data;
@@ -281,9 +282,10 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         return; // Don't make API call
       }
 
-      const response = await axios.put(`http://localhost:5000/budget-categories/${budgetCategory.id}`, {
-        budget: newBudget
-      });
+      const response = await axios.put(
+        getApiUrlWithParams('/budget-categories/:id', { id: budgetCategory.id }), 
+        { budget: newBudget }
+      );
       
       if (response.data.success) {
         // Update local state

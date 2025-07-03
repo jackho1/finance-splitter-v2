@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiUrl } from './apiUtils';
 
 // ==========================================================
 // SHARED UTILITY FUNCTIONS FOR VALUE COMPARISON
@@ -128,7 +129,7 @@ export const optimizedHandleUpdate = async (transactionId, field, editValue, tra
     setIsUpdating(true);
     
     // Send update to backend
-    const response = await axios.put(`http://localhost:5000/transactions/${transactionId}`, { 
+    const response = await axios.put(`${getApiUrl()}/transactions/${transactionId}`, { 
       [field]: editValue 
     });
     
@@ -285,7 +286,7 @@ export const optimizedHandlePersonalUpdate = async (transactionId, field, editVa
     
     setIsUpdating(true);
     
-    const response = await axios.put(`http://localhost:5000/personal-transactions/${transactionId}`, { 
+    const response = await axios.put(`${getApiUrl()}/personal-transactions/${transactionId}`, { 
       [field]: editValue 
     });
     
@@ -416,7 +417,7 @@ export const optimizedHandleOffsetUpdate = async (transactionId, field, editValu
     
     setIsUpdating(true);
     
-    const response = await axios.put(`http://localhost:5000/offset-transactions/${transactionId}`, { 
+    const response = await axios.put(`${getApiUrl()}/offset-transactions/${transactionId}`, { 
       [field]: editValue 
     });
     
@@ -526,7 +527,7 @@ export const optimizedHandleBudgetUpdate = async (categoryId, newBudget, current
 
     console.log(`💰 Budget value changed for category ${categoryId}: ${currentBudget} -> ${newBudget} (making API call)`);
     
-    const response = await axios.put(`http://localhost:5000/budget-categories/${categoryId}`, { 
+    const response = await axios.put(`${getApiUrl()}/budget-categories/${categoryId}`, { 
       budget: newBudget 
     });
     
