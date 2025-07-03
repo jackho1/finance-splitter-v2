@@ -2917,6 +2917,27 @@ app.post('/auto-distribution/apply', async (req, res) => {
       }
     }
 
+    // Update the last auto distribution month in personal settings
+    const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+    
+    // Check if settings exist for this user
+    const settingsCheck = await client.query('SELECT * FROM personal_settings WHERE user_id = $1', [user_id]);
+    
+    if (settingsCheck.rows.length === 0) {
+      // Create new settings record with last distribution month
+      await client.query(`
+        INSERT INTO personal_settings (user_id, last_auto_distribution_month) 
+        VALUES ($1, $2)
+      `, [user_id, currentMonthKey]);
+    } else {
+      // Update existing settings record
+      await client.query(`
+        UPDATE personal_settings 
+        SET last_auto_distribution_month = $1 
+        WHERE user_id = $2
+      `, [currentMonthKey, user_id]);
+    }
+
     await client.query('COMMIT');
 
     res.json({
@@ -2926,7 +2947,8 @@ app.post('/auto-distribution/apply', async (req, res) => {
         appliedCount: successCount,
         failedCount: failureCount,
         createdTransactions: createdTransactions,
-        monthYear: monthYearStr
+        monthYear: monthYearStr,
+        lastDistributionMonth: currentMonthKey
       }
     });
 

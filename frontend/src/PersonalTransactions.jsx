@@ -912,12 +912,12 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       });
       
       if (response.data.success) {
-        const { appliedCount, failedCount, createdTransactions } = response.data.data;
+        const { appliedCount, failedCount, createdTransactions, lastDistributionMonth } = response.data.data;
         
-        // Update the last distribution month
-        const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
-        setLastAutoDistributionMonth(currentMonthKey);
-        // Note: Backend already updates personal settings
+        // Update the last distribution month from backend response
+        setLastAutoDistributionMonth(lastDistributionMonth);
+        console.log('✅ Auto distribution completed, updated lastDistributionMonth to:', lastDistributionMonth);
+        // Backend now properly updates personal settings
         
         // Refresh transactions
         const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
@@ -963,16 +963,27 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   
   // Check if we need to perform auto distribution (only after initial load is complete)
   useEffect(() => {
-    if (initialLoadComplete && autoDistributionEnabled && transactions.length > 0 && autoDistributionRules.length > 0) {
+    if (initialLoadComplete && autoDistributionEnabled && autoDistributionRules.length > 0) {
       const currentDate = new Date();
       const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
       
+      console.log('Auto distribution check:', {
+        initialLoadComplete,
+        autoDistributionEnabled,
+        autoDistributionRulesCount: autoDistributionRules.length,
+        currentMonthKey,
+        lastAutoDistributionMonth,
+        shouldRun: lastAutoDistributionMonth !== currentMonthKey
+      });
+      
       if (lastAutoDistributionMonth !== currentMonthKey) {
-        // New month detected, perform auto distribution
+        console.log('🚀 New month detected, performing auto distribution...');
         performAutoDistribution();
+      } else {
+        console.log('✅ Auto distribution already completed for this month');
       }
     }
-  }, [initialLoadComplete, autoDistributionEnabled, transactions, lastAutoDistributionMonth, autoDistributionRules]);
+  }, [initialLoadComplete, autoDistributionEnabled, lastAutoDistributionMonth, autoDistributionRules]);
   
   // Initialize or update category order when transactions change
   // Modified to respect database as source of truth and only update when there are actual changes
@@ -1431,7 +1442,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       editValue, 
       transactions, 
       setTransactions, 
-      filteredTransactions.length ? setFilteredTransactions : null, 
+      setFilteredTransactions, 
       setEditCell, 
       setIsUpdating,
       showErrorNotification
