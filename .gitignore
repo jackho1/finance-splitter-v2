@@ -48,3 +48,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+# Expo
+.expo/
+**/.expo/
+*/**/expo-env.d.ts
