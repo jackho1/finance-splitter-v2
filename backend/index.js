@@ -1663,13 +1663,18 @@ app.post('/transactions', async (req, res) => {
 // GET /labels — returns distinct labels for dropdown filter
 app.get('/labels', async (req, res) => {
   try {
-    const { rows } = await pool.query(`SELECT DISTINCT label FROM shared_transactions_generalized 
-                                      ORDER BY CASE 
-                                        WHEN label = 'Ruby' THEN 1 
-                                        WHEN label = 'Jack' THEN 2 
-                                        WHEN label = 'Both' THEN 3 
-                                        ELSE 4 
-                                      END`);
+    const { rows } = await pool.query(`SELECT label 
+FROM (
+  SELECT DISTINCT label 
+  FROM shared_transactions_generalized
+) AS sub
+ORDER BY CASE 
+  WHEN label = 'Ruby' THEN 1 
+  WHEN label = 'Jack' THEN 2 
+  WHEN label = 'Both' THEN 3 
+  ELSE 4 
+END;
+`);
     res.json(rows.map(row => row.label).filter(label => label != null));
   } catch (err) {
     console.error('Error fetching labels:', err);
