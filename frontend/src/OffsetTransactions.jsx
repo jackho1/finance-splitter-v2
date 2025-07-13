@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 
 // Import utility functions
-import { calculateTotals } from './utils/calculateTotals';
+//import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
 import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
@@ -505,6 +505,128 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const [labelFilter, setLabelFilter] = useState([]);
   const [isLabelsLoading, setIsLabelsLoading] = useState(false);
 
+  // New: Add user management states
+  const [users, setUsers] = useState([]);
+  const [splitAllocations, setSplitAllocations] = useState({});
+
+  // Helper function to get transaction label from split allocations
+  const getTransactionLabel = (transaction) => {
+    const allocations = splitAllocations[transaction.id];
+    if (!allocations || allocations.length === 0) {
+      // Fallback to legacy label for backwards compatibility
+      return transaction.label || null;
+    }
+
+    // Guard clause: return legacy label if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return transaction.label || null;
+    }
+
+    // Check if this is an equal split between all users
+    const isEqualSplit = () => {
+      // Primary method: Check if all allocations have split_type_code === 'equal'
+      const allEqual = allocations.every(allocation => allocation.split_type_code === 'equal');
+      if (allEqual) return true;
+
+      // Fallback 1: Check if all allocations have equal percentages
+      if (allocations.length > 1) {
+        const expectedPercentage = 100 / allocations.length;
+        const percentagesEqual = allocations.every(allocation => 
+          Math.abs(allocation.percentage - expectedPercentage) < 0.1
+        );
+        if (percentagesEqual) return true;
+      }
+
+      // Fallback 2: Check if all allocations have equal amounts (within 1 cent)
+      if (allocations.length > 1) {
+        const expectedAmount = Math.abs(parseFloat(transaction.amount)) / allocations.length;
+        const amountsEqual = allocations.every(allocation => 
+          Math.abs(Math.abs(allocation.amount) - expectedAmount) < 0.01
+        );
+        if (amountsEqual) return true;
+      }
+
+      return false;
+    };
+
+    // Get active users count for proper label display
+    const activeUsers = users.filter(user => user.username !== 'default');
+    
+    if (allocations.length === 1) {
+      // Single user allocation
+      return allocations[0].display_name;
+    } else if (allocations.length === activeUsers.length && isEqualSplit()) {
+      // Equal split between all users
+      return activeUsers.length === 2 ? 'Both' : 'All users';
+    } else if (isEqualSplit()) {
+      // Equal split between subset of users
+      return activeUsers.length === 2 ? 'Both' : 'All users';
+    } else {
+      // Mixed split - show primary user + count
+      const sortedAllocations = [...allocations].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+      return `${sortedAllocations[0].display_name} +${allocations.length - 1}`;
+    }
+  };
+
+  // Helper function to get user total from allocations
+  const getUserTotalFromAllocations = (userId, filteredTransactions) => {
+    return filteredTransactions.reduce((total, transaction) => {
+      const allocations = splitAllocations[transaction.id];
+      if (allocations) {
+        const userAllocation = allocations.find(allocation => allocation.user_id === userId);
+        if (userAllocation) {
+          return total + userAllocation.amount;
+        }
+      }
+      return total;
+    }, 0);
+  };
+
+  // Helper function to calculate totals from allocations
+  const calculateTotalsFromAllocations = (filteredTransactions) => {
+    const totals = {};
+    
+    // Guard clause: return empty totals if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return totals;
+    }
+    
+    users.forEach(user => {
+      if (user.username !== 'default') {
+        const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions);
+        const safeTotal = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
+        totals[user.display_name] = safeTotal;
+      }
+    });
+    
+    return totals;
+  };
+
+  // Helper function to get label dropdown options based on active users
+  const getLabelDropdownOptions = () => {
+    // Guard clause: return empty array if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return [];
+    }
+    
+    const activeUsers = users.filter(user => user.username !== 'default');
+    const options = [];
+    
+    // Add individual user options
+    activeUsers.forEach(user => {
+      options.push(user.display_name);
+    });
+    
+    // Add equal split option
+    if (activeUsers.length === 2) {
+      options.push('Both (Equal Split)');
+    } else if (activeUsers.length > 2) {
+      options.push('All users (Equal Split)');
+    }
+    
+    return options;
+  };
+
   // Add refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -653,7 +775,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         const response = await axios.get(getApiUrl('/offset-initial-data'));
         
         if (response.data.success) {
-          const { offsetTransactions, offsetCategories, labels } = response.data.data;
+          const { offsetTransactions, offsetCategories, labels, users, splitAllocations } = response.data.data;
           
           // Set all data from the combined response
           setTransactions(offsetTransactions);
@@ -665,6 +787,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           
           setLabels(labels);
           setIsLabelsLoading(false);
+
+          // New: Set users and split allocations
+          setUsers(users);
+          setSplitAllocations(splitAllocations);
         } else {
           throw new Error(response.data.error || 'Failed to fetch offset initial data');
         }
@@ -810,9 +936,18 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           document.body.removeChild(notification);
         }, 3000);
         
-        // Refresh the transactions data
-        const transactionsResponse = await axios.get(getApiUrl('/offset-transactions'));
-        setTransactions(transactionsResponse.data);
+        // Refresh the transactions data - use the full initial data endpoint
+        const transactionsResponse = await axios.get(getApiUrl('/offset-initial-data'));
+        if (transactionsResponse.data.success) {
+          const { offsetTransactions, offsetCategories, labels, users, splitAllocations } = transactionsResponse.data.data;
+          setTransactions(offsetTransactions);
+          setAvailableCategories(offsetCategories);
+          setLabels(labels);
+          setUsers(users);
+          setSplitAllocations(splitAllocations);
+        } else {
+          throw new Error(transactionsResponse.data.error || 'Failed to refresh data');
+        }
         
         // Reapply filters to new data
         let filtered = applyFilters(transactionsResponse.data, {
@@ -911,10 +1046,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
 
     if (labelFilter.length > 0) {
       filtered = filtered.filter(transaction => {
-        if (labelFilter.includes(null) && !transaction.label) {
+        const transactionLabel = getTransactionLabel(transaction);
+        if (labelFilter.includes(null) && !transactionLabel) {
           return true;
         }
-        return labelFilter.includes(transaction.label);
+        return labelFilter.includes(transactionLabel);
       });
     }
     
@@ -1025,18 +1161,243 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     }, 5000);
   };
 
+  // Helper function to show success notifications
+  const showSuccessNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #c3e6cb';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      document.body.removeChild(notification);
+    }, 3000);
+  };
+
+  // Handle split configuration updates for label editing
+  const handleSplitConfigUpdate = async (transactionId, newLabelValue) => {
+    try {
+      // Guard clause: return early if users is not loaded yet
+      if (!users || !Array.isArray(users)) {
+        throw new Error('Users data not loaded yet');
+      }
+      
+      const activeUsers = users.filter(user => user.username !== 'default');
+      
+      if (newLabelValue === '' || newLabelValue === null) {
+        // Delete existing split configuration
+        try {
+          const deleteResponse = await axios.delete(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=offset`));
+          
+          if (deleteResponse.data.success) {
+            // Remove from local split allocations
+            setSplitAllocations(prev => {
+              const updated = { ...prev };
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            showSuccessNotification('Split configuration removed successfully');
+            return;
+          }
+        } catch (deleteErr) {
+          if (deleteErr.response?.status === 404) {
+            // Split config doesn't exist, just update the label to null
+            console.log(`ℹ️ No split configuration found to delete for transaction ${transactionId}`);
+            
+            // Still update local state even if no split config existed
+            setSplitAllocations(prev => {
+              const updated = { ...prev };
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            showSuccessNotification('Label cleared successfully');
+            return;
+          } else {
+            throw deleteErr;
+          }
+        }
+        return;
+      } else {
+        // Create or update split configuration
+        const transaction = transactions.find(t => t.id === transactionId);
+        if (!transaction) {
+          throw new Error('Transaction not found');
+        }
+
+        // Determine users for the split based on the new label value
+        let splitUsers = [];
+        
+        if (newLabelValue === 'Both (Equal Split)' || newLabelValue === 'All users (Equal Split)') {
+          // Equal split between all active users
+          splitUsers = activeUsers.map(user => ({ id: user.id }));
+        } else {
+          // Single user assignment
+          const selectedUser = activeUsers.find(user => user.display_name === newLabelValue);
+          if (!selectedUser) {
+            throw new Error('Selected user not found');
+          }
+          splitUsers = [{ id: selectedUser.id }];
+        }
+
+        // Check if split configuration already exists
+        const existingConfigResponse = await axios.get(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=offset`));
+        
+        if (existingConfigResponse.data.success && existingConfigResponse.data.data) {
+          // Update existing configuration
+          const updateResponse = await axios.put(getApiUrl(`/transactions/${transactionId}/split-config`), {
+            transaction_type: 'offset',
+            split_type_code: 'equal',
+            users: splitUsers
+          });
+          
+          if (updateResponse.data.success) {
+            // Update local split allocations
+            const newAllocations = updateResponse.data.data.allocations.map(allocation => ({
+              allocation_id: allocation.id,
+              split_id: updateResponse.data.data.config.id,
+              user_id: allocation.user_id,
+              amount: parseFloat(allocation.amount),
+              percentage: allocation.percentage,
+              is_paid: allocation.is_paid,
+              paid_date: allocation.paid_date,
+              notes: allocation.notes,
+              created_at: allocation.created_at,
+              username: allocation.username,
+              display_name: allocation.display_name,
+              config_id: updateResponse.data.data.config.id,
+              split_type_code: 'equal',
+              split_type_label: 'Equal Split'
+            }));
+            
+            setSplitAllocations(prev => ({
+              ...prev,
+              [transactionId]: newAllocations
+            }));
+            
+            showSuccessNotification('Split configuration updated successfully');
+          } else {
+            throw new Error(updateResponse.data.error || 'Failed to update split configuration');
+          }
+        } else {
+          // Create new configuration
+          const createResponse = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), {
+            transaction_type: 'offset',
+            split_type_code: 'equal',
+            users: splitUsers
+          });
+          
+          if (createResponse.data.success) {
+            // Update local split allocations
+            const newAllocations = createResponse.data.data.allocations.map(allocation => ({
+              allocation_id: allocation.id,
+              split_id: createResponse.data.data.config.id,
+              user_id: allocation.user_id,
+              amount: parseFloat(allocation.amount),
+              percentage: allocation.percentage,
+              is_paid: allocation.is_paid,
+              paid_date: allocation.paid_date,
+              notes: allocation.notes,
+              created_at: allocation.created_at,
+              username: allocation.username,
+              display_name: allocation.display_name,
+              config_id: createResponse.data.data.config.id,
+              split_type_code: 'equal',
+              split_type_label: 'Equal Split'
+            }));
+            
+            setSplitAllocations(prev => ({
+              ...prev,
+              [transactionId]: newAllocations
+            }));
+            
+            showSuccessNotification('Split configuration created successfully');
+          } else {
+            throw new Error(createResponse.data.error || 'Failed to create split configuration');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating split configuration:', error);
+      showErrorNotification(error.message || 'Failed to update split configuration');
+    }
+  };
+
+  // Handle split configuration for new transactions
+  const createSplitConfigForNewTransaction = async (transactionId, labelValue) => {
+    if (!labelValue || labelValue === '') return;
+    
+    // Guard clause: return early if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      console.error('Users data not loaded yet');
+      return;
+    }
+    
+    try {
+      const activeUsers = users.filter(user => user.username !== 'default');
+      const transaction = transactions.find(t => t.id === transactionId);
+      
+      if (!transaction) {
+        console.error('Transaction not found for split config creation');
+        return;
+      }
+
+      await handleSplitConfigUpdate(transactionId, labelValue);
+    } catch (error) {
+      console.error('Error creating split configuration for new transaction:', error);
+      showErrorNotification('Failed to create split configuration for new transaction');
+    }
+  };
+
   const handleUpdate = async (transactionId, field) => {
-    await optimizedHandleOffsetUpdate(
-      transactionId, 
-      field, 
-      editValue, 
-      transactions, 
-      setTransactions, 
-      filteredTransactions.length ? setFilteredTransactions : null, 
-      setEditCell, 
-      setIsUpdating,
-      showErrorNotification
-    );
+    // Handle label updates using split configuration system
+    if (field === 'label') {
+      setEditCell(null);
+      setIsUpdating(true);
+      
+      try {
+        await handleSplitConfigUpdate(transactionId, editValue);
+        
+        // Update the transaction label in local state for immediate UI feedback
+        setTransactions(prev => prev.map(t => 
+          t.id === transactionId ? { ...t, label: editValue } : t
+        ));
+        
+        if (filteredTransactions.length) {
+          setFilteredTransactions(prev => prev.map(t => 
+            t.id === transactionId ? { ...t, label: editValue } : t
+          ));
+        }
+      } catch (error) {
+        console.error('Error updating label:', error);
+        showErrorNotification('Failed to update transaction label');
+      } finally {
+        setIsUpdating(false);
+      }
+    } else {
+      // Handle other field updates using the original handler
+      await optimizedHandleOffsetUpdate(
+        transactionId, 
+        field, 
+        editValue, 
+        transactions, 
+        setTransactions, 
+        filteredTransactions.length ? setFilteredTransactions : null, 
+        setEditCell, 
+        setIsUpdating,
+        showErrorNotification
+      );
+    }
   };
 
   const renderCell = (transaction, field) => {
@@ -1117,10 +1478,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               style={{ textAlign: 'center' }}
               autoFocus
             >
-              <option value="">Select a label</option>
-              {labels.map(label => (
-                <option key={label} value={label}>{label}</option>
-              ))}
+                                        <option value="">None</option>
+                          {getLabelDropdownOptions().filter(label => label !== '').map(label => (
+                            <option key={label} value={label}>{label}</option>
+                          ))}
             </select>
           );
         default:
@@ -1167,6 +1528,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           <span className={transaction[field] < 0 ? 'amount-negative' : 'amount-positive'}>
             {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
           </span>
+        ) : field === 'label' ? (
+          getTransactionLabel(transaction) || <span className="empty-value"></span>
         ) : (
           transaction[field]
         )}
@@ -1247,10 +1610,21 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   );
 
   // Get row color class based on label
-  const getRowLabelClass = (label) => {
-    if (label === labels[0]) return 'row-ruby';
-    if (label === labels[1]) return 'row-jack';
-    if (label === labels[2]) return 'row-both';
+  const getRowLabelClass = (transaction) => {
+    const label = getTransactionLabel(transaction);
+    if (!label || !users || !Array.isArray(users)) return '';
+    const lowerLabel = label.toLowerCase();
+    // Check for exact or partial match with any user display_name
+    for (const user of users) {
+      if (user.username === 'default') continue;
+      if (lowerLabel.includes(user.display_name.toLowerCase())) {
+        return `row-${user.display_name.toLowerCase().replace(/\s+/g, '-')}`;
+      }
+    }
+    // Group split (e.g., 'Both', 'All users', or any label with 2+ users)
+    if (lowerLabel.includes('both') || lowerLabel.includes('all user') || /\+\d+/.test(lowerLabel)) {
+      return 'row-group';
+    }
     return '';
   };
 
@@ -1335,7 +1709,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 <TableDropdownMenu
                   isActive={activeFilterColumn === 'label'}
                   onClose={() => setActiveFilterColumn(null)}
-                  availableOptions={labels}
+                  availableOptions={getLabelDropdownOptions()}
                   selectedOptions={labelFilter}
                   onChange={handleLabelFilterChange}
                   onClear={() => setLabelFilter([])}
@@ -1361,7 +1735,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
                   <tr 
-                    className={getRowLabelClass(transaction.label)} 
+                    className={getRowLabelClass(transaction)} 
                     style={{ 
                       backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
                                      transaction.split_from_id ? '#f7fbff' : undefined,
@@ -1595,6 +1969,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         
         setTransactions(prev => [addedTransaction, ...prev]);
         
+        // Create split configuration if label is provided
+        if (newTransaction.label) {
+          await createSplitConfigForNewTransaction(addedTransaction.id, newTransaction.label);
+        }
+        
         const transactionDate = new Date(addedTransaction.date);
         const isInCurrentMonth = transactionDate.getMonth() === currentMonth && 
                                 transactionDate.getFullYear() === currentYear;
@@ -1629,23 +2008,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           }
         }
         
-        const notification = document.createElement('div');
-        notification.textContent = 'Transaction added successfully!';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#d4edda';
-        notification.style.color = '#155724';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 3000);
+        showSuccessNotification('Transaction added successfully!');
         
         resetNewTransactionForm();
         setIsAddingTransaction(false);
@@ -3184,7 +3547,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 />
               </div>
               
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Category
                 </label>
@@ -3205,6 +3568,31 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   <option value="">Select a category</option>
                   {availableCategories.map(category => (
                     <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                  Label
+                </label>
+                <select
+                  name="label"
+                  value={newTransaction.label || ''}
+                  onChange={handleNewTransactionChange}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">None</option>
+                  {getLabelDropdownOptions().filter(label => label !== '').map(label => (
+                    <option key={label} value={label}>{label}</option>
                   ))}
                 </select>
               </div>
@@ -3566,8 +3954,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                           onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                         >
-                          <option value="">Label</option>
-                          {labels.map(label => (
+                          <option value="">None</option>
+                          {getLabelDropdownOptions().filter(label => label !== '').map(label => (
                             <option key={label} value={label}>{label}</option>
                           ))}
                         </select>

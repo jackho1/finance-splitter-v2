@@ -417,17 +417,59 @@ app.get('/initial-data', async (req, res) => {
   try {
     console.log('Fetching all initial data in single transaction...');
 
+    // Get transaction type ID for shared transactions
+    const transactionTypeResult = await client.query(
+      'SELECT id FROM transaction_types WHERE code = $1',
+      ['shared']
+    );
+    
+    const sharedTransactionTypeId = transactionTypeResult.rows[0]?.id || 1;
+
     // Execute all queries in parallel using the same connection
     const [
       categoryMappingsResult,
       transactionsResult,
       labelsResult,
-      bankCategoriesResult
+      bankCategoriesResult,
+      usersResult,
+      splitAllocationsResult
     ] = await Promise.all([
       client.query('SELECT * FROM shared_category ORDER BY bank_category'),
       client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
-      client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC'),
-      client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category')
+      client.query('SELECT * FROM users'),
+      client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category'),
+      // New: Fetch all active users
+      client.query(`
+        SELECT id, username, display_name, email, is_active, created_at, preferences, metadata
+        FROM users 
+        WHERE is_active = true 
+        ORDER BY display_name, username
+      `),
+      // New: Fetch bulk split allocation data for all shared transactions
+      client.query(`
+        SELECT 
+          tsc.transaction_id,
+          tsa.id as allocation_id,
+          tsa.split_id,
+          tsa.user_id,
+          tsa.amount,
+          tsa.percentage,
+          tsa.is_paid,
+          tsa.paid_date,
+          tsa.notes,
+          tsa.created_at,
+          u.username,
+          u.display_name,
+          tsc.id as config_id,
+          st.code as split_type_code,
+          st.label as split_type_label
+        FROM transaction_split_allocations tsa
+        JOIN transaction_split_configs tsc ON tsa.split_id = tsc.id
+        JOIN split_types st ON tsc.split_type_id = st.id
+        JOIN users u ON tsa.user_id = u.id
+        WHERE tsc.transaction_type_id = $1
+        ORDER BY tsc.transaction_id, u.display_name, u.username
+      `, [sharedTransactionTypeId])
     ]);
 
     // Process the results
@@ -441,7 +483,32 @@ app.get('/initial-data', async (req, res) => {
 
     const labels = labelsResult.rows.map(row => row.label);
 
-    console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories`);
+    // Process split allocations into a transaction-keyed structure for frontend performance
+    const splitAllocations = {};
+    splitAllocationsResult.rows.forEach(allocation => {
+      const transactionId = allocation.transaction_id;
+      if (!splitAllocations[transactionId]) {
+        splitAllocations[transactionId] = [];
+      }
+      splitAllocations[transactionId].push({
+        allocation_id: allocation.allocation_id,
+        split_id: allocation.split_id,
+        user_id: allocation.user_id,
+        amount: parseFloat(allocation.amount),
+        percentage: allocation.percentage,
+        is_paid: allocation.is_paid,
+        paid_date: allocation.paid_date,
+        notes: allocation.notes,
+        created_at: allocation.created_at,
+        username: allocation.username,
+        display_name: allocation.display_name,
+        config_id: allocation.config_id,
+        split_type_code: allocation.split_type_code,
+        split_type_label: allocation.split_type_label
+      });
+    });
+
+    console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories, ${usersResult.rows.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
 
     res.json({
       success: true,
@@ -449,7 +516,9 @@ app.get('/initial-data', async (req, res) => {
         transactions: transactionsResult.rows,
         categoryMappings,
         labels,
-        bankCategories
+        bankCategories,
+        users: usersResult.rows,
+        splitAllocations: splitAllocations
       }
     });
   } catch (err) {
@@ -470,6 +539,17 @@ app.get('/personal-initial-data', async (req, res) => {
   try {
     console.log('Fetching all personal initial data in single transaction...');
 
+    // Get the default user ID (assuming username 'Jack' or create one if doesn't exist)
+    let defaultUserId = 1; // fallback default
+    try {
+      const defaultUserResult = await client.query('SELECT id FROM users WHERE username = $1', ['Jack']);
+      if (defaultUserResult.rows.length > 0) {
+        defaultUserId = defaultUserResult.rows[0].id;
+      }
+    } catch (userErr) {
+      console.log('Note: Could not fetch default user, using fallback ID 1:', userErr.message);
+    }
+
     const [
       personalTransactionsResult,
       personalCategoriesResult,
@@ -478,8 +558,8 @@ app.get('/personal-initial-data', async (req, res) => {
     ] = await Promise.all([
       client.query('SELECT * FROM personal_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM personal_category ORDER BY category'),
-      client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', ['default']),
-      client.query('SELECT * FROM personal_settings WHERE user_id = $1', ['default'])
+      client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', [defaultUserId]),
+      client.query('SELECT * FROM personal_settings WHERE user_id = $1', [defaultUserId])
     ]);
 
     // Resolve category IDs back to category names for auto distribution rules
@@ -527,23 +607,90 @@ app.get('/offset-initial-data', async (req, res) => {
   try {
     console.log('Fetching all offset initial data in single transaction...');
 
+    // Get the offset transaction type ID
+    const offsetTransactionTypeResult = await client.query('SELECT id FROM transaction_types WHERE code = $1', ['offset']);
+    const offsetTransactionTypeId = offsetTransactionTypeResult.rows.length > 0 ? offsetTransactionTypeResult.rows[0].id : null;
+
     const [
       offsetTransactionsResult,
       offsetCategoriesResult,
-      labelsResult
+      labelsResult,
+      // New: Fetch all active users
+      usersResult,
+      // New: Fetch bulk split allocation data for all offset transactions
+      splitAllocationsResult
     ] = await Promise.all([
       client.query('SELECT * FROM offset_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM offset_category ORDER BY category'),
-      client.query('SELECT DISTINCT label FROM shared_transactions_generalized WHERE label IS NOT NULL ORDER BY label DESC')
+      client.query('SELECT * FROM users'),
+      client.query(`
+        SELECT id, username, display_name, email, is_active, created_at, preferences, metadata
+        FROM users 
+        WHERE is_active = true 
+        ORDER BY display_name, username
+      `),
+      // Get split allocations for offset transactions if offset transaction type exists
+      offsetTransactionTypeId ? client.query(`
+        SELECT 
+          tsc.transaction_id,
+          tsa.id as allocation_id,
+          tsa.split_id,
+          tsa.user_id,
+          tsa.amount,
+          tsa.percentage,
+          tsa.is_paid,
+          tsa.paid_date,
+          tsa.notes,
+          tsa.created_at,
+          u.username,
+          u.display_name,
+          tsc.id as config_id,
+          st.code as split_type_code,
+          st.label as split_type_label
+        FROM transaction_split_allocations tsa
+        JOIN transaction_split_configs tsc ON tsa.split_id = tsc.id
+        JOIN split_types st ON tsc.split_type_id = st.id
+        JOIN users u ON tsa.user_id = u.id
+        WHERE tsc.transaction_type_id = $1
+        ORDER BY tsc.transaction_id, u.display_name, u.username
+      `, [offsetTransactionTypeId]) : { rows: [] }
     ]);
-    console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories`);
+
+    // Process split allocations into a transaction-keyed structure for frontend performance
+    const splitAllocations = {};
+    splitAllocationsResult.rows.forEach(allocation => {
+      const transactionId = allocation.transaction_id;
+      if (!splitAllocations[transactionId]) {
+        splitAllocations[transactionId] = [];
+      }
+      splitAllocations[transactionId].push({
+        allocation_id: allocation.allocation_id,
+        split_id: allocation.split_id,
+        user_id: allocation.user_id,
+        amount: parseFloat(allocation.amount),
+        percentage: allocation.percentage,
+        is_paid: allocation.is_paid,
+        paid_date: allocation.paid_date,
+        notes: allocation.notes,
+        created_at: allocation.created_at,
+        username: allocation.username,
+        display_name: allocation.display_name,
+        config_id: allocation.config_id,
+        split_type_code: allocation.split_type_code,
+        split_type_label: allocation.split_type_label
+      });
+    });
+
+    console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories, ${usersResult.rows.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
 
     res.json({
       success: true,
       data: {
         offsetTransactions: offsetTransactionsResult.rows,
         offsetCategories: offsetCategoriesResult.rows.map(item => item.category),
-        labels: labelsResult.rows.map(row => row.label)
+        labels: labelsResult.rows.map(row => row.label),
+        users: usersResult.rows,
+        splitAllocations: splitAllocations
       }
     });
   } catch (err) {
@@ -1357,8 +1504,17 @@ app.put('/budget-categories/:id', async (req, res) => {
  */
 app.put('/personal-settings/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
     const updates = req.body;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     const allowedFields = [
       'hide_zero_balance_buckets',
@@ -2419,7 +2575,16 @@ app.post('/offset-transactions/split', async (req, res) => {
  */
 app.get('/personal-settings/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     const query = 'SELECT * FROM personal_settings WHERE user_id = $1';
     const { rows } = await pool.query(query, [userId]);
@@ -2473,7 +2638,16 @@ app.get('/personal-settings/:userId', async (req, res) => {
 app.get('/auto-distribution-rules/:userId', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     const query = 'SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id';
     const { rows } = await client.query(query, [userId]);
@@ -3122,7 +3296,7 @@ app.post('/transactions/split', async (req, res) => {
  */
 app.get('/shared-transactions-filtered', async (req, res) => {
   try {
-    const { startDate, endDate, user = 'Jack', userId = 'default' } = req.query;
+    const { startDate, endDate, user = 'Jack', userId: userIdParam } = req.query;
 
     // Build dynamic query with filters
     let query = 'SELECT * FROM shared_transactions_generalized WHERE 1=1';
@@ -3151,6 +3325,15 @@ app.get('/shared-transactions-filtered', async (req, res) => {
     query += ' ORDER BY date DESC';
 
     const { rows } = await pool.query(query, values);
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     // Get user's personal split configuration from database
     const splitConfigQuery = `
@@ -3292,7 +3475,16 @@ app.get('/shared-transactions-filtered', async (req, res) => {
  */
 app.get('/personal-split-groups/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     const query = `
       SELECT psg.*, 
@@ -3498,7 +3690,16 @@ app.delete('/personal-split-groups/:id', async (req, res) => {
  */
 app.get('/personal-split-mapping/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     const query = `
       SELECT psm.*, psg.group_name, psg.personal_category
@@ -3633,8 +3834,17 @@ app.delete('/personal-split-mapping/:id', async (req, res) => {
  */
 app.delete('/personal-split-mapping/bulk/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId: userIdParam } = req.params;
     const { personal_split_group_id, budget_categories } = req.body;
+
+    // Convert userId to integer (handle 'default' or string values)
+    let userId = 1; // fallback default
+    if (userIdParam && userIdParam !== 'default') {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
+      }
+    }
 
     if (!personal_split_group_id || !Array.isArray(budget_categories)) {
       return res.status(400).json({
@@ -3695,6 +3905,875 @@ app.get('/budget-categories', async (req, res) => {
     });
   }
 });
+
+// ===== NEW USER MANAGEMENT AND SPLIT ALLOCATION ENDPOINTS =====
+
+/**
+ * Helper function to determine transaction table and validate transaction exists
+ * Uses transaction_types table for dynamic table resolution
+ */
+const getTransactionTable = async (client, transactionId, transactionTypeCode) => {
+  // Get transaction type and table name from database
+  const transactionTypeResult = await client.query(
+    'SELECT id, code, label, table_name FROM transaction_types WHERE code = $1',
+    [transactionTypeCode]
+  );
+
+  if (transactionTypeResult.rows.length === 0) {
+    throw new Error(`Invalid transaction type: ${transactionTypeCode}`);
+  }
+
+  const transactionType = transactionTypeResult.rows[0];
+  const tableName = transactionType.table_name;
+
+  if (!tableName) {
+    throw new Error(`No table name configured for transaction type: ${transactionTypeCode}`);
+  }
+
+  // Verify transaction exists
+  const result = await client.query(`SELECT * FROM ${tableName} WHERE id = $1`, [transactionId]);
+  if (result.rows.length === 0) {
+    throw new Error(`Transaction not found in ${tableName}`);
+  }
+
+  return { 
+    table: tableName, 
+    transaction: result.rows[0],
+    transactionType: transactionType
+  };
+};
+
+/**
+ * Helper function to calculate split allocations based on split type
+ */
+const calculateSplitAllocations = (totalAmount, splitType, users) => {
+  const allocations = [];
+  const absAmount = Math.abs(totalAmount);
+  
+  switch (splitType.code) {
+    case 'equal':
+      const equalAmount = absAmount / users.length;
+      users.forEach(user => {
+        allocations.push({
+          user_id: user.id,
+          amount: totalAmount < 0 ? -equalAmount : equalAmount,
+          percentage: (100 / users.length).toFixed(2)
+        });
+      });
+      break;
+      
+    case 'percentage':
+      // For percentage splits, percentages should be provided in the request
+      users.forEach(user => {
+        if (!user.percentage) {
+          throw new Error(`Percentage not provided for user ${user.id}`);
+        }
+        const amount = (absAmount * user.percentage / 100);
+        allocations.push({
+          user_id: user.id,
+          amount: totalAmount < 0 ? -amount : amount,
+          percentage: user.percentage
+        });
+      });
+      break;
+      
+    case 'fixed':
+      // For fixed splits, amounts should be provided in the request
+      users.forEach(user => {
+        if (!user.amount) {
+          throw new Error(`Fixed amount not provided for user ${user.id}`);
+        }
+        
+        // Ensure fixed amounts respect the original transaction's sign direction
+        const userAbsAmount = Math.abs(user.amount);
+        const signCorrectedAmount = totalAmount < 0 ? -userAbsAmount : userAbsAmount;
+        const percentage = ((userAbsAmount / absAmount) * 100).toFixed(2);
+        
+        allocations.push({
+          user_id: user.id,
+          amount: signCorrectedAmount,
+          percentage: percentage
+        });
+      });
+      break;
+      
+    default:
+      throw new Error(`Unsupported split type: ${splitType.code}`);
+  }
+  
+  return allocations;
+};
+
+/**
+ * Helper function to validate split allocations sum to 100%
+ */
+const validateSplitAllocations = (allocations, totalAmount) => {
+  const totalAllocated = allocations.reduce((sum, allocation) => sum + Math.abs(allocation.amount), 0);
+  const totalPercentage = allocations.reduce((sum, allocation) => sum + parseFloat(allocation.percentage), 0);
+  
+  const tolerance = 0.01; // 1 cent tolerance for floating-point issues
+  const absTotalAmount = Math.abs(totalAmount);
+  
+  if (Math.abs(totalAllocated - absTotalAmount) > tolerance) {
+    throw new Error(`Split allocations total (${totalAllocated.toFixed(2)}) does not match transaction amount (${absTotalAmount.toFixed(2)})`);
+  }
+  
+  if (Math.abs(totalPercentage - 100) > 0.01) {
+    throw new Error(`Split percentages total (${totalPercentage.toFixed(2)}%) does not equal 100%`);
+  }
+};
+
+/**
+ * GET /users - Fetch all active users
+ */
+app.get('/users', async (req, res) => {
+  try {
+    const query = `
+      SELECT id, username, display_name, email, is_active, created_at, preferences, metadata
+      FROM users 
+      WHERE is_active = true 
+      ORDER BY display_name, username
+    `;
+    
+    const { rows } = await pool.query(query);
+    
+    res.json({
+      success: true,
+      data: rows,
+      count: rows.length
+    });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /split-types - Get available split types
+ */
+app.get('/split-types', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM split_types ORDER BY is_default DESC, id';
+    const { rows } = await pool.query(query);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (err) {
+    console.error('Error fetching split types:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /transaction-types - Get available transaction types
+ */
+app.get('/transaction-types', async (req, res) => {
+  try {
+    const query = 'SELECT * FROM transaction_types ORDER BY is_default DESC, id';
+    const { rows } = await pool.query(query);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (err) {
+    console.error('Error fetching transaction types:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /transactions/:id/split-config - Get split configuration for any transaction
+ * Query params: transaction_type (required) - 'shared', 'personal', or 'offset'
+ */
+app.get('/transactions/:id/split-config', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { transaction_type } = req.query;
+    
+    if (!transaction_type) {
+      return res.status(400).json({
+        success: false,
+        error: 'transaction_type query parameter is required (shared, personal, or offset)'
+      });
+    }
+    
+    // Verify transaction exists using dynamic table resolution
+    const { table, transaction, transactionType } = await getTransactionTable(client, id, transaction_type);
+    
+    // Get split configuration
+    const splitConfigQuery = `
+      SELECT tsc.*, st.code as split_type_code, st.label as split_type_label, 
+             tt.code as transaction_type_code, tt.label as transaction_type_label
+      FROM transaction_split_configs tsc
+      JOIN split_types st ON tsc.split_type_id = st.id
+      JOIN transaction_types tt ON tsc.transaction_type_id = tt.id
+      WHERE tsc.transaction_id = $1 AND tsc.transaction_type_id = $2
+    `;
+    
+    const splitConfigResult = await client.query(splitConfigQuery, [id, transactionType.id]);
+    
+    if (splitConfigResult.rows.length === 0) {
+      // ===== BACKWARDS COMPATIBILITY SECTION - MARK FOR FUTURE DELETION =====
+      console.log(`🔄 LEGACY FALLBACK: No split config found for ${transaction_type} transaction ${id}, checking for legacy label-based splitting`);
+      
+      // Check if this is a legacy transaction with label-based splitting
+      let legacyData = null;
+      if (transaction_type === 'shared' && transaction.label) {
+        if (transaction.label === 'Both') {
+          // Legacy "Both" transaction - would be split equally between Ruby and Jack
+          const usersResult = await client.query('SELECT id, username, display_name FROM users WHERE username IN ($1, $2)', ['Ruby', 'Jack']);
+          legacyData = {
+            legacy_mode: true,
+            original_label: transaction.label,
+            split_type: 'equal',
+            users: usersResult.rows,
+            estimated_allocations: usersResult.rows.map(user => ({
+              user_id: user.id,
+              username: user.username,
+              display_name: user.display_name,
+              amount: parseFloat(transaction.amount) / 2,
+              percentage: 50
+            }))
+          };
+        } else if (transaction.label === 'Ruby' || transaction.label === 'Jack') {
+          // Legacy single-user transaction
+          const userResult = await client.query('SELECT id, username, display_name FROM users WHERE username = $1', [transaction.label]);
+          if (userResult.rows.length > 0) {
+            legacyData = {
+              legacy_mode: true,
+              original_label: transaction.label,
+              split_type: 'equal',
+              users: userResult.rows,
+              estimated_allocations: [{
+                user_id: userResult.rows[0].id,
+                username: userResult.rows[0].username,
+                display_name: userResult.rows[0].display_name,
+                amount: parseFloat(transaction.amount),
+                percentage: 100
+              }]
+            };
+          }
+        }
+      }
+      // ===== END BACKWARDS COMPATIBILITY SECTION =====
+      
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No split configuration found for this transaction',
+        legacy_data: legacyData
+      });
+    }
+    
+    const splitConfig = splitConfigResult.rows[0];
+    
+    res.json({
+      success: true,
+      data: {
+        config: splitConfig,
+        transaction: transaction,
+        table_used: table
+      }
+    });
+    
+  } catch (err) {
+    console.error('Error fetching split configuration:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * GET /transactions/:id/allocations - Get split allocations for any transaction
+ * Query params: transaction_type (required) - 'shared', 'personal', or 'offset'
+ */
+app.get('/transactions/:id/allocations', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { transaction_type } = req.query;
+    
+    if (!transaction_type) {
+      return res.status(400).json({
+        success: false,
+        error: 'transaction_type query parameter is required (shared, personal, or offset)'
+      });
+    }
+    
+    // Verify transaction exists using dynamic table resolution
+    const { table, transaction, transactionType } = await getTransactionTable(client, id, transaction_type);
+    
+    // Get split configuration and allocations
+    const allocationsQuery = `
+      SELECT tsa.*, u.username, u.display_name, 
+             tsc.id as config_id, st.code as split_type_code, st.label as split_type_label
+      FROM transaction_split_allocations tsa
+      JOIN transaction_split_configs tsc ON tsa.split_id = tsc.id
+      JOIN split_types st ON tsc.split_type_id = st.id
+      JOIN users u ON tsa.user_id = u.id
+      WHERE tsc.transaction_id = $1 AND tsc.transaction_type_id = $2
+      ORDER BY u.display_name, u.username
+    `;
+    
+    const allocationsResult = await client.query(allocationsQuery, [id, transactionType.id]);
+    
+    if (allocationsResult.rows.length === 0) {
+      // ===== BACKWARDS COMPATIBILITY SECTION - MARK FOR FUTURE DELETION =====
+      console.log(`🔄 LEGACY FALLBACK: No split allocations found for ${transaction_type} transaction ${id}, checking for legacy label-based splitting`);
+      
+      // Check if this is a legacy transaction with label-based splitting
+      let legacyAllocations = null;
+      if (transaction_type === 'shared' && transaction.label) {
+        if (transaction.label === 'Both') {
+          // Legacy "Both" transaction - split equally between Ruby and Jack
+          const usersResult = await client.query('SELECT id, username, display_name FROM users WHERE username IN ($1, $2)', ['Ruby', 'Jack']);
+          legacyAllocations = usersResult.rows.map(user => ({
+            user_id: user.id,
+            username: user.username,
+            display_name: user.display_name,
+            amount: parseFloat(transaction.amount) / 2,
+            percentage: 50,
+            is_paid: false,
+            legacy_mode: true
+          }));
+        } else if (transaction.label === 'Ruby' || transaction.label === 'Jack') {
+          // Legacy single-user transaction
+          const userResult = await client.query('SELECT id, username, display_name FROM users WHERE username = $1', [transaction.label]);
+          if (userResult.rows.length > 0) {
+            legacyAllocations = [{
+              user_id: userResult.rows[0].id,
+              username: userResult.rows[0].username,
+              display_name: userResult.rows[0].display_name,
+              amount: parseFloat(transaction.amount),
+              percentage: 100,
+              is_paid: false,
+              legacy_mode: true
+            }];
+          }
+        }
+      }
+      // ===== END BACKWARDS COMPATIBILITY SECTION =====
+      
+      return res.json({
+        success: true,
+        data: legacyAllocations || [],
+        message: legacyAllocations ? 'Showing legacy label-based allocation data' : 'No split allocations found for this transaction',
+        legacy_mode: !!legacyAllocations,
+        transaction: transaction,
+        table_used: table
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: allocationsResult.rows,
+      count: allocationsResult.rows.length,
+      transaction: transaction,
+      table_used: table,
+      total_allocated: allocationsResult.rows.reduce((sum, allocation) => sum + parseFloat(allocation.amount), 0)
+    });
+    
+  } catch (err) {
+    console.error('Error fetching split allocations:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',  
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /transactions/:id/split-config - Create split configuration and allocations
+ * Body: { transaction_type, split_type_code, users: [{ id, percentage?, amount? }] }
+ */
+app.post('/transactions/:id/split-config', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { transaction_type, split_type_code, users, created_by } = req.body;
+    
+    if (!transaction_type || !split_type_code || !users || !Array.isArray(users)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'transaction_type, split_type_code, and users array are required'
+      });
+    }
+    
+    if (users.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'At least one user must be specified for split allocation'
+      });
+    }
+    
+    // Verify transaction exists using dynamic table resolution
+    const { table, transaction, transactionType } = await getTransactionTable(client, id, transaction_type);
+    
+    // Get split type
+    const splitTypeResult = await client.query('SELECT * FROM split_types WHERE code = $1', [split_type_code]);
+    
+    if (splitTypeResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: `Invalid split type: ${split_type_code}`
+      });
+    }
+    
+    const splitType = splitTypeResult.rows[0];
+    
+    // Check if split configuration already exists
+    const existingConfigResult = await client.query(
+      'SELECT id FROM transaction_split_configs WHERE transaction_id = $1 AND transaction_type_id = $2',
+      [id, transactionType.id]
+    );
+    
+    if (existingConfigResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        error: 'Split configuration already exists for this transaction'
+      });
+    }
+    
+    // Validate and get user details
+    const userIds = users.map(user => user.id);
+    const usersResult = await client.query(
+      'SELECT id, username, display_name FROM users WHERE id = ANY($1) AND is_active = true',
+      [userIds]
+    );
+    
+    if (usersResult.rows.length !== users.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'One or more specified users not found or inactive'
+      });
+    }
+    
+    // Calculate split allocations
+    const allocations = calculateSplitAllocations(parseFloat(transaction.amount), splitType, users);
+    
+    // Validate allocations sum to 100%
+    validateSplitAllocations(allocations, parseFloat(transaction.amount));
+    
+    // Create split configuration
+    const splitConfigResult = await client.query(`
+      INSERT INTO transaction_split_configs (transaction_id, transaction_type_id, split_type_id, created_by)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [id, transactionType.id, splitType.id, created_by || null]);
+    
+    const splitConfigId = splitConfigResult.rows[0].id;
+    
+    // Create split allocations
+    const createdAllocations = [];
+    for (const allocation of allocations) {
+      const allocationResult = await client.query(`
+        INSERT INTO transaction_split_allocations (split_id, user_id, amount, percentage)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+      `, [splitConfigId, allocation.user_id, allocation.amount, allocation.percentage]);
+      
+      // Join with user data for response
+      const userInfo = usersResult.rows.find(user => user.id === allocation.user_id);
+      createdAllocations.push({
+        ...allocationResult.rows[0],
+        username: userInfo.username,
+        display_name: userInfo.display_name
+      });
+    }
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ Created split configuration for ${transaction_type} transaction ${id} with ${users.length} allocations using ${split_type_code} split type (table: ${table})`);
+    
+    res.status(201).json({
+      success: true,
+      data: {
+        config: splitConfigResult.rows[0],
+        allocations: createdAllocations,
+        transaction: transaction,
+        split_type: splitType,
+        table_used: table
+      },
+      message: 'Split configuration created successfully'
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating split configuration:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * PUT /transactions/:id/split-config - Update split configuration and allocations
+ * Body: { transaction_type, split_type_code?, users: [{ id, percentage?, amount? }] }
+ */
+app.put('/transactions/:id/split-config', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { transaction_type, split_type_code, users } = req.body;
+    
+    if (!transaction_type || !users || !Array.isArray(users)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'transaction_type and users array are required'
+      });
+    }
+    
+    // Verify transaction exists using dynamic table resolution
+    const { table, transaction, transactionType } = await getTransactionTable(client, id, transaction_type);
+    
+    // Get existing split configuration
+    const existingConfigResult = await client.query(`
+      SELECT tsc.*, st.code as split_type_code 
+      FROM transaction_split_configs tsc
+      JOIN split_types st ON tsc.split_type_id = st.id
+      WHERE tsc.transaction_id = $1 AND tsc.transaction_type_id = $2
+    `, [id, transactionType.id]);
+    
+    if (existingConfigResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Split configuration not found for this transaction'
+      });
+    }
+    
+    const existingConfig = existingConfigResult.rows[0];
+    const currentSplitTypeCode = split_type_code || existingConfig.split_type_code;
+    
+    // Get split type (current or new)
+    const splitTypeResult = await client.query('SELECT * FROM split_types WHERE code = $1', [currentSplitTypeCode]);
+    if (splitTypeResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: `Invalid split type: ${currentSplitTypeCode}`
+      });
+    }
+    
+    const splitType = splitTypeResult.rows[0];
+    
+    // Validate users
+    const userIds = users.map(user => user.id);
+    const usersResult = await client.query(
+      'SELECT id, username, display_name FROM users WHERE id = ANY($1) AND is_active = true',
+      [userIds]
+    );
+    
+    if (usersResult.rows.length !== users.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'One or more specified users not found or inactive'
+      });
+    }
+    
+    // Calculate new allocations
+    const allocations = calculateSplitAllocations(parseFloat(transaction.amount), splitType, users);
+    
+    // Validate allocations sum to 100%
+    validateSplitAllocations(allocations, parseFloat(transaction.amount));
+    
+    // Update split configuration if split type changed
+    if (split_type_code && split_type_code !== existingConfig.split_type_code) {
+      await client.query(`
+        UPDATE transaction_split_configs 
+        SET split_type_id = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [splitType.id, existingConfig.id]);
+    }
+    
+    // Delete existing allocations
+    await client.query('DELETE FROM transaction_split_allocations WHERE split_id = $1', [existingConfig.id]);
+    
+    // Create new allocations
+    const createdAllocations = [];
+    for (const allocation of allocations) {
+      const allocationResult = await client.query(`
+        INSERT INTO transaction_split_allocations (split_id, user_id, amount, percentage)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+      `, [existingConfig.id, allocation.user_id, allocation.amount, allocation.percentage]);
+      
+      // Join with user data for response
+      const userInfo = usersResult.rows.find(user => user.id === allocation.user_id);
+      createdAllocations.push({
+        ...allocationResult.rows[0],
+        username: userInfo.username,
+        display_name: userInfo.display_name
+      });
+    }
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ Updated split configuration for ${transaction_type} transaction ${id} with ${users.length} allocations using ${currentSplitTypeCode} split type (table: ${table})`);
+    
+    res.json({
+      success: true,
+      data: {
+        config: { ...existingConfig, split_type_id: splitType.id },
+        allocations: createdAllocations,
+        transaction: transaction,
+        split_type: splitType,
+        table_used: table
+      },
+      message: 'Split configuration updated successfully'
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating split configuration:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * DELETE /transactions/:id/split-config - Delete split configuration with audit trail
+ * Query params: transaction_type (required)
+ * Body: { deleted_by? }
+ */
+app.delete('/transactions/:id/split-config', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { transaction_type } = req.query;
+    const { deleted_by } = req.body || {};
+    
+    if (!transaction_type) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'transaction_type query parameter is required'
+      });
+    }
+    
+    // Verify transaction exists using dynamic table resolution
+    const { table, transaction, transactionType } = await getTransactionTable(client, id, transaction_type);
+    
+    // Get existing split configuration with allocations for audit
+    const splitDataQuery = `
+      SELECT 
+        tsc.*,
+        json_agg(
+          json_build_object(
+            'allocation_id', tsa.id,
+            'user_id', tsa.user_id,
+            'amount', tsa.amount,
+            'percentage', tsa.percentage,
+            'is_paid', tsa.is_paid,
+            'paid_date', tsa.paid_date,
+            'notes', tsa.notes,
+            'username', u.username,
+            'display_name', u.display_name
+          )
+        ) as allocations
+      FROM transaction_split_configs tsc
+      LEFT JOIN transaction_split_allocations tsa ON tsc.id = tsa.split_id
+      LEFT JOIN users u ON tsa.user_id = u.id
+      WHERE tsc.transaction_id = $1 AND tsc.transaction_type_id = $2
+      GROUP BY tsc.id
+    `;
+    
+    const splitDataResult = await client.query(splitDataQuery, [id, transactionType.id]);
+    
+    if (splitDataResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Split configuration not found for this transaction'
+      });
+    }
+    
+    const splitConfig = splitDataResult.rows[0];
+    
+    // Create audit trail entry
+    await client.query(`
+      INSERT INTO transaction_split_audit (
+        action, transaction_id, transaction_type, split_config_id, split_data, deleted_by
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+    `, [
+      'DELETE',
+      id,
+      transaction_type,
+      splitConfig.id,
+      JSON.stringify({
+        config: splitConfig,
+        allocations: splitConfig.allocations,
+        transaction: transaction,
+        table_used: table
+      }),
+      deleted_by || null
+    ]);
+    
+    // Delete allocations first (due to foreign key constraint)
+    await client.query('DELETE FROM transaction_split_allocations WHERE split_id = $1', [splitConfig.id]);
+    
+    // Delete split configuration
+    await client.query('DELETE FROM transaction_split_configs WHERE id = $1', [splitConfig.id]);
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ Deleted split configuration for ${transaction_type} transaction ${id} with audit trail (table: ${table})`);
+    
+    res.json({
+      success: true,
+      message: 'Split configuration deleted successfully',
+      audit_id: splitConfig.id,
+      deleted_allocations_count: splitConfig.allocations ? splitConfig.allocations.length : 0,
+      table_used: table
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting split configuration:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * PUT /transactions/:id/allocations/:allocation_id/payment - Mark allocation as paid/unpaid
+ * Body: { is_paid, paid_date?, notes? }
+ */
+app.put('/transactions/:id/allocations/:allocation_id/payment', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { id, allocation_id } = req.params;
+    const { is_paid, paid_date, notes } = req.body;
+    
+    if (is_paid === undefined || is_paid === null) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'is_paid field is required'
+      });
+    }
+    
+    // Verify allocation exists and belongs to the transaction
+    const allocationResult = await client.query(`
+      SELECT tsa.*, tsc.transaction_id, u.username, u.display_name,
+             tt.code as transaction_type_code, tt.table_name
+      FROM transaction_split_allocations tsa
+      JOIN transaction_split_configs tsc ON tsa.split_id = tsc.id
+      JOIN transaction_types tt ON tsc.transaction_type_id = tt.id
+      JOIN users u ON tsa.user_id = u.id
+      WHERE tsa.id = $1 AND tsc.transaction_id = $2
+    `, [allocation_id, id]);
+    
+    if (allocationResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Allocation not found for this transaction'
+      });
+    }
+    
+    const currentAllocation = allocationResult.rows[0];
+    
+    // Update allocation payment status
+    const updateQuery = `
+      UPDATE transaction_split_allocations 
+      SET is_paid = $1, paid_date = $2, notes = $3
+      WHERE id = $4
+      RETURNING *
+    `;
+    
+    const updatedResult = await client.query(updateQuery, [
+      is_paid,
+      is_paid ? (paid_date || new Date().toISOString()) : null,
+      notes || currentAllocation.notes,
+      allocation_id
+    ]);
+    
+    await client.query('COMMIT');
+    
+    const updatedAllocation = {
+      ...updatedResult.rows[0],
+      username: currentAllocation.username,
+      display_name: currentAllocation.display_name,
+      transaction_type_code: currentAllocation.transaction_type_code,
+      table_used: currentAllocation.table_name
+    };
+    
+    console.log(`✅ Updated payment status for allocation ${allocation_id} to ${is_paid ? 'paid' : 'unpaid'} (transaction: ${currentAllocation.transaction_type_code} ${id})`);
+    
+    res.json({
+      success: true,
+      data: updatedAllocation,
+      message: `Allocation marked as ${is_paid ? 'paid' : 'unpaid'} successfully`
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating allocation payment status:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ===== END NEW USER MANAGEMENT AND SPLIT ALLOCATION ENDPOINTS =====
 
 // Default route for root URL
 app.get('/', (req, res) => {

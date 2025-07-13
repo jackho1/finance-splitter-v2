@@ -73,12 +73,6 @@ interface SelectedSegment {
   color: string;
 }
 
-interface DropdownPosition {
-  x: number;
-  y: number;
-  width: number;
-}
-
 // API Configuration
 const API_CONFIG = {
   development: {
@@ -337,7 +331,7 @@ const DateHeader = memo<{
 
 const TransactionItem = memo<{
   transaction: Transaction;
-  onPress: (event: any) => void;
+  onPress: () => void;
   colorScheme: 'light' | 'dark';
   categoryMappings: Record<string, string>;
 }>(({ transaction, onPress, colorScheme, categoryMappings }) => {
@@ -426,8 +420,6 @@ export default function FinanceDashboard() {
   const [currentYear] = useState(new Date().getFullYear());
   const [displayMonth, setDisplayMonth] = useState(new Date().getMonth());
   const [lastPressTime, setLastPressTime] = useState<number>(0);
-  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
-  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   
   // Category filtering state
   const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
@@ -441,9 +433,9 @@ export default function FinanceDashboard() {
       .map(([bankCategory, _]) => bankCategory);
   }, [categoryMappings]);
   
-  // Dropdown animation
-  const dropdownScale = useRef(new Animated.Value(0)).current;
-  const dropdownOpacity = useRef(new Animated.Value(0)).current;
+  // Modal animation
+  const modalScale = useRef(new Animated.Value(0)).current;
+  const modalOpacity = useRef(new Animated.Value(0)).current;
   
   // Computed values
   const categoryData = useMemo(() => {
@@ -710,7 +702,7 @@ export default function FinanceDashboard() {
               if (!response.ok) throw new Error('Failed to delete transaction');
               
               await fetchTransactions();
-              hideDropdown();
+              setSelectedTransaction(null);
               Alert.alert('Success', 'Transaction deleted successfully');
             } catch (error) {
               console.error('Error deleting transaction:', error);
@@ -762,65 +754,50 @@ export default function FinanceDashboard() {
     }
   }, [selectedCategoryFilters]);
   
-  // Dropdown animation functions
-  const showDropdown = useCallback((transaction: Transaction, event: any) => {
-    // Get the position of the pressed transaction item
-    event.target.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-      const position = {
-        x: pageX,
-        y: pageY + height,
-        width: width
-      };
-      
-      setDropdownPosition(position);
-      setSelectedTransaction(transaction);
-      setIsDropdownVisible(true);
-      
-      // Animate dropdown appearance
-      dropdownScale.setValue(0.8);
-      dropdownOpacity.setValue(0);
-      
-      Animated.parallel([
-        Animated.timing(dropdownScale, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.out(Easing.back(1.1)),
-          useNativeDriver: true,
-        }),
-        Animated.timing(dropdownOpacity, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  }, [dropdownScale, dropdownOpacity]);
-  
-  const hideDropdown = useCallback(() => {
+  // Modal animation functions
+  const showModal = useCallback((transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    modalScale.setValue(0.3);
+    modalOpacity.setValue(0);
+    
     Animated.parallel([
-      Animated.timing(dropdownScale, {
-        toValue: 0.8,
-        duration: 150,
+      Animated.timing(modalScale, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [modalScale, modalOpacity]);
+  
+  const hideModal = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 0.3,
+        duration: 200,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
-      Animated.timing(dropdownOpacity, {
+      Animated.timing(modalOpacity, {
         toValue: 0,
-        duration: 150,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setIsDropdownVisible(false);
       setSelectedTransaction(null);
-      setDropdownPosition(null);
     });
-  }, [dropdownScale, dropdownOpacity]);
+  }, [modalScale, modalOpacity]);
   
   const splitTransaction = useCallback(async (transaction: Transaction) => {
-    hideDropdown();
+    hideModal();
     // TODO: Implement split transaction functionality
     Alert.alert('Split Transaction', 'Split transaction functionality coming soon!');
-  }, [hideDropdown]);
+  }, [hideModal]);
   
   const toggleTransactionMark = useCallback(async (transaction: Transaction) => {
     try {
@@ -838,15 +815,15 @@ export default function FinanceDashboard() {
       if (!response.ok) throw new Error('Failed to update transaction');
       
       await fetchTransactions();
-      hideDropdown();
+      hideModal();
       Alert.alert('Success', `Transaction marked as ${updatedTransaction.mark ? 'paid' : 'unpaid'}`);
     } catch (error) {
       console.error('Error updating transaction mark:', error);
       Alert.alert('Error', 'Failed to update transaction. Please try again.');
     }
-  }, [fetchTransactions, hideDropdown]);
+  }, [fetchTransactions, hideModal]);
   
-  const updateTransactionWithDropdown = useCallback(async (transaction: Transaction) => {
+  const updateTransactionWithModal = useCallback(async (transaction: Transaction) => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
         method: 'PUT',
@@ -857,13 +834,13 @@ export default function FinanceDashboard() {
       if (!response.ok) throw new Error('Failed to update transaction');
       
       await fetchTransactions();
-      hideDropdown();
+      hideModal();
       Alert.alert('Success', 'Transaction updated successfully');
     } catch (error) {
       console.error('Error updating transaction:', error);
       Alert.alert('Error', 'Failed to update transaction. Please try again.');
     }
-  }, [fetchTransactions, hideDropdown]);
+  }, [fetchTransactions, hideModal]);
   
   const navigateMonth = useCallback((direction: 'prev' | 'next') => {
     setDisplayMonth(prev => {
@@ -1139,240 +1116,245 @@ export default function FinanceDashboard() {
     );
   };
   
-  const renderTransactionDropdown = () => {
-    if (!selectedTransaction || !dropdownPosition || !isDropdownVisible) return null;
+  const renderTransactionModal = () => {
+    if (!selectedTransaction) return null;
     
     return (
-      <Animated.View
-        style={[
-          styles.dropdownContainer,
-          {
-            position: 'absolute',
-            top: dropdownPosition.y,
-            left: dropdownPosition.x,
-            width: dropdownPosition.width,
-            transform: [{ scale: dropdownScale }],
-            opacity: dropdownOpacity,
-            zIndex: 1000,
-          }
-        ]}
+      <Modal
+        visible={!!selectedTransaction}
+        animationType="none"
+        transparent
+        onRequestClose={hideModal}
       >
-        <View style={[
-          styles.dropdownContent,
-          { backgroundColor: isDark ? '#1c1c1c' : '#fff' }
-        ]}>
-          {/* Dropdown Header */}
-          <View style={styles.dropdownHeader}>
-            <Text style={[styles.dropdownTitle, { color: isDark ? '#fff' : '#1a1a1a' }]}>
-              Edit Transaction
-            </Text>
-            <Pressable 
-              style={({ pressed }) => [
-                styles.dropdownCloseButton,
-                { 
-                  backgroundColor: isDark ? '#333' : '#f5f5f5',
-                  opacity: pressed ? 0.7 : 1
-                }
-              ]}
-              onPress={hideDropdown}
-            >
-              <Text style={[styles.dropdownCloseIcon, { color: isDark ? '#ccc' : '#666' }]}>
-                ×
-              </Text>
-            </Pressable>
-          </View>
-          
-          <ScrollView style={styles.dropdownBody} showsVerticalScrollIndicator={false}>
-            {/* Transaction fields */}
-            <View style={styles.dropdownField}>
-              <Text style={[styles.dropdownLabel, { color: isDark ? '#aaa' : '#666' }]}>
-                Description
-              </Text>
-              <TextInput
-                style={[
-                  styles.dropdownInput,
-                  { 
-                    color: isDark ? '#fff' : '#1a1a1a',
-                    backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
-                    borderColor: isDark ? '#444' : '#e1e5e9'
-                  }
-                ]}
-                value={selectedTransaction.description}
-                onChangeText={text => 
-                  setSelectedTransaction({ ...selectedTransaction, description: text })
-                }
-                placeholder="Enter description"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-              />
-            </View>
-            
-            <View style={styles.dropdownField}>
-              <Text style={[styles.dropdownLabel, { color: isDark ? '#aaa' : '#666' }]}>
-                Amount
-              </Text>
-              <TextInput
-                style={[
-                  styles.dropdownInput,
-                  { 
-                    color: isDark ? '#fff' : '#1a1a1a',
-                    backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
-                    borderColor: isDark ? '#444' : '#e1e5e9'
-                  }
-                ]}
-                value={selectedTransaction.amount}
-                onChangeText={text => 
-                  setSelectedTransaction({ ...selectedTransaction, amount: text })
-                }
-                placeholder="0.00"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                keyboardType="decimal-pad"
-              />
-            </View>
-            
-            <View style={styles.dropdownField}>
-              <Text style={[styles.dropdownLabel, { color: isDark ? '#aaa' : '#666' }]}>
-                Category
-              </Text>
-              <TextInput
-                style={[
-                  styles.dropdownInput,
-                  { 
-                    color: isDark ? '#fff' : '#1a1a1a',
-                    backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
-                    borderColor: isDark ? '#444' : '#e1e5e9'
-                  }
-                ]}
-                value={selectedTransaction.category}
-                onChangeText={text => 
-                  setSelectedTransaction({ ...selectedTransaction, category: text })
-                }
-                placeholder="Enter category"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-              />
-            </View>
-            
-            <View style={styles.dropdownField}>
-              <Text style={[styles.dropdownLabel, { color: isDark ? '#aaa' : '#666' }]}>
-                Label
-              </Text>
-              <TextInput
-                style={[
-                  styles.dropdownInput,
-                  { 
-                    color: isDark ? '#fff' : '#1a1a1a',
-                    backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
-                    borderColor: isDark ? '#444' : '#e1e5e9'
-                  }
-                ]}
-                value={selectedTransaction.label}
-                onChangeText={text => 
-                  setSelectedTransaction({ ...selectedTransaction, label: text })
-                }
-                placeholder="Enter label"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-              />
-            </View>
-            
-            {/* Category Mapping Information - Read Only */}
-            <View style={[styles.dropdownField, styles.mappingInfoField]}>
-              <Text style={[styles.dropdownLabel, { color: isDark ? '#aaa' : '#666' }]}>
-                Category Mapping (Info)
-              </Text>
-              <View style={[
-                styles.mappingInfoContainer,
-                { 
-                  backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
-                  borderColor: isDark ? '#333' : '#ddd'
-                }
-              ]}>
-                <Text style={[styles.mappingInfoText, { color: isDark ? '#ccc' : '#555' }]}>
-                  Subcategory: {selectedTransaction.bank_category || 'None'}
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={hideModal}
+        >
+          <Animated.View
+            style={[
+              styles.modalContent,
+              { 
+                backgroundColor: isDark ? '#1c1c1c' : '#fff',
+                transform: [{ scale: modalScale }],
+                opacity: modalOpacity,
+              }
+            ]}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#1a1a1a' }]}>
+                  Edit Transaction
                 </Text>
-                <Text style={[styles.mappingArrow, { color: isDark ? '#888' : '#999' }]}>
-                  ↓
-                </Text>
-                <Text style={[styles.mappingInfoText, { color: isDark ? '#ccc' : '#555' }]}>
-                  Main Category: {getTransactionCategory(selectedTransaction, categoryMappings)}
-                </Text>
-                {!getCategoryFromMapping(selectedTransaction.bank_category, categoryMappings) && (
-                  <Text style={[styles.mappingNoteText, { color: isDark ? '#888' : '#777' }]}>
-                    No automatic mapping available
-                  </Text>
-                )}
-              </View>
-            </View>
-            
-            {/* Action buttons */}
-            <View style={styles.dropdownActions}>
-              {/* Primary Actions Row - Split and Mark */}
-              <View style={styles.primaryActions}>
                 <Pressable 
                   style={({ pressed }) => [
-                    styles.actionButton, 
-                    styles.splitButton,
+                    styles.modalCloseButton,
                     { 
-                      backgroundColor: isDark ? '#5E5CE6' : '#5856D6',
-                      opacity: pressed ? 0.8 : 1
+                      backgroundColor: isDark ? '#333' : '#f5f5f5',
+                      opacity: pressed ? 0.7 : 1
                     }
                   ]}
-                  onPress={() => splitTransaction(selectedTransaction)}
+                  onPress={hideModal}
                 >
-                  <Text style={styles.splitButtonText}>Split Transaction</Text>
-                </Pressable>
-                
-                <Pressable 
-                  style={({ pressed }) => [
-                    styles.actionButton, 
-                    styles.markButton,
-                    { 
-                      backgroundColor: selectedTransaction.mark 
-                        ? (isDark ? '#34C759' : '#34C759') 
-                        : (isDark ? '#FF9F0A' : '#FF9500'),
-                      opacity: pressed ? 0.8 : 1
-                    }
-                  ]}
-                  onPress={() => toggleTransactionMark(selectedTransaction)}
-                >
-                  <Text style={styles.markButtonText}>
-                    {selectedTransaction.mark ? 'Mark as Unpaid' : 'Mark as Paid'}
+                  <Text style={[styles.modalCloseIcon, { color: isDark ? '#ccc' : '#666' }]}>
+                    ×
                   </Text>
                 </Pressable>
               </View>
               
-              {/* Secondary Actions Row - Save and Delete */}
-              <View style={styles.secondaryActions}>
-                <Pressable 
-                  style={({ pressed }) => [
-                    styles.actionButton, 
-                    styles.saveButton,
-                    { 
-                      backgroundColor: isDark ? '#0A84FF' : '#007AFF',
-                      opacity: pressed ? 0.8 : 1
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                {/* Transaction fields */}
+                <View style={styles.modalField}>
+                  <Text style={[styles.modalLabel, { color: isDark ? '#aaa' : '#666' }]}>
+                    Description
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { 
+                        color: isDark ? '#fff' : '#1a1a1a',
+                        backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
+                        borderColor: isDark ? '#444' : '#e1e5e9'
+                      }
+                    ]}
+                    value={selectedTransaction.description}
+                    onChangeText={text => 
+                      setSelectedTransaction({ ...selectedTransaction, description: text })
                     }
-                  ]}
-                  onPress={() => updateTransactionWithDropdown(selectedTransaction)}
-                >
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </Pressable>
+                    placeholder="Enter description"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                  />
+                </View>
                 
-                <Pressable 
-                  style={({ pressed }) => [
-                    styles.actionButton, 
-                    styles.deleteButton,
-                    { 
-                      backgroundColor: isDark ? '#FF453A' : '#FF3B30',
-                      opacity: pressed ? 0.8 : 1
+                <View style={styles.modalField}>
+                  <Text style={[styles.modalLabel, { color: isDark ? '#aaa' : '#666' }]}>
+                    Amount
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { 
+                        color: isDark ? '#fff' : '#1a1a1a',
+                        backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
+                        borderColor: isDark ? '#444' : '#e1e5e9'
+                      }
+                    ]}
+                    value={selectedTransaction.amount}
+                    onChangeText={text => 
+                      setSelectedTransaction({ ...selectedTransaction, amount: text })
                     }
-                  ]}
-                  onPress={() => deleteTransaction(selectedTransaction.id)}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Animated.View>
+                    placeholder="0.00"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                
+                <View style={styles.modalField}>
+                  <Text style={[styles.modalLabel, { color: isDark ? '#aaa' : '#666' }]}>
+                    Category
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { 
+                        color: isDark ? '#fff' : '#1a1a1a',
+                        backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
+                        borderColor: isDark ? '#444' : '#e1e5e9'
+                      }
+                    ]}
+                    value={selectedTransaction.category}
+                    onChangeText={text => 
+                      setSelectedTransaction({ ...selectedTransaction, category: text })
+                    }
+                    placeholder="Enter category"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                  />
+                </View>
+                
+                <View style={styles.modalField}>
+                  <Text style={[styles.modalLabel, { color: isDark ? '#aaa' : '#666' }]}>
+                    Label
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.modalInput,
+                      { 
+                        color: isDark ? '#fff' : '#1a1a1a',
+                        backgroundColor: isDark ? '#2a2a2a' : '#f8f9fa',
+                        borderColor: isDark ? '#444' : '#e1e5e9'
+                      }
+                    ]}
+                    value={selectedTransaction.label}
+                    onChangeText={text => 
+                      setSelectedTransaction({ ...selectedTransaction, label: text })
+                    }
+                    placeholder="Enter label"
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                  />
+                </View>
+                
+                {/* Category Mapping Information - Read Only */}
+                <View style={[styles.modalField, styles.mappingInfoField]}>
+                  <Text style={[styles.modalLabel, { color: isDark ? '#aaa' : '#666' }]}>
+                    Category Mapping (Info)
+                  </Text>
+                  <View style={[
+                    styles.mappingInfoContainer,
+                    { 
+                      backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
+                      borderColor: isDark ? '#333' : '#ddd'
+                    }
+                  ]}>
+                    <Text style={[styles.mappingInfoText, { color: isDark ? '#ccc' : '#555' }]}>
+                      Subcategory: {selectedTransaction.bank_category || 'None'}
+                    </Text>
+                    <Text style={[styles.mappingArrow, { color: isDark ? '#888' : '#999' }]}>
+                      ↓
+                    </Text>
+                    <Text style={[styles.mappingInfoText, { color: isDark ? '#ccc' : '#555' }]}>
+                      Main Category: {getTransactionCategory(selectedTransaction, categoryMappings)}
+                    </Text>
+                    {!getCategoryFromMapping(selectedTransaction.bank_category, categoryMappings) && (
+                      <Text style={[styles.mappingNoteText, { color: isDark ? '#888' : '#777' }]}>
+                        No automatic mapping available
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                
+                {/* Action buttons */}
+                <View style={styles.modalActions}>
+                  {/* Primary Actions Row - Split and Mark */}
+                  <View style={styles.primaryActions}>
+                    <Pressable 
+                      style={({ pressed }) => [
+                        styles.actionButton, 
+                        styles.splitButton,
+                        { 
+                          backgroundColor: isDark ? '#5E5CE6' : '#5856D6',
+                          opacity: pressed ? 0.8 : 1
+                        }
+                      ]}
+                      onPress={() => splitTransaction(selectedTransaction)}
+                    >
+                      <Text style={styles.splitButtonText}>Split Transaction</Text>
+                    </Pressable>
+                    
+                    <Pressable 
+                      style={({ pressed }) => [
+                        styles.actionButton, 
+                        styles.markButton,
+                        { 
+                          backgroundColor: selectedTransaction.mark 
+                            ? (isDark ? '#34C759' : '#34C759') 
+                            : (isDark ? '#FF9F0A' : '#FF9500'),
+                          opacity: pressed ? 0.8 : 1
+                        }
+                      ]}
+                      onPress={() => toggleTransactionMark(selectedTransaction)}
+                    >
+                      <Text style={styles.markButtonText}>
+                        {selectedTransaction.mark ? 'Mark as Unpaid' : 'Mark as Paid'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  
+                  {/* Secondary Actions Row - Save and Delete */}
+                  <View style={styles.secondaryActions}>
+                    <Pressable 
+                      style={({ pressed }) => [
+                        styles.actionButton, 
+                        styles.saveButton,
+                        { 
+                          backgroundColor: isDark ? '#0A84FF' : '#007AFF',
+                          opacity: pressed ? 0.8 : 1
+                        }
+                      ]}
+                      onPress={() => updateTransactionWithModal(selectedTransaction)}
+                    >
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </Pressable>
+                    
+                    <Pressable 
+                      style={({ pressed }) => [
+                        styles.actionButton, 
+                        styles.deleteButton,
+                        { 
+                          backgroundColor: isDark ? '#FF453A' : '#FF3B30',
+                          opacity: pressed ? 0.8 : 1
+                        }
+                      ]}
+                      onPress={() => deleteTransaction(selectedTransaction.id)}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </ScrollView>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Modal>
     );
   };
   
@@ -1400,7 +1382,7 @@ export default function FinanceDashboard() {
       return (
         <TransactionItem
           transaction={item}
-          onPress={(event) => showDropdown(item, event)}
+          onPress={() => showModal(item)}
           colorScheme={colorScheme || 'light'}
           categoryMappings={categoryMappings}
         />
@@ -1439,7 +1421,7 @@ export default function FinanceDashboard() {
         }
       />
       
-      {renderTransactionDropdown()}
+      {renderTransactionModal()}
     </SafeAreaView>
   );
 }
@@ -1770,24 +1752,26 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   
-  // Dropdown styles
-  dropdownContainer: {
-    position: 'absolute',
-    zIndex: 1000,
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  dropdownContent: {
+  modalContent: {
+    width: '100%',
     maxWidth: 380,
-    maxHeight: SCREEN_HEIGHT * 0.6,
+    maxHeight: SCREEN_HEIGHT * 0.75,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
   },
-  dropdownHeader: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1796,42 +1780,42 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(0,0,0,0.08)',
   },
-  dropdownTitle: {
+  modalTitle: {
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
-  dropdownCloseButton: {
+  modalCloseButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dropdownCloseIcon: {
+  modalCloseIcon: {
     fontSize: 20,
     fontWeight: '400',
   },
-  dropdownBody: {
+  modalBody: {
     padding: 18,
   },
-  dropdownField: {
+  modalField: {
     marginBottom: 18,
   },
-  dropdownLabel: {
+  modalLabel: {
     fontSize: 13,
     fontWeight: '500',
     marginBottom: 6,
     letterSpacing: 0.2,
   },
-  dropdownInput: {
+  modalInput: {
     fontSize: 15,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 44,
   },
-  dropdownActions: {
+  modalActions: {
     marginTop: 16,
     gap: 12,
   },
