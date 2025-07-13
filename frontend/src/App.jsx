@@ -16,7 +16,7 @@ import {
 } from 'chart.js';
 
 // Import utility functions
-import { calculateTotals } from './utils/calculateTotals';
+
 import { applyFilters } from './utils/filterTransactions';
 import { groupSplitTransactions } from './utils/transactionGrouping';
 import { 
@@ -537,6 +537,9 @@ const App = () => {
   const [categoryFilter, setCategoryFilter] = useState([]);
   // Add label filter for chart
   const [chartLabelFilter, setChartLabelFilter] = useState('All');
+  // Add state for new user management system
+  const [users, setUsers] = useState([]);
+  const [splitAllocations, setSplitAllocations] = useState({});
   // Add state for transaction month filtering
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -568,6 +571,122 @@ const App = () => {
   // Add screen grab state
   const [isScreenGrabOpen, setIsScreenGrabOpen] = useState(false);
   const screenGrabRef = useRef(null);
+
+  // Helper functions for new user management system
+  const getTransactionLabel = (transaction) => {
+    const allocations = splitAllocations[transaction.id];
+    
+    if (!allocations || allocations.length === 0) {
+      // Fallback to legacy label for backward compatibility
+      return transaction.label || null;
+    }
+    
+    // If single user, show their display name
+    if (allocations.length === 1) {
+      return allocations[0].display_name;
+    }
+    
+    // For multiple users, check if it's an equal split
+    const isEqualSplit = () => {
+      // Check if all allocations have the same split_type_code and it's 'equal'
+      const allEqualType = allocations.every(allocation => allocation.split_type_code === 'equal');
+      
+      if (allEqualType) {
+        return true;
+      }
+      
+      // Alternative check: if percentages are equal (indicating equal split)
+      if (allocations.length > 1 && allocations[0].percentage) {
+        const firstPercentage = parseFloat(allocations[0].percentage);
+        const expectedPercentage = 100 / allocations.length;
+        const tolerance = 0.1; // Small tolerance for floating point comparison
+        
+        return allocations.every(allocation => {
+          const percentage = parseFloat(allocation.percentage);
+          return Math.abs(percentage - expectedPercentage) < tolerance;
+        });
+      }
+      
+      // Alternative check: if amounts are equal (for equal splits)
+      if (allocations.length > 1) {
+        const firstAmount = Math.abs(parseFloat(allocations[0].amount));
+        const tolerance = 0.01; // 1 cent tolerance
+        
+        return allocations.every(allocation => {
+          const amount = Math.abs(parseFloat(allocation.amount));
+          return Math.abs(amount - firstAmount) < tolerance;
+        });
+      }
+      
+      return false;
+    };
+    
+    // If it's an equal split among multiple users
+    if (isEqualSplit()) {
+      // If exactly 2 users with equal split, show "Both"
+      if (allocations.length === 2) {
+        return 'Both';
+      }
+      
+      // If 3+ users with equal split, show "All users"
+      if (allocations.length >= 3) {
+        return 'All users';
+      }
+    }
+    
+    // For other cases (mixed split types), show first user + count
+    return `${allocations[0].display_name} +${allocations.length - 1}`;
+  };
+
+  const getUserTotalFromAllocations = (userId, filteredTransactions) => {
+    let total = 0;
+    
+    if (!Array.isArray(filteredTransactions)) {
+      return 0;
+    }
+    
+    filteredTransactions.forEach(transaction => {
+      const allocations = splitAllocations[transaction.id];
+      if (allocations && Array.isArray(allocations)) {
+        const userAllocation = allocations.find(allocation => allocation.user_id === userId);
+        if (userAllocation && typeof userAllocation.amount === 'number') {
+          total += userAllocation.amount;
+        }
+      } else {
+        // Fallback to legacy label system for backward compatibility
+        // Guard clause: only process legacy labels if users is loaded
+        if (users && Array.isArray(users)) {
+          const user = users.find(u => u.id === userId);
+          if (user && transaction.label === user.display_name) {
+            total += parseFloat(transaction.amount) || 0;
+          } else if (user && transaction.label === 'Both' && users.length >= 2) {
+            // For legacy "Both" transactions, split equally
+            total += (parseFloat(transaction.amount) || 0) / 2;
+          }
+        }
+      }
+    });
+    
+    return typeof total === 'number' && !isNaN(total) ? total : 0;
+  };
+
+  const calculateTotalsFromAllocations = (filteredTransactions) => {
+    const totals = {};
+    
+    // Guard clause: return empty totals if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return totals;
+    }
+    
+    // Calculate totals for each user using split allocations
+    users.forEach(user => {
+      const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions);
+      // Ensure all totals are numeric (handle undefined, null, NaN cases)
+      totals[user.display_name] = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
+    });
+    
+    return totals;
+  };
   
   // Add split transaction states
   const [isSplitting, setIsSplitting] = useState(false);
@@ -610,7 +729,7 @@ const App = () => {
         const response = await axios.get(getApiUrl('/initial-data'));
         
         if (response.data.success) {
-          const { transactions, categoryMappings, labels, bankCategories } = response.data.data;
+          const { transactions, categoryMappings, labels, bankCategories, users, splitAllocations } = response.data.data;
           
           // Set all data from the combined response
           setCategoryMappings(categoryMappings);
@@ -619,6 +738,10 @@ const App = () => {
           setAllFilteredTransactions(transactions);
           setLabels(labels);
           setAvailableBankCategories(bankCategories);
+          
+          // Set new user management system data
+          setUsers(users || []);
+          setSplitAllocations(splitAllocations || {});
           
           // Update loading states
           setIsCategoryMappingsLoading(false);
@@ -799,7 +922,7 @@ const App = () => {
         setFilteredTransactions(tableFiltered);
         
         // Recalculate totals
-        const newTotals = calculateTotals(tableFiltered, labels);
+        const newTotals = calculateTotalsFromAllocations(tableFiltered);
         setTotals(newTotals);
         
       } else {
@@ -897,8 +1020,8 @@ const App = () => {
 
     setFilteredTransactions(tableFiltered);
 
-    // Calculate totals using the utility function
-    const newTotals = calculateTotals(tableFiltered, labels);
+    // Calculate totals using the new allocation-based system
+    const newTotals = calculateTotalsFromAllocations(tableFiltered);
     setTotals(newTotals);
   }, [
     transactions, 
@@ -909,7 +1032,9 @@ const App = () => {
     categoryFilter, 
     labels, 
     currentMonth,
-    currentYear
+    currentYear,
+    users,
+    splitAllocations
   ]);
 
   const data = {
@@ -937,17 +1062,32 @@ const App = () => {
   // Filter transactions based on chart label filter
   const getChartFilteredTransactions = () => {
     return allFilteredTransactions.filter(transaction => {
-      // 1. Filter out unlabelled transactions
-      if (!transaction.label) {
-        return false;
+      const allocations = splitAllocations[transaction.id];
+      
+      // 1. Filter out transactions without allocations (and fallback for legacy unlabelled)
+      if (!allocations || allocations.length === 0) {
+        if (!transaction.label) {
+          return false;
+        }
       }
       
-      // 2. Apply chart label filter using configuration instead of hardcoded names
+      // 2. Apply chart label filter using new user system
       if (chartLabelFilter !== 'All') {
-        if (chartLabelFilter === labels[0]) { // Currently set to Ruby for development purposes
-          return transaction.label === labels[0] || transaction.label === labels[2]; 
-        } else if (chartLabelFilter === labels[1]) { // Currently set to Jack for development purposes
-          return transaction.label === labels[1] || transaction.label === labels[2];
+        // Find the user by display name
+        const selectedUser = users.find(user => user.display_name === chartLabelFilter);
+        if (selectedUser && allocations) {
+          // Check if this user has an allocation for this transaction
+          const hasUserAllocation = allocations.some(allocation => allocation.user_id === selectedUser.id);
+          if (!hasUserAllocation) {
+            return false;
+          }
+        } else if (selectedUser && !allocations) {
+          // Fallback to legacy label system
+          const isUserTransaction = transaction.label === selectedUser.display_name;
+          const isBothTransaction = transaction.label === 'Both' && users.length >= 2;
+          if (!isUserTransaction && !isBothTransaction) {
+            return false;
+          }
         }
       }
       
@@ -964,7 +1104,7 @@ const App = () => {
   // Use the filtering function to get filtered transactions
   const chartFilteredTransactions = getChartFilteredTransactions();
   
-  // Process the transactions and only include categories with data
+    // Process the transactions and only include categories with data
   uniqueCategories.forEach(category => {
     const categoryData = Array(12).fill(0); // Initialize an array for each month
     let hasData = false; // Track if this category has any data points
@@ -974,11 +1114,30 @@ const App = () => {
       const transactionCategory = transaction.category;  // Use direct category field
       
       if (transactionCategory === category) {
-        let amount = parseFloat(transaction.amount) || 0;
+        let amount = 0;
         
-        // If it's a "Both" transaction and we're filtering by a specific label, divide by 2
-        if (transaction.label === labels[2] && chartLabelFilter !== 'All') {
-          amount = amount / 2;
+        // Use allocation system if available
+        const allocations = splitAllocations[transaction.id];
+        if (allocations && chartLabelFilter !== 'All') {
+          // Get the specific user's allocation
+          const selectedUser = users.find(user => user.display_name === chartLabelFilter);
+          if (selectedUser) {
+            const userAllocation = allocations.find(allocation => allocation.user_id === selectedUser.id);
+            if (userAllocation) {
+              amount = userAllocation.amount;
+            }
+          }
+        } else if (allocations && chartLabelFilter === 'All') {
+          // Sum all allocations for "All" view
+          amount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+        } else {
+          // Fallback to legacy label system
+          amount = parseFloat(transaction.amount) || 0;
+          
+          // If it's a "Both" transaction and we're filtering by a specific user, divide by 2
+          if (transaction.label === 'Both' && chartLabelFilter !== 'All') {
+            amount = amount / 2;
+          }
         }
         
         if (amount !== 0) {
@@ -987,7 +1146,7 @@ const App = () => {
         }
       }
     });
-  
+
     // Only add to datasets if this category has data
     if (hasData) {
       data.datasets.push({
@@ -1020,10 +1179,13 @@ const App = () => {
   };
 
   // Updated getRowColor function using modern classes
+  // TODO: Fix this so it is not hardcoded and works with the new user system
   const getRowLabelClass = (label) => {
-    if (label === labels[0]) return 'row-ruby';
-    if (label === labels[1]) return 'row-jack';
-    if (label === labels[2]) return 'row-both';
+    if (!label) return '';
+    const lower = label.toLowerCase();
+    if (lower.includes('ruby')) return 'row-ruby';
+    if (lower.includes('jack')) return 'row-jack';
+    if (lower.includes('both') || lower.includes('all user')) return 'row-group';
     return '';
   };
   
@@ -1117,17 +1279,337 @@ const App = () => {
     }
   };
 
+  // New function to handle split configuration updates for label field
+  const handleSplitConfigUpdate = async (transactionId, newLabelValue) => {
+    try {
+      setIsUpdating(true);
+      console.log(`🔄 Updating split configuration for transaction ${transactionId} with label: ${newLabelValue}`);
+
+      // Guard clause: return early if users is not loaded yet
+      if (!users || !Array.isArray(users)) {
+        throw new Error('Users data not loaded yet');
+      }
+
+      // Handle empty/null label value - delete existing split configuration
+      if (!newLabelValue || newLabelValue === '') {
+        console.log(`🗑️ Deleting split configuration for transaction ${transactionId} - label set to empty/null`);
+        
+        try {
+          const response = await axios.delete(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=shared`));
+          if (response.data.success) {
+            console.log(`✅ Deleted split configuration for transaction ${transactionId}`);
+            
+            // Update local state to reflect the change
+            setTransactions(prevTransactions => 
+              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            setFilteredTransactions(prevFiltered => 
+              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            
+            // Update split allocations state
+            setSplitAllocations(prev => {
+              const updated = {...prev};
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            // Show success notification
+            showSuccessNotification('Split configuration removed successfully');
+            return;
+          }
+        } catch (deleteErr) {
+          if (deleteErr.response?.status === 404) {
+            // Split config doesn't exist, just update the label to null
+            console.log(`ℹ️ No split configuration found to delete for transaction ${transactionId}`);
+            
+            // Still update local state even if no split config existed
+            setTransactions(prevTransactions => 
+              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            setFilteredTransactions(prevFiltered => 
+              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            
+            // Update split allocations state
+            setSplitAllocations(prev => {
+              const updated = {...prev};
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            showSuccessNotification('Label cleared successfully');
+            return;
+          } else {
+            throw deleteErr;
+          }
+        }
+        return;
+      }
+
+      // Determine users for the split based on the new label value
+      let splitUsers = [];
+      
+      if (newLabelValue === 'Both' || newLabelValue === 'All users') {
+        // Equal split between all active users (excluding default)
+        const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+        splitUsers = activeUsers.map(user => ({ id: user.id }));
+      } else if (newLabelValue && newLabelValue !== '') {
+        // Single user assignment
+        const selectedUser = users.find(user => user.display_name === newLabelValue);
+        if (selectedUser) {
+          splitUsers = [{ id: selectedUser.id }];
+        } else {
+          throw new Error(`User not found: ${newLabelValue}`);
+        }
+      }
+
+      if (splitUsers.length === 0) {
+        throw new Error('No valid users found for split configuration');
+      }
+
+      // Check if split configuration already exists
+      let existingSplitConfig = null;
+      try {
+        const existingResponse = await axios.get(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=shared`));
+        if (existingResponse.data.success && existingResponse.data.data) {
+          existingSplitConfig = existingResponse.data.data;
+        }
+      } catch (checkErr) {
+        // Split config doesn't exist yet, will create new one
+        console.log(`ℹ️ No existing split configuration found for transaction ${transactionId}`);
+      }
+
+      const splitConfigData = {
+        transaction_type: 'shared',
+        split_type_code: 'equal', // Default to equal split as specified
+        users: splitUsers,
+        created_by: 1 // Default user ID, could be made dynamic based on current user
+      };
+
+      let response;
+      if (existingSplitConfig) {
+        // Update existing split configuration
+        response = await axios.put(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+        console.log(`✅ Updated existing split configuration for transaction ${transactionId}`);
+      } else {
+        // Create new split configuration
+        response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+        console.log(`✅ Created new split configuration for transaction ${transactionId}`);
+      }
+
+      if (response.data.success) {
+        const { allocations } = response.data.data;
+        
+        // Update split allocations state for this transaction
+        setSplitAllocations(prev => ({
+          ...prev,
+          [transactionId]: allocations
+        }));
+
+        // Update transaction state - the label will be derived from split allocations
+        setTransactions(prevTransactions => 
+          prevTransactions.map(t => 
+            t.id === transactionId 
+              ? {...t, label: newLabelValue} // Temporary update, will be overridden by getTransactionLabel
+              : t
+          )
+        );
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(t => 
+            t.id === transactionId 
+              ? {...t, label: newLabelValue} // Temporary update, will be overridden by getTransactionLabel
+              : t
+          )
+        );
+
+        // Show success notification
+        showSuccessNotification(
+          existingSplitConfig 
+            ? 'Split configuration updated successfully' 
+            : 'Split configuration created successfully'
+        );
+      }
+
+    } catch (err) {
+      console.error('Error updating split configuration:', err);
+      let errorMessage = 'Failed to update split configuration. Please try again.';
+      
+      if (err.response && err.response.data) {
+        errorMessage = err.response.data.error || 
+                       (err.response.data.errors && err.response.data.errors.join(', ')) || 
+                       errorMessage;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Show error notification
+      showErrorNotification(errorMessage);
+    } finally {
+      setIsUpdating(false);
+      setEditCell(null);
+    }
+  };
+
+  // Helper function to show success notifications
+  const showSuccessNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #c3e6cb';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 3000);
+  };
+
+  // Helper function to show error notifications
+  const showErrorNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#f8d7da';
+    notification.style.color = '#721c24';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #f5c6cb';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 5000);
+  };
+
+  // Helper function to generate dynamic dropdown options based on active users
+  const getLabelDropdownOptions = () => {
+    // Guard clause: return default options if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return [{ value: '', label: 'None' }];
+    }
+    
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    const options = [
+      { value: '', label: 'None' }
+    ];
+    
+    // Add individual user options
+    activeUsers.forEach(user => {
+      options.push({
+        value: user.display_name,
+        label: user.display_name
+      });
+    });
+    
+    // Add collective option based on number of users
+    if (activeUsers.length === 2) {
+      options.push({
+        value: 'Both',
+        label: 'Both (Equal Split)'
+      });
+    } else if (activeUsers.length >= 3) {
+      options.push({
+        value: 'All users',
+        label: 'All users (Equal Split)'
+      });
+    }
+    
+    return options;
+  };
+
+  // Helper function to create split configuration for newly created transactions
+  const createSplitConfigForNewTransaction = async (transactionId, labelValue) => {
+    // Guard clause: return early if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      console.error('Users data not loaded yet');
+      return;
+    }
+    
+    // If no label value is provided, don't create a split configuration
+    if (!labelValue || labelValue === '') {
+      console.log(`ℹ️ No split configuration created for transaction ${transactionId} - no label selected`);
+      return;
+    }
+    
+    // Determine users for the split based on the label value
+    let splitUsers = [];
+    
+    if (labelValue === 'Both' || labelValue === 'All users') {
+      // Equal split between all active users (excluding default)
+      const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+      splitUsers = activeUsers.map(user => ({ id: user.id }));
+    } else if (labelValue && labelValue !== '') {
+      // Single user assignment
+      const selectedUser = users.find(user => user.display_name === labelValue);
+      if (selectedUser) {
+        splitUsers = [{ id: selectedUser.id }];
+      } else {
+        throw new Error(`User not found: ${labelValue}`);
+      }
+    }
+
+    if (splitUsers.length === 0) {
+      throw new Error('No valid users found for split configuration');
+    }
+
+    const splitConfigData = {
+      transaction_type: 'shared',
+      split_type_code: 'equal', // Default to equal split
+      users: splitUsers,
+      created_by: 1 // Default user ID
+    };
+
+    const response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+    
+    if (response.data.success) {
+      const { allocations } = response.data.data;
+      
+      // Update split allocations state for this transaction
+      setSplitAllocations(prev => ({
+        ...prev,
+        [transactionId]: allocations
+      }));
+
+      console.log(`✅ Created split configuration for new transaction ${transactionId}`);
+    }
+  };
+
   const handleUpdate = async (transactionId, field) => {
-    await optimizedHandleUpdate(
-      transactionId, 
-      field, 
-      editValue, 
-      transactions, 
-      setTransactions, 
-      setFilteredTransactions, 
-      setEditCell, 
-      setIsUpdating
-    );
+    // Special handling for label field - use new split configuration system
+    if (field === 'label') {
+      await handleSplitConfigUpdate(transactionId, editValue);
+    } else {
+      // For all other fields, use the existing optimized update handler
+      await optimizedHandleUpdate(
+        transactionId, 
+        field, 
+        editValue, 
+        transactions, 
+        setTransactions, 
+        setFilteredTransactions, 
+        setEditCell, 
+        setIsUpdating
+      );
+    }
   };
 
   // Modernized renderCell function
@@ -1213,9 +1695,10 @@ const App = () => {
               style={{ textAlign: 'center' }}
               autoFocus
             >
-              <option value="">Select a label</option>
-              {labels.map(label => (
-                <option key={label} value={label}>{label}</option>
+              {getLabelDropdownOptions().map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
             </select>
           );
@@ -1289,6 +1772,8 @@ const App = () => {
               </div>
             )}
           </div>
+        ) : field === 'label' ? (
+          getTransactionLabel(transaction)
         ) : (
           transaction[field]
         )}
@@ -1337,7 +1822,7 @@ const App = () => {
       description: '',
       amount: '',
       bank_category: '',
-      label: labels[0] || ''
+      label: '' // Default to empty (no split)
     });
   };
 
@@ -1366,12 +1851,28 @@ const App = () => {
         return;
       }
       
+      // Extract label value and remove from transaction data for separate handling
+      const labelValue = transactionData.label;
+      const transactionDataForCreation = { ...transactionData };
+      delete transactionDataForCreation.label; // Remove label from transaction creation
+
       // Send data to backend
-      const response = await axios.post(getApiUrl('/transactions'), transactionData);
+      const response = await axios.post(getApiUrl('/transactions'), transactionDataForCreation);
       
       if (response.data.success) {
         // Add the new transaction to state
         const addedTransaction = response.data.data;
+
+        // If a label was specified, create split configuration
+        if (labelValue) {
+          try {
+            await createSplitConfigForNewTransaction(addedTransaction.id, labelValue);
+          } catch (splitErr) {
+            console.error('Error creating split configuration for new transaction:', splitErr);
+            // Don't fail the entire transaction creation, just show a warning
+            showErrorNotification('Transaction created but split configuration failed. You can edit the label to set it up.');
+          }
+        }
         
         // Update transactions list
         setTransactions(prev => [addedTransaction, ...prev]);
@@ -1425,7 +1926,7 @@ const App = () => {
             setFilteredTransactions(prev => [addedTransaction, ...prev]);
             
             // Update totals
-            const newTotals = calculateTotals([...filteredTransactions, addedTransaction], labels);
+            const newTotals = calculateTotalsFromAllocations([...filteredTransactions, addedTransaction]);
             setTotals(newTotals);
           }
         }
@@ -1738,7 +2239,7 @@ const App = () => {
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
                   <tr 
-                    className={getRowLabelClass(transaction.label)} 
+                    className={getRowLabelClass(getTransactionLabel(transaction))} 
                     style={{ 
                       backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
                                      transaction.split_from_id ? '#f7fbff' : undefined,
@@ -2148,23 +2649,19 @@ const App = () => {
             borderBottom: '1px solid #dee2e6',
             paddingBottom: '3px'
           }}>Summary</h3>
-          {labels[0] && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-              <span>{labels[0]}</span>
-              <span style={{ fontWeight: 'bold', color: totals[labels[0]] < 0 ? '#e53935' : '#43a047' }}>
-                {totals[labels[0]] < 0 ? `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : `$${totals[labels[0]].toFixed(2)}`}
+          {/* Dynamically render user totals */}
+          {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map(user => (
+            <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>{user.display_name}</span>
+              <span style={{ fontWeight: 'bold', color: (totals[user.display_name] || 0) < 0 ? '#e53935' : '#43a047' }}>
+                {(totals[user.display_name] || 0) < 0 ? 
+                  `-$${Math.abs(totals[user.display_name] || 0).toFixed(2)}` : 
+                  `$${(totals[user.display_name] || 0).toFixed(2)}`}
               </span>
             </div>
-          )}
-          {labels[1] && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-              <span>{labels[1]}</span>
-              <span style={{ fontWeight: 'bold', color: totals[labels[1]] < 0 ? '#e53935' : '#43a047' }}>
-                {totals[labels[1]] < 0 ? `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : `$${totals[labels[1]].toFixed(2)}`}
-              </span>
-            </div>
-          )}
-          {labels[2] && (
+          ))}
+          {/* Total Spend - sum of all users */}
+          {users && Array.isArray(users) && users.filter(user => user.username !== 'default').length >= 2 && (
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
@@ -2174,10 +2671,22 @@ const App = () => {
               fontWeight: 'bold'
             }}>
               <span>Total Spend</span>
-              <span style={{ color: (totals[labels[0]] + totals[labels[1]]) < 0 ? '#e53935' : '#43a047' }}>
-                {(totals[labels[0]] + totals[labels[1]]) < 0 ? 
-                  `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
-                  `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`}
+              <span style={{ 
+                color: (() => {
+                  const totalSpend = (users && Array.isArray(users)) ? users
+                    .filter(user => user.username !== 'default')
+                    .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                  return totalSpend < 0 ? '#e53935' : '#43a047';
+                })()
+              }}>
+                {(() => {
+                  const totalSpend = (users && Array.isArray(users)) ? users
+                    .filter(user => user.username !== 'default')
+                    .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                  return totalSpend < 0 ? 
+                    `-$${Math.abs(totalSpend).toFixed(2)}` : 
+                    `$${totalSpend.toFixed(2)}`;
+                })()}
               </span>
             </div>
           )}
@@ -2463,8 +2972,8 @@ const App = () => {
 
         setFilteredTransactions(tableFiltered);
 
-        // Calculate totals using the utility function
-        const newTotals = calculateTotals(tableFiltered, labels);
+        // Calculate totals using the new allocation-based system
+        const newTotals = calculateTotalsFromAllocations(tableFiltered);
         setTotals(newTotals);
       } else {
         // Show error notification
@@ -3131,23 +3640,24 @@ const App = () => {
         }
         
         /* Enhanced row styling for better discernibility */
+        /* TODO: Fix this so it is not hardcoded and works with the new user system */
         .row-ruby {
           background-color: rgba(255, 99, 132, 0.25) !important;
           border-left: 4px solid rgba(255, 99, 132, 0.8);
         }
-        
+         
         .row-jack {
           background-color: rgba(54, 162, 235, 0.25) !important;
           border-left: 4px solid rgba(54, 162, 235, 0.8);
         }
         
-        .row-both {
+        .row-group {
           background-color: rgba(75, 192, 95, 0.25) !important;
           border-left: 4px solid rgba(75, 192, 95, 0.8);
         }
         
         /* Styling for unlabeled rows */
-        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-both) {
+        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-group) {
           background-color: white;
           border-left: 4px solid #d1d1d1;
         }
@@ -3578,7 +4088,7 @@ const App = () => {
                     textAlign: 'center'
                   }}>
                     {chartLabelFilter === 'All' 
-                      ? 'All-Time Transactions' 
+                      ? 'All Users - All-Time Transactions' 
                       : `${chartLabelFilter}'s All-Time Transactions`}
                   </h3>
                   
@@ -3607,13 +4117,12 @@ const App = () => {
                         fontSize: '13px'
                       }}
                     >
-                      <option value="All">All Transactions</option>
-                      {labels.length > 0 && (
-                        <>
-                          <option value={labels[0]}>{labels[0]}'s</option>
-                          <option value={labels[1]}>{labels[1]}'s</option>
-                        </>
-                      )}
+                      <option value="All">All Users Combined</option>
+                      {users.filter(user => user.username !== 'default').map(user => (
+                        <option key={user.id} value={user.display_name}>
+                          {user.display_name}'s
+                        </option>
+                      ))}
                     </select>
                     <button 
                       data-filter="category"
@@ -4010,9 +4519,10 @@ const App = () => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <option value="">Select a label</option>
-                      {labels.map(label => (
-                        <option key={label} value={label}>{label}</option>
+                      {getLabelDropdownOptions().map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -4058,57 +4568,48 @@ const App = () => {
             <LoadingSpinner />
           ) : (
             <div className="totals-container">
-              {labels[0] && (
-                <div 
-                  style={{ 
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)', 
-                    padding: '15px', 
-                    borderRadius: '8px',
-                    borderRight: '5px solid rgba(255, 99, 132, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    maxWidth: 'fit-content'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
-                    {labels[0]}
+              {/* Dynamically render user totals */}
+              {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map((user, index) => {
+                const colorOptions = [
+                  { bg: 'rgba(54, 162, 235, 0.2)', border: 'rgba(54, 162, 235, 1)' },
+                  { bg: 'rgba(255, 99, 132, 0.2)', border: 'rgba(255, 99, 132, 1)' },
+                  { bg: 'rgba(255, 206, 86, 0.2)', border: 'rgba(255, 206, 86, 1)' },
+                  { bg: 'rgba(75, 192, 192, 0.2)', border: 'rgba(75, 192, 192, 1)' }
+                ];
+                const colors = colorOptions[index % colorOptions.length];
+                
+                return (
+                  <div 
+                    key={user.id}
+                    style={{ 
+                      backgroundColor: colors.bg, 
+                      padding: '15px', 
+                      borderRadius: '8px',
+                      borderRight: `5px solid ${colors.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      maxWidth: 'fit-content'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                      {user.display_name}
+                    </div>
+                    <div style={{ minWidth: '100px', textAlign: 'right' }}>
+                      {(() => {
+                        const userTotal = totals[user.display_name];
+                        const safeTotal = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
+                        return safeTotal < 0 ? 
+                          `-$${Math.abs(safeTotal).toFixed(2)}` : 
+                          `$${safeTotal.toFixed(2)}`;
+                      })()}
+                    </div>
                   </div>
-                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
-                    {totals[labels[0]] != null ? 
-                      (totals[labels[0]] < 0 ? 
-                        `-$${Math.abs(totals[labels[0]]).toFixed(2)}` : 
-                        `$${totals[labels[0]].toFixed(2)}`)
-                      : '$0.00'}
-                  </div>
-                </div>
-              )}
-              {labels[1] && (
-                <div 
-                  style={{ 
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)', 
-                    padding: '15px', 
-                    borderRadius: '8px',
-                    borderRight: '5px solid rgba(54, 162, 235, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    maxWidth: 'fit-content'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
-                    {labels[1]}
-                  </div>
-                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
-                    {totals[labels[1]] != null ? 
-                      (totals[labels[1]] < 0 ? 
-                        `-$${Math.abs(totals[labels[1]]).toFixed(2)}` : 
-                        `$${totals[labels[1]].toFixed(2)}`)
-                      : '$0.00'}
-                  </div>
-                </div>
-              )}
-              {labels[2] && (
+                );
+              })}
+              
+              {/* Total Spend - sum of all users */}
+              {users && Array.isArray(users) && users.filter(user => user.username !== 'default').length >= 2 && (
                 <div 
                   style={{ 
                     backgroundColor: 'rgba(75, 192, 95, 0.2)', 
@@ -4125,11 +4626,14 @@ const App = () => {
                     Total Spend
                   </div>
                   <div style={{ minWidth: '100px', textAlign: 'right' }}>
-                    {(totals[labels[0]] != null && totals[labels[1]] != null) ? 
-                      ((totals[labels[0]] + totals[labels[1]]) < 0 ? 
-                        `-$${Math.abs(totals[labels[0]] + totals[labels[1]]).toFixed(2)}` : 
-                        `$${(totals[labels[0]] + totals[labels[1]]).toFixed(2)}`)
-                      : '$0.00'}
+                    {(() => {
+                      const totalSpend = (users && Array.isArray(users)) ? users
+                        .filter(user => user.username !== 'default')
+                        .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                      return totalSpend < 0 ? 
+                        `-$${Math.abs(totalSpend).toFixed(2)}` : 
+                        `$${totalSpend.toFixed(2)}`;
+                    })()}
                   </div>
                 </div>
               )}

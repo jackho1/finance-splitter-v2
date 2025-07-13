@@ -586,7 +586,7 @@ const PersonalTransactions = ({ helpTextVisible }) => {
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   
   // Add user ID constant for database operations | TODO: Add login functionality to remove this hardcoded value
-  const userId = 'default';
+  const userId = 'Jack';
   
   // Database API functions for auto distribution rules
   const loadAutoDistributionRules = async () => {
@@ -1078,16 +1078,17 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           }));
           setAutoDistributionRules(transformedRules);
           
-          // Load personal settings
+          // Load personal settings using the dedicated function to ensure proper boolean handling
           if (personalSettings && Object.keys(personalSettings).length > 0) {
-            setHideZeroBalanceBuckets(personalSettings.hide_zero_balance_buckets || false);
-            setAutoDistributionEnabled(personalSettings.auto_distribution_enabled || false);
+            // Use proper boolean handling - only default to false if the value is null/undefined
+            setHideZeroBalanceBuckets(personalSettings.hide_zero_balance_buckets ?? false);
+            setAutoDistributionEnabled(personalSettings.auto_distribution_enabled ?? false);
             setLastAutoDistributionMonth(personalSettings.last_auto_distribution_month || '');
-            setEnableNegativeOffsetBucket(personalSettings.enable_negative_offset_bucket || false);
+            setEnableNegativeOffsetBucket(personalSettings.enable_negative_offset_bucket ?? false);
             setSelectedNegativeOffsetBucket(personalSettings.selected_negative_offset_bucket || '');
             
             // Personal split settings
-            setPersonalSplitEnabled(personalSettings.personal_split_enabled || false);
+            setPersonalSplitEnabled(personalSettings.personal_split_enabled ?? false);
             setPersonalSplitDefaultDays(personalSettings.personal_split_default_days || 7);
             
             // Handle category order if it exists in database
@@ -1130,6 +1131,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
           
           // Load personal split configuration
           await loadPersonalSplitConfig();
+          
+          // Also call loadPersonalSettings as a backup to ensure proper boolean handling
+          await loadPersonalSettings();
           
           setIsTransactionsLoading(false);
           

@@ -402,4 +402,17 @@
   - Expand bank category dropdown menu to be slightly larger to fit large texts.
 
 - [ ] **Budgets progress bar color**:
+
   - Update the budgets progress bar color to change depending on the % spent. ideally it is a smooth transition change, however incremental changes e.g., 50%, 75% would also suffice.
+
+- [ ] **Color management system**:
+
+  - Create a proper color management system so that user color preferences can be stored and is associated with selected users. Current solution simply arbitrarily selects a hardcoded color.
+
+- [ ] **Advanced Split System**:
+
+  - Add a more advanced transaction split system.
+
+- [ ] **Add offset_settings table**:
+
+  - Add this table and have it aligned somewhat simialarly to personal_settings table (likely with less features overall)

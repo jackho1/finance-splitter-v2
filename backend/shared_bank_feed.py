@@ -55,24 +55,31 @@ class SharedBankFeed(BaseBankFeed):
         """
         Automatically label transactions based on bank category.
         
+        DISABLED: Auto labeling system has been disabled in favor of manual 
+        split configuration through the UI using the new split config system.
+        
         Args:
             bank_category: The bank category from the transaction
             
         Returns:
-            The appropriate person label from PEOPLE list or None for shared/unlabeled categories.
+            None (auto labeling disabled)
         """
-        no_label_categories = ["Dining", "Transfers"]
-        first_person_categories = [
-            "Personal Items", "Personal Care", "Hobbies", 
-            "Entertainment/Recreation", "Vehicle", "Gym", "Fuel"
-        ]
+        # Auto labeling system disabled - users will manually assign labels/splits through UI
+        return None
         
-        if not bank_category or bank_category in no_label_categories:
-            return None
-        elif bank_category in first_person_categories:
-            return self.people[0] if self.people else None
-        else:
-            return "Both"
+        # Legacy auto labeling logic (disabled):
+        # no_label_categories = ["Dining", "Transfers"]
+        # first_person_categories = [
+        #     "Personal Items", "Personal Care", "Hobbies", 
+        #     "Entertainment/Recreation", "Vehicle", "Gym", "Fuel"
+        # ]
+        # 
+        # if not bank_category or bank_category in no_label_categories:
+        #     return None
+        # elif bank_category in first_person_categories:
+        #     return self.people[0] if self.people else None
+        # else:
+        #     return "Both"
     
     def categorize_and_label_transactions(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
