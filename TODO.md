@@ -401,7 +401,7 @@
   - Potentially move the dropdown menu option cancel/clear button to left-align only
   - Expand bank category dropdown menu to be slightly larger to fit large texts.
 
-- [ ] **Budgets progress bar color**:
+- [x] **Budgets progress bar color**:
 
   - Update the budgets progress bar color to change depending on the % spent. ideally it is a smooth transition change, however incremental changes e.g., 50%, 75% would also suffice.
 
@@ -417,7 +417,7 @@
 
   - Add this table and have it aligned somewhat simialarly to personal_settings table (likely with less features overall)
 
-- [ ] **Budgets webpage is broken**:
+- [x] **Budgets webpage is broken**:
 
   - Fix the budgets page to use the updated user management system. Currently it is not being updated at all.
 

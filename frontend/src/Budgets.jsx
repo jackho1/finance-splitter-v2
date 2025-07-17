@@ -59,6 +59,63 @@ const calculateCategorySpendWithAllocations = (spend, category, users, splitAllo
   return categorySpend;
 };
 
+// Progressive color function for budget progress
+const getProgressColor = (percentage) => {
+  // Clamp percentage between 0 and 150 for color calculation
+  const clampedPercentage = Math.min(Math.max(percentage, 0), 150);
+  
+  if (clampedPercentage <= 50) {
+    // Green to yellow-green (0-50%)
+    return {
+      backgroundColor: `hsl(120, 70%, ${50 - clampedPercentage * 0.2}%)`
+    };
+  } else if (clampedPercentage <= 75) {
+    // Yellow-green to yellow (50-75%)
+    const hue = 120 - ((clampedPercentage - 50) * 2.4); // 120 to 60
+    return {
+      backgroundColor: `hsl(${hue}, 70%, 45%)`
+    };
+  } else if (clampedPercentage <= 90) {
+    // Yellow to orange (75-90%)
+    const hue = 60 - ((clampedPercentage - 75) * 2); // 60 to 30
+    return {
+      backgroundColor: `hsl(${hue}, 75%, 50%)`
+    };
+  } else if (clampedPercentage <= 100) {
+    // Orange to red-orange (90-100%)
+    const hue = 30 - ((clampedPercentage - 90) * 1.5); // 30 to 15
+    return {
+      backgroundColor: `hsl(${hue}, 80%, 50%)`
+    };
+  } else {
+    // Bright red for over budget (100%+)
+    return {
+      backgroundColor: `hsl(0, 100.00%, 50.00%)`
+    };
+  }
+};
+
+// Component for the progress bar with gradient
+const BudgetProgressBar = ({ percentage, isLarge = false }) => {
+  const colors = getProgressColor(percentage);
+  const height = isLarge ? '8px' : '7px';
+  
+  return (
+    <div className="budget-progress" style={{ height, position: 'relative', overflow: 'visible' }}>
+      <div 
+        className="budget-progress-bar"
+        style={{
+          width: `${Math.min(percentage, 100)}%`,
+          backgroundColor: colors.backgroundColor,
+          transition: 'all 0.3s ease',
+          position: 'relative',
+        }}
+      >
+      </div>
+    </div>
+  );
+};
+
 const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState({});
@@ -728,7 +785,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       </div>
       
       <HelpText isVisible={helpTextVisible}>
-        Drag categories by clicking and dragging the category name cell. Red highlight indicates categories over budget.
+        Drag categories by clicking and dragging the category name cell. Progress bars use colors that transition from green to red as spending approaches and exceeds budget.
       </HelpText>
       
       {/* Add CSS styles for drag and drop */}
@@ -1012,11 +1069,14 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           border-radius: 3px;
           overflow: hidden;
           margin-top: 2px;
+          position: relative;
         }
         
         .budget-progress-bar {
           height: 100%;
-          transition: width 0.3s ease;
+          transition: all 0.3s ease;
+          border-radius: 3px;
+          position: relative;
         }
         
         /* Category indicator */
@@ -1057,6 +1117,22 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         
         .modern-table td, .modern-table th {
           line-height: 1.1;
+        }
+        
+        /* Progress text styling */
+        .progress-label {
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: #64748b;
+          transition: color 0.3s ease;
+        }
+        
+        .progress-label.warning {
+          color: #f59e0b;
+        }
+        
+        .progress-label.danger {
+          color: #ef4444;
         }
       `}
       </style>
@@ -1159,25 +1235,17 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                     </span>
                   </td>
                   <td className="col-progress">
-                    <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', width: '100%' }}>
-                      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
-                          {progressPercentage.toFixed(1)}%
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
-                          {isOverBudget ? 'Over' : 'Under'}
-                        </span>
+                                          <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', width: '100%' }}>
+                        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                          <span className={`progress-label ${progressPercentage > 90 ? 'danger' : progressPercentage > 75 ? 'warning' : ''}`}>
+                            {progressPercentage.toFixed(1)}%
+                          </span>
+                          <span className={`progress-label ${isOverBudget ? 'danger' : ''}`}>
+                            {isOverBudget ? 'Over' : 'Under'}
+                          </span>
+                        </div>
+                        <BudgetProgressBar percentage={progressPercentage} />
                       </div>
-                      <div className="budget-progress" style={{ height: '7px' }}>
-                        <div 
-                          className="budget-progress-bar"
-                          style={{
-                            width: `${Math.min(progressPercentage, 100)}%`,
-                            backgroundColor: isOverBudget ? '#ef4444' : '#10b981',
-                          }}
-                        />
-                      </div>
-                    </div>
                   </td>
                 </tr>
               );
@@ -1203,25 +1271,19 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                 </span>
               </td>
               <td>
-                <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
-                      {(summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0).toFixed(1)}%
-                    </span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b' }}>
-                      {summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? 'Over' : 'Under'}
-                    </span>
-                  </div>
-                  <div className="budget-progress" style={{ height: '7px' }}>
-                    <div 
-                      className="budget-progress-bar"
-                      style={{
-                        width: `${Math.min(summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0, 100)}%`,
-                        backgroundColor: summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? '#ef4444' : '#10b981',
-                      }}
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                      <span className={`progress-label ${summaryData.monthlyBudget && (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 > 90 ? 'danger' : (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 > 75 ? 'warning' : ''}`}>
+                        {(summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0).toFixed(1)}%
+                      </span>
+                      <span className={`progress-label ${summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? 'danger' : ''}`}>
+                        {summaryData.monthlyBudget - Math.abs(summaryData.monthlySpend) < 0 ? 'Over' : 'Under'}
+                      </span>
+                    </div>
+                    <BudgetProgressBar 
+                      percentage={summaryData.monthlyBudget ? (Math.abs(summaryData.monthlySpend) / summaryData.monthlyBudget) * 100 : 0} 
                     />
                   </div>
-                </div>
               </td>
             </tr>
             
@@ -1245,26 +1307,20 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                 </span>
               </td>
               <td>
-                <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      {(summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0).toFixed(1)}%
-                    </span>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      {summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? 'Over' : 'Under'}
-                    </span>
-                  </div>
-                  <div className="budget-progress" style={{ height: '8px' }}>
-                    <div 
-                      className="budget-progress-bar"
-                      style={{
-                        width: `${Math.min(summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0, 100)}%`,
-                        backgroundColor: summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? '#dc2626' : '#059669',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                      }}
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', width: '100%' }}>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                      <span className={`progress-label ${summaryData.totalBudget && (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 > 90 ? 'danger' : (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 > 75 ? 'warning' : ''}`} style={{ fontWeight: '600', fontSize: '0.8rem' }}>
+                        {(summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0).toFixed(1)}%
+                      </span>
+                      <span className={`progress-label ${summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? 'danger' : ''}`} style={{ fontWeight: '600', fontSize: '0.8rem' }}>
+                        {summaryData.totalBudget - Math.abs(summaryData.totalSpend) < 0 ? 'Over' : 'Under'}
+                      </span>
+                    </div>
+                    <BudgetProgressBar 
+                      percentage={summaryData.totalBudget ? (Math.abs(summaryData.totalSpend) / summaryData.totalBudget) * 100 : 0} 
+                      isLarge={true}
                     />
                   </div>
-                </div>
               </td>
             </tr>
           </tbody>
