@@ -43,16 +43,20 @@ const HelpText = ({ children, isVisible }) => {
   );
 };
 
-// Refactored budget calculation function that uses configuration
-const calculateCategorySpend = (spend, category) => {
+
+
+// Helper for category spend using allocations (backward compatible)
+const calculateCategorySpendWithAllocations = (spend, category, users, splitAllocations) => {
   const { PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
-  
-  // Using configuration values instead of hardcoded names
-  const categorySpend = spend[category] || { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
-  
-  // Refactored calculation using configuration values
-  const totalSpend = -(categorySpend[PRIMARY_USER_2] + categorySpend[BOTH_LABEL] / 2);
-  return totalSpend;
+  if (spend[category] && typeof spend[category] === 'object' && 'Both' in spend[category]) {
+    // Old system - use the original calculation
+    const categorySpend = spend[category];
+    const totalSpend = -(categorySpend[PRIMARY_USER_2] + categorySpend[BOTH_LABEL] / 2);
+    return totalSpend;
+  }
+  // New system - spend[category] is already Jack's spend for the category
+  const categorySpend = spend[category] || 0;
+  return categorySpend;
 };
 
 const Budgets = ({ helpTextVisible = true, onChartClick }) => {
@@ -69,6 +73,10 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     return savedOrder ? JSON.parse(savedOrder) : [];
   });
   const [loading, setLoading] = useState(true);
+  
+  // Add state for new user management system
+  const [users, setUsers] = useState([]);
+  const [splitAllocations, setSplitAllocations] = useState({});
   
   // Get user labels from configuration
   const { PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
@@ -103,22 +111,16 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     return categoryMappings[bankCategory] || null;
   };
 
-  // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
+  // Combined useEffect to fetch all initial data including users and split allocations
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
-      
       try {
-        // Single API call to get all budget initial data
-        const response = await axios.get(getApiUrl('/budget-initial-data'));
-        
-        if (response.data.success) {
-          const { budgetCategories, transactions, categoryMappings } = response.data.data;
-          
-          // Set budget categories
+        // Fetch budget specific data
+        const budgetResponse = await axios.get(getApiUrl('/budget-initial-data'));
+        if (budgetResponse.data.success) {
+          const { budgetCategories, transactions, categoryMappings } = budgetResponse.data.data;
           setBudgetCategories(budgetCategories);
-          
-          // Convert to budgets object for easier access
           const budgetsObj = {};
           const categories = [];
           budgetCategories.forEach(item => {
@@ -126,36 +128,33 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
             categories.push(item.category);
           });
           setBudgets(budgetsObj);
-          
-          // Set up monthly spend categories (exclude Mortgage, Bills, Savings, Gifts, Holidays)
-          const monthlyCategories = categories.filter(cat => 
-            !['Mortgage', 'Bills', 'Savings', 'Gifts', 'Holidays'].includes(cat)
-          );
+          const monthlyCategories = categories.filter(cat => !['Mortgage', 'Bills', 'Savings', 'Gifts', 'Holidays'].includes(cat));
           setMonthlySpendCategories(monthlyCategories);
-          
-          // Set transactions and category mappings
           setTransactions(transactions);
           setCategoryMappings(categoryMappings);
-          
-          setLoading(false);
-        } else {
-          throw new Error(response.data.error || 'Failed to fetch budget initial data');
         }
+        // Fetch user data from the main app's API
+        const usersResponse = await axios.get(getApiUrl('/initial-data'));
+        if (usersResponse.data.success) {
+          const { users, splitAllocations } = usersResponse.data.data;
+          setUsers(users || []);
+          setSplitAllocations(splitAllocations || {});
+        }
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching budget initial data:', error);
         setLoading(false);
       }
     };
-    
     fetchInitialData();
   }, []);
 
   useEffect(() => {
-    if (transactions.length > 0 && Object.keys(budgets).length > 0) {
+    if (transactions.length > 0 && Object.keys(budgets).length > 0 && users.length > 0) {
       const monthlySpend = calculateMonthlySpend();
       setChartData(createChartData(monthlySpend));
     }
-  }, [transactions, budgets, currentMonth, currentYear, categoryMappings, categoryOrder]);
+  }, [transactions, budgets, currentMonth, currentYear, categoryMappings, categoryOrder, users, splitAllocations]);
 
   // Update category order when budgets are loaded
   useEffect(() => {
@@ -185,44 +184,64 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     }
   }, [budgetCategories, categoryOrder.length]);
 
+  // Updated calculateMonthlySpend function that uses the new user management system
   const calculateMonthlySpend = () => {
     const spend = {};
-    const labels = [PRIMARY_USER_2, BOTH_LABEL];
-
-    // Initialize spend object with all budget categories
+    if (!users || !Array.isArray(users)) {
+      return spend;
+    }
+    
+    // Find Jack's user ID
+    // TODO: This is hardcoded to Jack. We need to make this dynamic in the future.
+    const jackUser = users.find(user => user.display_name === PRIMARY_USER_2);
+    if (!jackUser) {
+      console.warn('Jack user not found in users array');
+      return spend;
+    }
+    
     Object.keys(budgets).forEach(category => {
-      spend[category] = { [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 };
+      spend[category] = 0;
     });
-
-    transactions.forEach(transaction => {
+    const monthlyTransactions = transactions.filter(transaction => {
       const date = new Date(transaction.date);
-      if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-        // Use the category field directly from the transaction instead of mapping from bank_category
-        const category = transaction.category;
-        const amount = parseFloat(transaction.amount) || 0;
-
-        // Only process if we have a valid category AND it exists in our budgets
-        if (category && spend[category]) {
-          if (labels.includes(transaction.label)) {
-            spend[category][transaction.label] += amount;
-          }
-        }
-      }
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
-
+    Object.keys(budgets).forEach(category => {
+      const categoryTransactions = monthlyTransactions.filter(
+        transaction => transaction.category === category
+      );
+      categoryTransactions.forEach(transaction => {
+        const allocations = splitAllocations[transaction.id];
+        if (allocations && Array.isArray(allocations)) {
+          // New system: Use split allocations
+          // Find Jack's allocation for this transaction
+          const jackAllocation = allocations.find(allocation => allocation.user_id === jackUser.id);
+          if (jackAllocation) {
+            spend[category] += jackAllocation.amount || 0;
+          }
+        } else {
+          // Legacy system: Use transaction labels
+          if (transaction.label === PRIMARY_USER_2) {
+            // Jack's transaction - include full amount
+            spend[category] += parseFloat(transaction.amount) || 0;
+          } else if (transaction.label === BOTH_LABEL) {
+            // Both transaction - include half amount
+            spend[category] += (parseFloat(transaction.amount) || 0) / 2;
+          }
+          // Skip transactions assigned to other users (like Ruby)
+        }
+      });
+    });
+    
     return spend;
   };
 
   const createChartData = (monthlySpend) => {
-    // Filter out Mortgage from chart data
     const filteredCategories = categoryOrder.filter(cat => cat !== 'Mortgage');
-    
     const budgetData = filteredCategories.map(label => budgets[label]);
     const spendData = filteredCategories.map(label => {
-      // Use the helper function and get absolute value for the chart
-      return Math.abs(calculateCategorySpend(monthlySpend, label));
+      return Math.abs(calculateCategorySpendWithAllocations(monthlySpend, label, users, splitAllocations));
     });
-
     return {
       labels: filteredCategories,
       datasets: [
@@ -347,7 +366,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
   // Calculate summary data
   const calculateSummaryData = () => {
-    if (transactions.length === 0 || Object.keys(budgets).length === 0 || monthlySpendCategories.length === 0) {
+    if (transactions.length === 0 || Object.keys(budgets).length === 0 || monthlySpendCategories.length === 0 || users.length === 0) {
       return { monthlySpend: 0, totalSpend: 0, monthlyBudget: 0, totalBudget: 0 };
     }
     
@@ -360,7 +379,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     monthlySpendCategories.forEach(category => {
       if (budgets[category] !== undefined) {
         // Use helper function for consistent calculation
-        monthlySpendTotal += Math.abs(calculateCategorySpend(spend, category));
+        monthlySpendTotal += Math.abs(calculateCategorySpendWithAllocations(spend, category, users, splitAllocations));
         monthlyBudgetTotal += parseFloat(budgets[category]) || 0;
       }
     });
@@ -374,7 +393,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         if (category === 'Mortgage') {
           totalSpendAmount += 3000;
         } else {
-          totalSpendAmount += Math.abs(calculateCategorySpend(spend, category));
+          totalSpendAmount += Math.abs(calculateCategorySpendWithAllocations(spend, category, users, splitAllocations));
         }
         totalBudgetAmount += parseFloat(budgets[category]) || 0;
       }
@@ -390,7 +409,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
   
   const summaryData = useMemo(() => {
     return calculateSummaryData();
-  }, [transactions, budgets, monthlySpendCategories, currentMonth, currentYear, categoryOrder, categoryMappings]);
+  }, [transactions, budgets, monthlySpendCategories, currentMonth, currentYear, categoryOrder, categoryMappings, users, splitAllocations]);
 
   // Enhanced drag and drop handling functions
   const handleDragStart = (e, category, rowElement) => {
@@ -1065,9 +1084,8 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                 totalSpend = 3000;
                 remainingBalance = budget - Math.abs(totalSpend);
               } else {
-                // Use the helper function for consistent calculation
                 const spend = transactions.length > 0 ? calculateMonthlySpend() : {};
-                totalSpend = calculateCategorySpend(spend, category);
+                totalSpend = calculateCategorySpendWithAllocations(spend, category, users, splitAllocations);
                 remainingBalance = budget - Math.abs(totalSpend);
               }
               

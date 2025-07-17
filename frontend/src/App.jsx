@@ -539,7 +539,7 @@ const App = () => {
   const [chartLabelFilter, setChartLabelFilter] = useState('All');
   // Add state for new user management system
   const [users, setUsers] = useState([]);
-  const [splitAllocations, setSplitAllocations] = useState({});
+  const [splitAllocations, setSplitAllocations] = useState(null); // Use null to distinguish from empty object
   // Add state for transaction month filtering
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -574,68 +574,80 @@ const App = () => {
 
   // Helper functions for new user management system
   const getTransactionLabel = (transaction) => {
+    // Early return for loading states
+    if (isTransactionsLoading || !users || users.length === 0) {
+      return null;
+    }
+    
+    // Check if splitAllocations is loaded
+    if (splitAllocations === null || splitAllocations === undefined) {
+      return null;
+    }
+    
     const allocations = splitAllocations[transaction.id];
     
-    if (!allocations || allocations.length === 0) {
-      // Fallback to legacy label for backward compatibility
-      return transaction.label || null;
-    }
-    
-    // If single user, show their display name
-    if (allocations.length === 1) {
-      return allocations[0].display_name;
-    }
-    
-    // For multiple users, check if it's an equal split
-    const isEqualSplit = () => {
-      // Check if all allocations have the same split_type_code and it's 'equal'
-      const allEqualType = allocations.every(allocation => allocation.split_type_code === 'equal');
-      
-      if (allEqualType) {
-        return true;
+    // If we have split allocations data for this transaction, use it
+    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+      // If single user, show their display name
+      if (allocations.length === 1) {
+        const displayName = allocations[0].display_name;
+        return displayName;
       }
       
-      // Alternative check: if percentages are equal (indicating equal split)
-      if (allocations.length > 1 && allocations[0].percentage) {
-        const firstPercentage = parseFloat(allocations[0].percentage);
-        const expectedPercentage = 100 / allocations.length;
-        const tolerance = 0.1; // Small tolerance for floating point comparison
+      // For multiple users, check if it's an equal split
+      const isEqualSplit = () => {
+        // Check if all allocations have the same split_type_code and it's 'equal'
+        const allEqualType = allocations.every(allocation => allocation.split_type_code === 'equal');
         
-        return allocations.every(allocation => {
-          const percentage = parseFloat(allocation.percentage);
-          return Math.abs(percentage - expectedPercentage) < tolerance;
-        });
-      }
-      
-      // Alternative check: if amounts are equal (for equal splits)
-      if (allocations.length > 1) {
-        const firstAmount = Math.abs(parseFloat(allocations[0].amount));
-        const tolerance = 0.01; // 1 cent tolerance
+        if (allEqualType) {
+          return true;
+        }
         
-        return allocations.every(allocation => {
-          const amount = Math.abs(parseFloat(allocation.amount));
-          return Math.abs(amount - firstAmount) < tolerance;
-        });
+        // Alternative check: if percentages are equal (indicating equal split)
+        if (allocations.length > 1 && allocations[0].percentage) {
+          const firstPercentage = parseFloat(allocations[0].percentage);
+          const expectedPercentage = 100 / allocations.length;
+          const tolerance = 0.1; // Small tolerance for floating point comparison
+          
+          return allocations.every(allocation => {
+            const percentage = parseFloat(allocation.percentage);
+            return Math.abs(percentage - expectedPercentage) < tolerance;
+          });
+        }
+        
+        // Alternative check: if amounts are equal (for equal splits)
+        if (allocations.length > 1) {
+          const firstAmount = Math.abs(parseFloat(allocations[0].amount));
+          const tolerance = 0.01; // 1 cent tolerance
+          
+          return allocations.every(allocation => {
+            const amount = Math.abs(parseFloat(allocation.amount));
+            return Math.abs(amount - firstAmount) < tolerance;
+          });
+        }
+        
+        return false;
+      };
+      
+      // If it's an equal split among multiple users
+      if (isEqualSplit()) {
+        // If exactly 2 users with equal split, show "Both"
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        
+        // If 3+ users with equal split, show "All users"
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
       }
       
-      return false;
-    };
-    
-    // If it's an equal split among multiple users
-    if (isEqualSplit()) {
-      // If exactly 2 users with equal split, show "Both"
-      if (allocations.length === 2) {
-        return 'Both';
-      }
-      
-      // If 3+ users with equal split, show "All users"
-      if (allocations.length >= 3) {
-        return 'All users';
-      }
+      // For other cases (mixed split types), show first user + count
+      return `${allocations[0].display_name} +${allocations.length - 1}`;
+    } else {
+      // No split allocations found
+      return null;
     }
-    
-    // For other cases (mixed split types), show first user + count
-    return `${allocations[0].display_name} +${allocations.length - 1}`;
   };
 
   const getUserTotalFromAllocations = (userId, filteredTransactions) => {
@@ -723,8 +735,6 @@ const App = () => {
       setIsCategoryMappingsLoading(true);
       
       try {
-        console.log('Fetching initial data using optimized endpoint...');
-        
         // Single API call to get all initial data
         const response = await axios.get(getApiUrl('/initial-data'));
         
@@ -747,8 +757,6 @@ const App = () => {
           setIsCategoryMappingsLoading(false);
           setIsTransactionsLoading(false);
           setIsLabelsLoading(false);
-          
-          console.log('All initial data loaded successfully using optimized endpoint');
         } else {
           throw new Error(response.data.error || 'Failed to fetch initial data');
         }
@@ -1283,8 +1291,6 @@ const App = () => {
   const handleSplitConfigUpdate = async (transactionId, newLabelValue) => {
     try {
       setIsUpdating(true);
-      console.log(`🔄 Updating split configuration for transaction ${transactionId} with label: ${newLabelValue}`);
-
       // Guard clause: return early if users is not loaded yet
       if (!users || !Array.isArray(users)) {
         throw new Error('Users data not loaded yet');
@@ -1292,14 +1298,10 @@ const App = () => {
 
       // Handle empty/null label value - delete existing split configuration
       if (!newLabelValue || newLabelValue === '') {
-        console.log(`🗑️ Deleting split configuration for transaction ${transactionId} - label set to empty/null`);
-        
         try {
           const response = await axios.delete(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=shared`));
           if (response.data.success) {
-            console.log(`✅ Deleted split configuration for transaction ${transactionId}`);
-            
-            // Update local state to reflect the change
+            // Update local state to reflect the change - clear legacy label
             setTransactions(prevTransactions => 
               prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
             );
@@ -1316,14 +1318,16 @@ const App = () => {
             
             // Show success notification
             showSuccessNotification('Split configuration removed successfully');
+            
+            // Clear edit state to exit edit mode
+            setEditCell(null);
             return;
           }
         } catch (deleteErr) {
           if (deleteErr.response?.status === 404) {
             // Split config doesn't exist, just update the label to null
-            console.log(`ℹ️ No split configuration found to delete for transaction ${transactionId}`);
             
-            // Still update local state even if no split config existed
+            // Still update local state even if no split config existed - clear legacy label
             setTransactions(prevTransactions => 
               prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
             );
@@ -1339,6 +1343,9 @@ const App = () => {
             });
             
             showSuccessNotification('Label cleared successfully');
+            
+            // Clear edit state to exit edit mode
+            setEditCell(null);
             return;
           } else {
             throw deleteErr;
@@ -1377,7 +1384,6 @@ const App = () => {
         }
       } catch (checkErr) {
         // Split config doesn't exist yet, will create new one
-        console.log(`ℹ️ No existing split configuration found for transaction ${transactionId}`);
       }
 
       const splitConfigData = {
@@ -1391,11 +1397,9 @@ const App = () => {
       if (existingSplitConfig) {
         // Update existing split configuration
         response = await axios.put(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
-        console.log(`✅ Updated existing split configuration for transaction ${transactionId}`);
       } else {
         // Create new split configuration
         response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
-        console.log(`✅ Created new split configuration for transaction ${transactionId}`);
       }
 
       if (response.data.success) {
@@ -1407,18 +1411,18 @@ const App = () => {
           [transactionId]: allocations
         }));
 
-        // Update transaction state - the label will be derived from split allocations
+        // Update transaction state - clear the legacy label since we now have split allocations
         setTransactions(prevTransactions => 
           prevTransactions.map(t => 
             t.id === transactionId 
-              ? {...t, label: newLabelValue} // Temporary update, will be overridden by getTransactionLabel
+              ? {...t, label: null} // Clear legacy label since we now use split allocations
               : t
           )
         );
         setFilteredTransactions(prevFiltered => 
           prevFiltered.map(t => 
             t.id === transactionId 
-              ? {...t, label: newLabelValue} // Temporary update, will be overridden by getTransactionLabel
+              ? {...t, label: null} // Clear legacy label since we now use split allocations
               : t
           )
         );
@@ -1429,10 +1433,14 @@ const App = () => {
             ? 'Split configuration updated successfully' 
             : 'Split configuration created successfully'
         );
+        
+        // Clear edit state to exit edit mode
+        setEditCell(null);
       }
 
     } catch (err) {
-      console.error('Error updating split configuration:', err);
+      console.error('Error in handleSplitConfigUpdate:', err);
+      
       let errorMessage = 'Failed to update split configuration. Please try again.';
       
       if (err.response && err.response.data) {
@@ -1445,9 +1453,11 @@ const App = () => {
       
       // Show error notification
       showErrorNotification(errorMessage);
+      
+      // Clear edit state even on error
+      setEditCell(null);
     } finally {
       setIsUpdating(false);
-      setEditCell(null);
     }
   };
 
@@ -1588,8 +1598,6 @@ const App = () => {
         ...prev,
         [transactionId]: allocations
       }));
-
-      console.log(`✅ Created split configuration for new transaction ${transactionId}`);
     }
   };
 
@@ -1613,7 +1621,7 @@ const App = () => {
   };
 
   // Modernized renderCell function
-  const renderCell = (transaction, field) => {
+    const renderCell = (transaction, field) => {
     if (editCell && editCell.transactionId === transaction.id && editCell.field === field) {
       switch (field) {
         case 'date':
@@ -1655,36 +1663,64 @@ const App = () => {
           );
         case 'bank_category':
           return (
-            <select 
-              className="modern-select"
-              value={editValue === null ? 'null' : (editValue || '')}
-              onChange={handleInputChange} 
-              onBlur={() => handleUpdate(transaction.id, field)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleUpdate(transaction.id, field);
-                }
+            <div 
+              style={{ 
+                position: 'relative',
+                width: '100%',
+                zIndex: 1000,
+                pointerEvents: 'auto'
               }}
-              style={{ textAlign: 'center' }}
-              autoFocus
+              onClick={(e) => e.stopPropagation()}
             >
-              <option value="">Select a category</option>
-              {availableBankCategories
-                .filter(category => category !== null && category !== undefined && category !== '')
-                .map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))
-              }
-              <option value="null">(Empty/Null)</option>
-            </select>
+              <select 
+                className="modern-select"
+                value={editValue === null ? 'null' : (editValue || '')}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleInputChange(e);
+                }} 
+                onBlur={(e) => {
+                  e.stopPropagation();
+                  handleUpdate(transaction.id, field);
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleUpdate(transaction.id, field);
+                  }
+                }}
+                onFocus={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ 
+                  textAlign: 'center',
+                  width: '100%',
+                  position: 'relative',
+                  zIndex: 1001,
+                  pointerEvents: 'auto',
+                  backgroundColor: 'white',
+                  border: '2px solid #4a90e2',
+                  outline: 'none'
+                }}
+                autoFocus
+              >
+                <option value="">Select a category</option>
+                {availableBankCategories
+                  .filter(category => category !== null && category !== undefined && category !== '')
+                  .map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))
+                }
+                <option value="null">(Empty/Null)</option>
+              </select>
+            </div>
           );
         case 'label':
           return (
             <select 
               className="modern-select"
               value={editValue || ''} 
-              onChange={handleInputChange} 
+              onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1729,12 +1765,32 @@ const App = () => {
       transaction[field] === undefined || 
       transaction[field] === '';
     
-  return (
-    <div 
-        className="cell-content editable-cell"
-        onDoubleClick={() => handleDoubleClick(transaction.id, field, transaction[field] || '')}
-      >
-        {isEmpty ? (
+    const isInEditMode = editCell && editCell.transactionId === transaction.id && editCell.field === field;
+  
+    return (
+      <div 
+          className={isInEditMode ? '' : 'cell-content editable-cell'}
+          onDoubleClick={isInEditMode ? undefined : () => handleDoubleClick(transaction.id, field, transaction[field] || '')}
+          style={{
+            pointerEvents: isInEditMode ? 'none' : 'auto',
+            position: 'relative',
+            width: '100%',
+            height: '100%'
+          }}
+        >
+        {field === 'label' ? (
+          (() => {
+            const label = getTransactionLabel(transaction);
+            
+            // Show loading indicator if data is still loading
+            if (isTransactionsLoading || splitAllocations === null) {
+              return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '12px' }}>Loading...</span>;
+            }
+            
+            // Return clean label display
+            return label || '';
+          })()
+        ) : isEmpty ? (
           <span className="empty-value"></span>
         ) : field === 'date' ? (
           new Date(transaction[field]).toLocaleDateString('en-GB', {
@@ -1772,8 +1828,6 @@ const App = () => {
               </div>
             )}
           </div>
-        ) : field === 'label' ? (
-          getTransactionLabel(transaction)
         ) : (
           transaction[field]
         )}
@@ -1867,11 +1921,16 @@ const App = () => {
         if (labelValue) {
           try {
             await createSplitConfigForNewTransaction(addedTransaction.id, labelValue);
+            // Clear the legacy label since we now have split allocations
+            addedTransaction.label = null;
           } catch (splitErr) {
             console.error('Error creating split configuration for new transaction:', splitErr);
             // Don't fail the entire transaction creation, just show a warning
             showErrorNotification('Transaction created but split configuration failed. You can edit the label to set it up.');
           }
+        } else {
+          // Ensure no legacy label if no split was specified
+          addedTransaction.label = null;
         }
         
         // Update transactions list
@@ -2320,7 +2379,9 @@ const App = () => {
                     </td>
                     <td className="col-amount">{renderCell(transaction, 'amount')}</td>
                     <td className="col-category">{renderCell(transaction, 'bank_category')}</td>
-                    <td className="col-label">{renderCell(transaction, 'label')}</td>
+                    <td className="col-label">
+                      {renderCell(transaction, 'label')}
+                    </td>
                   </tr>
                   {expandedRow === transaction.id && (
                     <tr>
