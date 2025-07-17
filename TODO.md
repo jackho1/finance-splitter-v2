@@ -416,3 +416,15 @@
 - [ ] **Add offset_settings table**:
 
   - Add this table and have it aligned somewhat simialarly to personal_settings table (likely with less features overall)
+
+- [ ] **Budgets webpage is broken**:
+
+  - Fix the budgets page to use the updated user management system. Currently it is not being updated at all.
+
+- [ ] **Display icons for each transaction in mobile app view**:
+
+  - Use icons instead of category names. When users open the transaction record, we can display the category name there instead (displays both sub and main category)
+
+- [ ] **App.jsx labelling is broken**:
+
+  - Fix the labelling behaviour. Upon page refresh, the label value is not retained.
