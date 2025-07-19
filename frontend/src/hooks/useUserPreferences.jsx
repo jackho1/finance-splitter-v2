@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { getApiUrl } from '../utils/apiUtils';
+import { USER_COLOR_OPACITIES, THEME_OPTIONS } from '../utils/colorConstants';
 
 // Move defaultPreferences outside the component to prevent recreation on every render
 const createDefaultPreferences = (userId) => ({
   user_id: userId,
-  primary: { r: 54, g: 162, b: 235, a: 1 },
-  secondary: { r: 255, g: 99, b: 132, a: 1 },
-  tertiary: { r: 75, g: 192, b: 192, a: 1 },
-  theme: 'light'
+  primary: { r: 54, g: 162, b: 235, a: USER_COLOR_OPACITIES.BACKGROUND },
+  secondary: { r: 54, g: 162, b: 235, a: USER_COLOR_OPACITIES.BACKGROUND }, // Keep for backward compatibility
+  theme: THEME_OPTIONS.LIGHT
 });
 
 /**
@@ -168,7 +168,15 @@ const useUserPreferences = (userId) => {
       const response = await axios.get(getApiUrl(`/user-preferences/${userId}`));
       
       if (response.data.success) {
-        setPreferences(response.data.data);
+        const data = response.data.data;
+        // Ensure primary color has correct opacity from constants
+        if (data.primary) {
+          data.primary = { ...data.primary, a: USER_COLOR_OPACITIES.BACKGROUND };
+        }
+        if (data.secondary) {
+          data.secondary = { ...data.secondary, a: USER_COLOR_OPACITIES.BACKGROUND };
+        }
+        setPreferences(data);
       } else {
         setError(response.data.error || 'Failed to fetch preferences');
         setPreferences(defaultPreferences);

@@ -47,12 +47,16 @@ export const setUserPreferencesCache = (users) => {
     if (user.username === 'default') return;
     
     // Use preferences from the user object if available
-    if (user.primary && user.secondary) {
+    if (user.primary) {
+      // Ensure primary color has 20% opacity
+      const primary = {
+        ...user.primary,
+        a: 0.2
+      };
       userPreferencesCache[user.id] = {
         user_id: user.id,
-        primary: user.primary,
-        secondary: user.secondary,
-        tertiary: user.tertiary || { r: 75, g: 192, b: 192, a: 1 },
+        primary: primary,
+        secondary: primary, // Keep for backward compatibility
         theme: user.theme || 'light'
       };
     } else {
@@ -85,16 +89,18 @@ const getUserPreferencesFromCache = (userId) => {
 const getDefaultPreferences = (userId) => {
   // Use deterministic colors based on user ID
   const defaultColors = [
-    { primary: { r: 255, g: 99, b: 132, a: 1 }, secondary: { r: 255, g: 205, b: 86, a: 1 } }, // Pink/Yellow
-    { primary: { r: 54, g: 162, b: 235, a: 1 }, secondary: { r: 75, g: 192, b: 192, a: 1 } }, // Blue/Teal
-    { primary: { r: 153, g: 102, b: 255, a: 1 }, secondary: { r: 255, g: 159, b: 64, a: 1 } }, // Purple/Orange
+    { r: 255, g: 99, b: 132, a: 0.2 }, // Pink
+    { r: 54, g: 162, b: 235, a: 0.2 }, // Blue
+    { r: 153, g: 102, b: 255, a: 0.2 }, // Purple
+    { r: 255, g: 159, b: 64, a: 0.2 }, // Orange
+    { r: 75, g: 192, b: 192, a: 0.2 }, // Teal
   ];
   
   const colorIndex = (userId - 1) % defaultColors.length;
   return {
     user_id: userId,
-    ...defaultColors[colorIndex],
-    tertiary: { r: 75, g: 192, b: 192, a: 1 },
+    primary: defaultColors[colorIndex],
+    secondary: defaultColors[colorIndex], // Keep for backward compatibility
     theme: 'light'
   };
 };
@@ -127,28 +133,25 @@ export const generateUserRowCSS = (users) => {
     const className = `row-${user.display_name.toLowerCase().replace(/\s+/g, '-')}`;
 
     const primaryColor = rgbaToString(preferences.primary);
-    const secondaryColor = rgbaToString(preferences.secondary);
 
     // Extract RGBA values for creating background color  
     const primaryMatch = primaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    const secondaryMatch = secondaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
 
-    if (primaryMatch && secondaryMatch) {
+    if (primaryMatch) {
       const [, primaryR, primaryG, primaryB] = primaryMatch;
-      const [, secondaryR, secondaryG, secondaryB] = secondaryMatch;
 
       cssRules += `
         /* User preference styles for ${user.display_name} */
         .modern-table tbody tr.${className},
         .modern-table .${className} {
-          background-color: rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.25) !important;
+          background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.2) !important;
           border-left: 4px solid rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.8) !important;
           transition: background-color 0.2s ease !important;
         }
         
         .modern-table tbody tr.${className}:hover,
         .modern-table .${className}:hover {
-          background-color: rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.4) !important;
+          background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.3) !important;
         }
       `;
     }
@@ -178,23 +181,21 @@ export const updateUserTotalColors = (users) => {
       if (user.username === 'default') return;
       
       const preferences = getUserPreferencesFromCache(user.id);
+      
       if (!preferences) return;
       
       const primaryColor = rgbaToString(preferences.primary);
-      const secondaryColor = rgbaToString(preferences.secondary);
 
-      // Extract RGB values - secondary for background, primary for border
+      // Extract RGB values - use primary for both with different opacity
       const primaryMatch = primaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-      const secondaryMatch = secondaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
       
-      if (primaryMatch && secondaryMatch) {
+      if (primaryMatch) {
         const [, primaryR, primaryG, primaryB] = primaryMatch;
-        const [, secondaryR, secondaryG, secondaryB] = secondaryMatch;
         
         window.userTotalColors[user.display_name] = {
-          bg: `rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.2)`,
-          border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 1)`
-                };
+          bg: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.2)`,
+          border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.8)`
+        };
       }
     });
 
@@ -239,16 +240,18 @@ export const updateUserColorStyles = (users) => {
     const cssString = generateUserRowCSS(users);
     
     if (cssString.trim()) {
-            // Apply styles immediately
+      // Apply styles immediately
       injectCSS(cssString);
       
       // Remove placeholder styles since we now have real user preferences
       removePlaceholderStyles();
-    } else {
-      console.warn('🎨 No CSS generated - users might be invalid or preferences missing');
+      
+      // Notify components that color styles have been updated
+      const event = new CustomEvent('userColorStylesUpdated');
+      window.dispatchEvent(event);
     }
   } catch (error) {
-    console.error('🎨 Error generating user color styles:', error);
+    console.error('Error generating user color styles:', error);
   }
 };
 
