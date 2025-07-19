@@ -438,12 +438,17 @@ app.get('/initial-data', async (req, res) => {
       client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM users'),
       client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category'),
-      // New: Fetch all active users
+      // New: Fetch all active users with their preferences
       client.query(`
-        SELECT id, username, display_name, email, is_active, created_at, preferences, metadata
-        FROM users 
-        WHERE is_active = true 
-        ORDER BY display_name, username
+        SELECT u.id, u.username, u.display_name, u.email, u.is_active, u.created_at, u.preferences, u.metadata,
+               up.color_primary_r, up.color_primary_g, up.color_primary_b, up.color_primary_a,
+               up.color_secondary_r, up.color_secondary_g, up.color_secondary_b, up.color_secondary_a,
+               up.color_tertiary_r, up.color_tertiary_g, up.color_tertiary_b, up.color_tertiary_a,
+               up.theme
+        FROM users u
+        LEFT JOIN user_preferences up ON u.id = up.user_id
+        WHERE u.is_active = true 
+        ORDER BY u.display_name, u.username
       `),
       // New: Fetch bulk split allocation data for all shared transactions
       client.query(`
@@ -508,7 +513,56 @@ app.get('/initial-data', async (req, res) => {
       });
     });
 
-    console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories, ${usersResult.rows.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
+    // Process users data to format color preferences as objects
+    const processedUsers = usersResult.rows.map(user => {
+      const processedUser = { ...user };
+      
+      // Format color preferences as objects if they exist
+      if (user.color_primary_r !== null && user.color_primary_g !== null && user.color_primary_b !== null && user.color_primary_a !== null) {
+        processedUser.primary = {
+          r: user.color_primary_r,
+          g: user.color_primary_g,
+          b: user.color_primary_b,
+          a: parseFloat(user.color_primary_a)
+        };
+      }
+      
+      if (user.color_secondary_r !== null && user.color_secondary_g !== null && user.color_secondary_b !== null && user.color_secondary_a !== null) {
+        processedUser.secondary = {
+          r: user.color_secondary_r,
+          g: user.color_secondary_g,
+          b: user.color_secondary_b,
+          a: parseFloat(user.color_secondary_a)
+        };
+      }
+      
+      if (user.color_tertiary_r !== null && user.color_tertiary_g !== null && user.color_tertiary_b !== null && user.color_tertiary_a !== null) {
+        processedUser.tertiary = {
+          r: user.color_tertiary_r,
+          g: user.color_tertiary_g,
+          b: user.color_tertiary_b,
+          a: parseFloat(user.color_tertiary_a)
+        };
+      }
+      
+      // Remove the individual color component fields to clean up the response
+      delete processedUser.color_primary_r;
+      delete processedUser.color_primary_g;
+      delete processedUser.color_primary_b;
+      delete processedUser.color_primary_a;
+      delete processedUser.color_secondary_r;
+      delete processedUser.color_secondary_g;
+      delete processedUser.color_secondary_b;
+      delete processedUser.color_secondary_a;
+      delete processedUser.color_tertiary_r;
+      delete processedUser.color_tertiary_g;
+      delete processedUser.color_tertiary_b;
+      delete processedUser.color_tertiary_a;
+      
+      return processedUser;
+    });
+
+    console.log(`Successfully fetched all initial data: ${transactionsResult.rows.length} transactions, ${Object.keys(categoryMappings).length} mappings, ${labels.length} labels, ${bankCategories.length} bank categories, ${processedUsers.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
 
     res.json({
       success: true,
@@ -517,7 +571,7 @@ app.get('/initial-data', async (req, res) => {
         categoryMappings,
         labels,
         bankCategories,
-        users: usersResult.rows,
+        users: processedUsers,
         splitAllocations: splitAllocations
       }
     });
@@ -624,10 +678,15 @@ app.get('/offset-initial-data', async (req, res) => {
       client.query('SELECT * FROM offset_category ORDER BY category'),
       client.query('SELECT * FROM users'),
       client.query(`
-        SELECT id, username, display_name, email, is_active, created_at, preferences, metadata
-        FROM users 
-        WHERE is_active = true 
-        ORDER BY display_name, username
+        SELECT u.id, u.username, u.display_name, u.email, u.is_active, u.created_at, u.preferences, u.metadata,
+               up.color_primary_r, up.color_primary_g, up.color_primary_b, up.color_primary_a,
+               up.color_secondary_r, up.color_secondary_g, up.color_secondary_b, up.color_secondary_a,
+               up.color_tertiary_r, up.color_tertiary_g, up.color_tertiary_b, up.color_tertiary_a,
+               up.theme
+        FROM users u
+        LEFT JOIN user_preferences up ON u.id = up.user_id
+        WHERE u.is_active = true 
+        ORDER BY u.display_name, u.username
       `),
       // Get split allocations for offset transactions if offset transaction type exists
       offsetTransactionTypeId ? client.query(`
@@ -681,7 +740,56 @@ app.get('/offset-initial-data', async (req, res) => {
       });
     });
 
-    console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories, ${usersResult.rows.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
+    // Process users data to format color preferences as objects
+    const processedUsers = usersResult.rows.map(user => {
+      const processedUser = { ...user };
+      
+      // Format color preferences as objects if they exist
+      if (user.color_primary_r !== null && user.color_primary_g !== null && user.color_primary_b !== null && user.color_primary_a !== null) {
+        processedUser.primary = {
+          r: user.color_primary_r,
+          g: user.color_primary_g,
+          b: user.color_primary_b,
+          a: parseFloat(user.color_primary_a)
+        };
+      }
+      
+      if (user.color_secondary_r !== null && user.color_secondary_g !== null && user.color_secondary_b !== null && user.color_secondary_a !== null) {
+        processedUser.secondary = {
+          r: user.color_secondary_r,
+          g: user.color_secondary_g,
+          b: user.color_secondary_b,
+          a: parseFloat(user.color_secondary_a)
+        };
+      }
+      
+      if (user.color_tertiary_r !== null && user.color_tertiary_g !== null && user.color_tertiary_b !== null && user.color_tertiary_a !== null) {
+        processedUser.tertiary = {
+          r: user.color_tertiary_r,
+          g: user.color_tertiary_g,
+          b: user.color_tertiary_b,
+          a: parseFloat(user.color_tertiary_a)
+        };
+      }
+      
+      // Remove the individual color component fields to clean up the response
+      delete processedUser.color_primary_r;
+      delete processedUser.color_primary_g;
+      delete processedUser.color_primary_b;
+      delete processedUser.color_primary_a;
+      delete processedUser.color_secondary_r;
+      delete processedUser.color_secondary_g;
+      delete processedUser.color_secondary_b;
+      delete processedUser.color_secondary_a;
+      delete processedUser.color_tertiary_r;
+      delete processedUser.color_tertiary_g;
+      delete processedUser.color_tertiary_b;
+      delete processedUser.color_tertiary_a;
+      
+      return processedUser;
+    });
+
+    console.log(`Successfully fetched offset data: ${offsetTransactionsResult.rows.length} transactions, ${offsetCategoriesResult.rows.length} categories, ${processedUsers.length} users, ${Object.keys(splitAllocations).length} transactions with split allocations`);
 
     res.json({
       success: true,
@@ -689,7 +797,7 @@ app.get('/offset-initial-data', async (req, res) => {
         offsetTransactions: offsetTransactionsResult.rows,
         offsetCategories: offsetCategoriesResult.rows.map(item => item.category),
         labels: labelsResult.rows.map(row => row.label),
-        users: usersResult.rows,
+        users: processedUsers,
         splitAllocations: splitAllocations
       }
     });
@@ -4774,6 +4882,285 @@ app.put('/transactions/:id/allocations/:allocation_id/payment', async (req, res)
 });
 
 // ===== END NEW USER MANAGEMENT AND SPLIT ALLOCATION ENDPOINTS =====
+
+// ===== USER PREFERENCES ENDPOINTS =====
+
+/**
+ * GET /user-preferences/:userId - Get user color preferences
+ */
+app.get('/user-preferences/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Validate user ID
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid user ID is required'
+      });
+    }
+    
+    const query = `
+      SELECT 
+        user_id,
+        color_primary_r, color_primary_g, color_primary_b, color_primary_a,
+        color_secondary_r, color_secondary_g, color_secondary_b, color_secondary_a,
+        color_tertiary_r, color_tertiary_g, color_tertiary_b, color_tertiary_a,
+        theme,
+        created_at,
+        updated_at
+      FROM user_preferences 
+      WHERE user_id = $1
+    `;
+    
+    const { rows } = await pool.query(query, [userId]);
+    
+    if (rows.length === 0) {
+      // Return default preferences if none exist
+      const defaultPreferences = {
+        user_id: userId,
+        primary: { r: 54, g: 162, b: 235, a: 1 },
+        secondary: { r: 255, g: 99, b: 132, a: 1 },
+        tertiary: { r: 75, g: 192, b: 192, a: 1 },
+        theme: 'light'
+      };
+      
+      return res.json({
+        success: true,
+        data: defaultPreferences,
+        message: 'Using default preferences (not saved yet)'
+      });
+    }
+    
+    const preferences = rows[0];
+    
+    // Transform to a more user-friendly format
+    const formattedPreferences = {
+      user_id: preferences.user_id,
+      primary: {
+        r: preferences.color_primary_r,
+        g: preferences.color_primary_g,
+        b: preferences.color_primary_b,
+        a: parseFloat(preferences.color_primary_a)
+      },
+      secondary: {
+        r: preferences.color_secondary_r,
+        g: preferences.color_secondary_g,
+        b: preferences.color_secondary_b,
+        a: parseFloat(preferences.color_secondary_a)
+      },
+      tertiary: {
+        r: preferences.color_tertiary_r,
+        g: preferences.color_tertiary_g,
+        b: preferences.color_tertiary_b,
+        a: parseFloat(preferences.color_tertiary_a)
+      },
+      theme: preferences.theme,
+      created_at: preferences.created_at,
+      updated_at: preferences.updated_at
+    };
+    
+    res.json({
+      success: true,
+      data: formattedPreferences
+    });
+    
+  } catch (err) {
+    console.error('Error fetching user preferences:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * PUT /user-preferences/:userId - Update user color preferences
+ */
+app.put('/user-preferences/:userId', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { userId } = req.params;
+    const { primary, secondary, tertiary, theme } = req.body;
+    
+    // Validate user ID
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Valid user ID is required'
+      });
+    }
+    
+    // Validate that user exists
+    const userCheck = await client.query(
+      'SELECT id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    // Validate color formats
+    const validateColor = (color, colorName) => {
+      if (!color || typeof color !== 'object') {
+        throw new Error(`${colorName} color must be an object`);
+      }
+      
+      const { r, g, b, a } = color;
+      
+      if (typeof r !== 'number' || r < 0 || r > 255) {
+        throw new Error(`${colorName} red value must be a number between 0 and 255`);
+      }
+      if (typeof g !== 'number' || g < 0 || g > 255) {
+        throw new Error(`${colorName} green value must be a number between 0 and 255`);
+      }
+      if (typeof b !== 'number' || b < 0 || b > 255) {
+        throw new Error(`${colorName} blue value must be a number between 0 and 255`);
+      }
+      if (typeof a !== 'number' || a < 0 || a > 1) {
+        throw new Error(`${colorName} alpha value must be a number between 0 and 1`);
+      }
+    };
+    
+    // Validate all required colors
+    if (primary) validateColor(primary, 'Primary');
+    if (secondary) validateColor(secondary, 'Secondary');
+    if (tertiary) validateColor(tertiary, 'Tertiary');
+    
+    // Check if preferences already exist
+    const existingPrefs = await client.query(
+      'SELECT user_id FROM user_preferences WHERE user_id = $1',
+      [userId]
+    );
+    
+    let query, values;
+    
+    if (existingPrefs.rows.length === 0) {
+      // Insert new preferences
+      query = `
+        INSERT INTO user_preferences (
+          user_id,
+          color_primary_r, color_primary_g, color_primary_b, color_primary_a,
+          color_secondary_r, color_secondary_g, color_secondary_b, color_secondary_a,
+          color_tertiary_r, color_tertiary_g, color_tertiary_b, color_tertiary_a,
+          theme,
+          created_at,
+          updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        RETURNING *
+      `;
+      
+      values = [
+        userId,
+        primary?.r || 54, primary?.g || 162, primary?.b || 235, primary?.a || 1,
+        secondary?.r || 255, secondary?.g || 99, secondary?.b || 132, secondary?.a || 1,
+        tertiary?.r || 75, tertiary?.g || 192, tertiary?.b || 192, tertiary?.a || 1,
+        theme || 'light'
+      ];
+    } else {
+      // Update existing preferences
+      const updates = [];
+      values = [userId];
+      let paramIndex = 2;
+      
+      if (primary) {
+        updates.push(`color_primary_r = $${paramIndex}, color_primary_g = $${paramIndex + 1}, color_primary_b = $${paramIndex + 2}, color_primary_a = $${paramIndex + 3}`);
+        values.push(primary.r, primary.g, primary.b, primary.a);
+        paramIndex += 4;
+      }
+      
+      if (secondary) {
+        updates.push(`color_secondary_r = $${paramIndex}, color_secondary_g = $${paramIndex + 1}, color_secondary_b = $${paramIndex + 2}, color_secondary_a = $${paramIndex + 3}`);
+        values.push(secondary.r, secondary.g, secondary.b, secondary.a);
+        paramIndex += 4;
+      }
+      
+      if (tertiary) {
+        updates.push(`color_tertiary_r = $${paramIndex}, color_tertiary_g = $${paramIndex + 1}, color_tertiary_b = $${paramIndex + 2}, color_tertiary_a = $${paramIndex + 3}`);
+        values.push(tertiary.r, tertiary.g, tertiary.b, tertiary.a);
+        paramIndex += 4;
+      }
+      
+      if (theme) {
+        updates.push(`theme = $${paramIndex}`);
+        values.push(theme);
+        paramIndex++;
+      }
+      
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      
+      query = `
+        UPDATE user_preferences 
+        SET ${updates.join(', ')}
+        WHERE user_id = $1
+        RETURNING *
+      `;
+    }
+    
+    const result = await client.query(query, values);
+    const savedPreferences = result.rows[0];
+    
+    await client.query('COMMIT');
+    
+    // Transform response to user-friendly format
+    const formattedPreferences = {
+      user_id: savedPreferences.user_id,
+      primary: {
+        r: savedPreferences.color_primary_r,
+        g: savedPreferences.color_primary_g,
+        b: savedPreferences.color_primary_b,
+        a: parseFloat(savedPreferences.color_primary_a)
+      },
+      secondary: {
+        r: savedPreferences.color_secondary_r,
+        g: savedPreferences.color_secondary_g,
+        b: savedPreferences.color_secondary_b,
+        a: parseFloat(savedPreferences.color_secondary_a)
+      },
+      tertiary: {
+        r: savedPreferences.color_tertiary_r,
+        g: savedPreferences.color_tertiary_g,
+        b: savedPreferences.color_tertiary_b,
+        a: parseFloat(savedPreferences.color_tertiary_a)
+      },
+      theme: savedPreferences.theme,
+      created_at: savedPreferences.created_at,
+      updated_at: savedPreferences.updated_at
+    };
+    
+    console.log(`✅ ${existingPrefs.rows.length === 0 ? 'Created' : 'Updated'} preferences for user ${userId}`);
+    
+    res.json({
+      success: true,
+      data: formattedPreferences,
+      message: `User preferences ${existingPrefs.rows.length === 0 ? 'created' : 'updated'} successfully`
+    });
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating user preferences:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: err.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ===== END USER PREFERENCES ENDPOINTS =====
 
 // Default route for root URL
 app.get('/', (req, res) => {
