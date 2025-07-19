@@ -2,6 +2,8 @@
  * Utility functions for generating dynamic CSS based on user color preferences
  */
 
+import { USER_COLOR_OPACITIES, DEFAULT_COLORS, THEME_OPTIONS } from './colorConstants';
+
 /**
  * Convert RGBA object to CSS rgba string
  * @param {Object} color - Color object with r, g, b, a properties
@@ -17,17 +19,15 @@ export const rgbaToString = (color) => {
 /**
  * Create a lighter version of a color for backgrounds
  * @param {Object} color - Color object with r, g, b, a properties  
- * @param {number} opacity - Opacity for background (default 0.25)
+ * @param {number} opacity - Opacity for background (default from constants)
  * @returns {string} CSS rgba string with reduced opacity
  */
-export const createBackgroundColor = (color, opacity = 0.25) => {
+export const createBackgroundColor = (color, opacity = USER_COLOR_OPACITIES.BACKGROUND) => {
   if (!color || typeof color !== 'object') {
     return `rgba(54, 162, 235, ${opacity})`;
   }
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
 };
-
-
 
 // Cache for user preferences to avoid redundant API calls
 let userPreferencesCache = {};
@@ -48,16 +48,16 @@ export const setUserPreferencesCache = (users) => {
     
     // Use preferences from the user object if available
     if (user.primary) {
-      // Ensure primary color has 20% opacity
+      // Ensure primary color has correct opacity from constants
       const primary = {
         ...user.primary,
-        a: 0.2
+        a: USER_COLOR_OPACITIES.BACKGROUND
       };
       userPreferencesCache[user.id] = {
         user_id: user.id,
         primary: primary,
         secondary: primary, // Keep for backward compatibility
-        theme: user.theme || 'light'
+        theme: user.theme || THEME_OPTIONS.LIGHT
       };
     } else {
       // Use default preferences if none found
@@ -89,11 +89,11 @@ const getUserPreferencesFromCache = (userId) => {
 const getDefaultPreferences = (userId) => {
   // Use deterministic colors based on user ID
   const defaultColors = [
-    { r: 255, g: 99, b: 132, a: 0.2 }, // Pink
-    { r: 54, g: 162, b: 235, a: 0.2 }, // Blue
-    { r: 153, g: 102, b: 255, a: 0.2 }, // Purple
-    { r: 255, g: 159, b: 64, a: 0.2 }, // Orange
-    { r: 75, g: 192, b: 192, a: 0.2 }, // Teal
+    { r: 255, g: 99, b: 132, a: USER_COLOR_OPACITIES.BACKGROUND }, // Pink
+    { r: 54, g: 162, b: 235, a: USER_COLOR_OPACITIES.BACKGROUND }, // Blue
+    { r: 153, g: 102, b: 255, a: USER_COLOR_OPACITIES.BACKGROUND }, // Purple
+    { r: 255, g: 159, b: 64, a: USER_COLOR_OPACITIES.BACKGROUND }, // Orange
+    { r: 75, g: 192, b: 192, a: USER_COLOR_OPACITIES.BACKGROUND }, // Teal
   ];
   
   const colorIndex = (userId - 1) % defaultColors.length;
@@ -101,7 +101,7 @@ const getDefaultPreferences = (userId) => {
     user_id: userId,
     primary: defaultColors[colorIndex],
     secondary: defaultColors[colorIndex], // Keep for backward compatibility
-    theme: 'light'
+    theme: THEME_OPTIONS.LIGHT
   };
 };
 
@@ -144,8 +144,8 @@ export const generateUserRowCSS = (users) => {
         /* User preference styles for ${user.display_name} */
         .modern-table tbody tr.${className},
         .modern-table .${className} {
-          background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.2) !important;
-          border-left: 4px solid rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.8) !important;
+          background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BACKGROUND}) !important;
+          border-left: 4px solid rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BORDER}) !important;
           transition: background-color 0.2s ease !important;
         }
         
@@ -193,8 +193,8 @@ export const updateUserTotalColors = (users) => {
         const [, primaryR, primaryG, primaryB] = primaryMatch;
         
         window.userTotalColors[user.display_name] = {
-          bg: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.2)`,
-          border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.8)`
+          bg: `rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BACKGROUND})`,
+          border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BORDER})`
         };
       }
     });
