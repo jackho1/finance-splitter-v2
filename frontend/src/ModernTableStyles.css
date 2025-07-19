@@ -50,31 +50,11 @@
   transition: background-color 0.2s ease;
 }
 
-.modern-table tbody tr:hover {
+.modern-table tbody tr:hover:not([class*="row-"]) {
   background-color: #f8fafc;
 }
 
-/* Color-coded rows */
-.row-ruby {
-  background-color: rgba(255, 99, 132, 0.03);
-}
-.row-ruby:hover {
-  background-color: rgba(255, 99, 132, 0.08);
-}
-
-.row-jack {
-  background-color: rgba(54, 162, 235, 0.03);
-}
-.row-jack:hover {
-  background-color: rgba(54, 162, 235, 0.08);
-}
-
-.row-both {
-  background-color: rgba(75, 192, 95, 0.03);
-}
-.row-both:hover {
-  background-color: rgba(75, 192, 95, 0.08);
-}
+/* Color-coded rows - Now dynamically generated based on user preferences */
 
 /* Amount colors */
 .amount-positive {

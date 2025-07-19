@@ -1,5 +1,73 @@
 /* Modern Table Styles */
 
+/* Navigation button styling */
+.nav-button {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.nav-button:active {
+  background-color: #e5e7eb;
+  transform: scale(0.98);
+}
+
+.nav-button.active {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.nav-button.active:hover {
+  background-color: #2563eb;
+}
+
+/* Preferences button styling */
+.preferences-toggle {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.preferences-toggle:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.preferences-toggle:active {
+  background-color: #e5e7eb;
+  transform: scale(0.98);
+}
+
+/* Spinning animation for loading spinners */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Navigation container to match table width */
 .table-navigation-container {
   max-width: 1300px;
@@ -84,34 +152,11 @@
   border-bottom: none;
 }
 
-.modern-table tbody tr:hover {
-  background-color: #f9fbfd;
+.modern-table tbody tr:hover:not([class*="row-"]) {
+  background-color: #08080800;
 }
 
-/* Row color classes */
-.row-ruby {
-  background-color: rgba(255, 99, 132, 0.05);
-}
-
-.row-jack {
-  background-color: rgba(54, 162, 235, 0.05);
-}
-
-.row-both {
-  background-color: rgba(75, 192, 95, 0.05);
-}
-
-.row-ruby:hover {
-  background-color: rgba(255, 99, 132, 0.1) !important;
-}
-
-.row-jack:hover {
-  background-color: rgba(54, 162, 235, 0.1) !important;
-}
-
-.row-both:hover {
-  background-color: rgba(75, 192, 95, 0.1) !important;
-}
+/* Row color classes - Now dynamically generated based on user preferences */
 
 /* Cell content styles */
 .cell-content {

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+import { useUserPreferencesContext } from './contexts/UserPreferencesContext';
+import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
 
 // Import utility functions
 //import { calculateTotals } from './utils/calculateTotals';
@@ -508,6 +510,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // New: Add user management states
   const [users, setUsers] = useState([]);
   const [splitAllocations, setSplitAllocations] = useState(null); // Use null to distinguish from empty object
+  
+  // User preferences context (not needed anymore since we fetch directly)
+  // const { getUserColor } = useUserPreferencesContext();
 
   // Helper function to get transaction label from split allocations
   const getTransactionLabel = (transaction) => {
@@ -822,6 +827,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           // New: Set users and split allocations
           setUsers(users || []);
           setSplitAllocations(splitAllocations || {});
+          
+          // Initialize user preferences cache (prevents multiple API calls)
+          setUserPreferencesCache(users || []);
         } else {
           throw new Error(response.data.error || 'Failed to fetch offset initial data');
         }
@@ -1104,6 +1112,18 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     
     setFilteredTransactions(tableFiltered);
   }, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
+
+  // Update user color styles when users change
+  useEffect(() => {
+    if (users && users.length > 0) {
+      try {
+        updateUserColorStyles(users);
+        updateUserTotalColors(users);
+      } catch (error) {
+        console.error('Error updating user colors in OffsetTransactions:', error);
+      }
+    }
+  }, [users]);
 
   const toggleColumnFilter = (column) => {
     setActiveFilterColumn(activeFilterColumn === column ? null : column);

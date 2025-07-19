@@ -5,6 +5,8 @@ import html2canvas from 'html2canvas';
 import Budgets from './Budgets';
 import PersonalTransactions from './PersonalTransactions';
 import OffsetTransactions from './OffsetTransactions';
+import { UserPreferencesProvider, useUserPreferencesContext } from './contexts/UserPreferencesContext';
+import UserPreferencesModal from './components/UserPreferencesModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,6 +28,7 @@ import {
   getFieldType 
 } from './utils/updateHandlers';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
 
 import './ModernTables.css';
 import './SortableTableHeaders.css';
@@ -515,7 +518,8 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
     );
 };
 
-const App = () => {
+// Create a separate component for the main app logic
+const AppContent = () => {
   const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -543,6 +547,17 @@ const App = () => {
   // Add state for transaction month filtering
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  
+  // User preferences context
+  const { 
+    setUsers: setContextUsers, 
+    setCurrentUser, 
+    getUserTotalColors, 
+    getTransactionRowColor
+  } = useUserPreferencesContext();
+  
+  // User preferences modal state
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
 
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
@@ -716,6 +731,12 @@ const App = () => {
   
   // Add bulk update state
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  
+  // Add state for dynamic total colors
+  const [userTotalColors, setUserTotalColors] = useState({});
+  
+  // Add a refresh counter to force re-renders when colors update
+  const [colorRefreshCounter, setColorRefreshCounter] = useState(0);
 
   // Function to generate a random color
   const getRandomColor = () => {
@@ -752,6 +773,12 @@ const App = () => {
           // Set new user management system data
           setUsers(users || []);
           setSplitAllocations(splitAllocations || {});
+          
+          // Initialize user preferences cache (prevents multiple API calls)
+          setUserPreferencesCache(users || []);
+          
+          // Update context with users
+          setContextUsers(users || []);
           
           // Update loading states
           setIsCategoryMappingsLoading(false);
@@ -1045,6 +1072,32 @@ const App = () => {
     splitAllocations
   ]);
 
+  // Update user color styles when users change
+  useEffect(() => {
+    if (users && users.length > 0) {
+      try {
+        updateUserColorStyles(users);
+        updateUserTotalColors(users);
+      } catch (error) {
+        console.error('Error updating user colors:', error);
+      }
+    }
+  }, [users]);
+
+  // Listen for total color updates
+  useEffect(() => {
+    const handleTotalColorsUpdate = (event) => {
+            setUserTotalColors(event.detail.userTotalColors);
+      setColorRefreshCounter(prev => prev + 1);
+    };
+
+    window.addEventListener('userTotalColorsUpdated', handleTotalColorsUpdate);
+    
+    return () => {
+      window.removeEventListener('userTotalColorsUpdated', handleTotalColorsUpdate);
+    };
+  }, []);
+
   const data = {
     labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
     datasets: []
@@ -1186,14 +1239,38 @@ const App = () => {
     maintainAspectRatio: false,
   };
 
-  // Updated getRowColor function using modern classes
-  // TODO: Fix this so it is not hardcoded and works with the new user system
+  // Helper function to get user total colors with fallback
+  const getDynamicUserTotalColors = (userDisplayName) => {
+    // Try to get colors from our dynamic system first
+    if (userTotalColors[userDisplayName]) {
+      return userTotalColors[userDisplayName];
+    }
+    
+    // Fallback to context function if dynamic colors aren't ready yet
+    return getUserTotalColors(userDisplayName);
+  };
+
+  // Updated getRowColor function using dynamic user system
   const getRowLabelClass = (label) => {
-    if (!label) return '';
-    const lower = label.toLowerCase();
-    if (lower.includes('ruby')) return 'row-ruby';
-    if (lower.includes('jack')) return 'row-jack';
-    if (lower.includes('both') || lower.includes('all user')) return 'row-group';
+    if (!label || !users || !Array.isArray(users)) {
+      return '';
+    }
+    const lowerLabel = label.toLowerCase();
+    
+    // Check for exact or partial match with any user display_name
+    for (const user of users) {
+      if (user.username === 'default') continue;
+      if (lowerLabel.includes(user.display_name.toLowerCase())) {
+        const className = `row-${user.display_name.toLowerCase().replace(/\s+/g, '-')}`;
+        return className;
+      }
+    }
+    
+    // Group split (e.g., 'Both', 'All users', or any label with 2+ users)
+    if (lowerLabel.includes('both') || lowerLabel.includes('all user') || /\+\d+/.test(lowerLabel)) {
+      return 'row-group';
+    }
+    
     return '';
   };
   
@@ -2301,7 +2378,8 @@ const App = () => {
                     className={getRowLabelClass(getTransactionLabel(transaction))} 
                     style={{ 
                       backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
-                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                                     transaction.split_from_id ? '#f7fbff' : 
+                                     getTransactionRowColor(transaction, users, splitAllocations),
                       transition: 'background-color 0.2s',
                       borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
                     }}
@@ -3132,10 +3210,7 @@ const App = () => {
       const bulkUpdateData = {
         mark_value: true,
         transaction_ids: transactionIds
-      };
-      
-      console.log('Sending bulk update data:', bulkUpdateData);
-      console.log('Number of transactions to update:', transactionIds.length);
+            };
       
       const response = await axios.put(getApiUrl('/transactions/bulk-update-mark'), bulkUpdateData);
       
@@ -3701,16 +3776,7 @@ const App = () => {
         }
         
         /* Enhanced row styling for better discernibility */
-        /* TODO: Fix this so it is not hardcoded and works with the new user system */
-        .row-ruby {
-          background-color: rgba(255, 99, 132, 0.25) !important;
-          border-left: 4px solid rgba(255, 99, 132, 0.8);
-        }
-         
-        .row-jack {
-          background-color: rgba(54, 162, 235, 0.25) !important;
-          border-left: 4px solid rgba(54, 162, 235, 0.8);
-        }
+        /* User-specific row styles are now dynamically generated based on user preferences */
         
         .row-group {
           background-color: rgba(75, 192, 95, 0.25) !important;
@@ -3718,7 +3784,7 @@ const App = () => {
         }
         
         /* Styling for unlabeled rows */
-        .modern-table tbody tr:not(.row-ruby):not(.row-jack):not(.row-group) {
+        .modern-table tbody tr:not(.row-group):not([class*="row-"]) {
           background-color: white;
           border-left: 4px solid #d1d1d1;
         }
@@ -3943,6 +4009,18 @@ const App = () => {
               Show Help
             </>
           )}
+        </button>
+        
+        <button 
+          onClick={() => setIsPreferencesModalOpen(true)}
+          className={`nav-button ${activeTab === 'settings' ? 'active' : ''}`}
+          title="Color preferences"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+            <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" strokeWidth="2"/>
+          </svg>
+          User Settings
         </button>
       </div>
       {activeTab === 'transactions' && (
@@ -4628,16 +4706,10 @@ const App = () => {
           {isTransactionsLoading || isLabelsLoading ? (
             <LoadingSpinner />
           ) : (
-            <div className="totals-container">
+            <div className="totals-container" key={`totals-${colorRefreshCounter}`}>
               {/* Dynamically render user totals */}
               {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map((user, index) => {
-                const colorOptions = [
-                  { bg: 'rgba(54, 162, 235, 0.2)', border: 'rgba(54, 162, 235, 1)' },
-                  { bg: 'rgba(255, 99, 132, 0.2)', border: 'rgba(255, 99, 132, 1)' },
-                  { bg: 'rgba(255, 206, 86, 0.2)', border: 'rgba(255, 206, 86, 1)' },
-                  { bg: 'rgba(75, 192, 192, 0.2)', border: 'rgba(75, 192, 192, 1)' }
-                ];
-                const colors = colorOptions[index % colorOptions.length];
+                const colors = getDynamicUserTotalColors(user.display_name);
                 
                 return (
                   <div 
@@ -4738,6 +4810,12 @@ const App = () => {
       {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
       {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} />}
       {activeTab === 'offset' && <OffsetTransactions helpTextVisible={helpTextVisible} />}
+      
+      {/* User Preferences Modal */}
+      <UserPreferencesModal 
+        isOpen={isPreferencesModalOpen} 
+        onClose={() => setIsPreferencesModalOpen(false)} 
+      />
 
       {/* Add this at the end of the transactions view, before the closing div */}
       {isScreenGrabOpen && (
@@ -5239,6 +5317,15 @@ const App = () => {
         </div>
       )}
     </div>
+  );
+};
+
+// Main App component that provides user preferences context
+const App = () => {
+  return (
+    <UserPreferencesProvider>
+      <AppContent />
+    </UserPreferencesProvider>
   );
 };
 
