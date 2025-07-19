@@ -511,8 +511,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const [users, setUsers] = useState([]);
   const [splitAllocations, setSplitAllocations] = useState(null); // Use null to distinguish from empty object
   
-  // User preferences context (not needed anymore since we fetch directly)
-  // const { getUserColor } = useUserPreferencesContext();
+  // User preferences context for getting color functions
+  const { getUserTotalColors } = useUserPreferencesContext();
 
   // Helper function to get transaction label from split allocations
   const getTransactionLabel = (transaction) => {
@@ -855,6 +855,20 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Listen for color style updates from preferences modal
+  useEffect(() => {
+    const handleColorStylesUpdate = () => {
+      // Force a small re-render to pick up new CSS classes
+      setIsTransactionsLoading(prev => prev);
+    };
+
+    window.addEventListener('userColorStylesUpdated', handleColorStylesUpdate);
+    
+    return () => {
+      window.removeEventListener('userColorStylesUpdated', handleColorStylesUpdate);
     };
   }, []);
 

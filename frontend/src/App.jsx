@@ -1087,7 +1087,7 @@ const AppContent = () => {
   // Listen for total color updates
   useEffect(() => {
     const handleTotalColorsUpdate = (event) => {
-            setUserTotalColors(event.detail.userTotalColors);
+      setUserTotalColors(event.detail.userTotalColors);
       setColorRefreshCounter(prev => prev + 1);
     };
 

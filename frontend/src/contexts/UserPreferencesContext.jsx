@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import useUserPreferences from '../hooks/useUserPreferences';
+import { USER_COLOR_OPACITIES } from '../utils/colorConstants';
 
 const UserPreferencesContext = createContext();
 
@@ -53,7 +54,7 @@ export const UserPreferencesProvider = ({ children }) => {
   const getUserTotalColors = (userDisplayName) => {
     if (!users.length) {
       return {
-        bg: 'rgba(54, 162, 235, 0.2)',
+        bg: `rgba(54, 162, 235, ${USER_COLOR_OPACITIES.BACKGROUND})`,
         border: 'rgba(54, 162, 235, 1)'
       };
     }
@@ -61,31 +62,28 @@ export const UserPreferencesProvider = ({ children }) => {
     const user = users.find(u => u.display_name === userDisplayName);
     if (!user) {
       return {
-        bg: 'rgba(200, 200, 200, 0.2)',
+        bg: `rgba(200, 200, 200, ${USER_COLOR_OPACITIES.BACKGROUND})`,
         border: 'rgba(200, 200, 200, 1)'
       };
     }
 
-    // Get user's primary and secondary colors
+    // Get user's primary color only
     const primaryColor = getUserColor(user.id, 'primary');
-    const secondaryColor = getUserColor(user.id, 'secondary');
     
-    // Extract RGB values - secondary for background, primary for border
+    // Extract RGB values - use primary for both with different opacity
     const primaryMatch = primaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    const secondaryMatch = secondaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
     
-    if (primaryMatch && secondaryMatch) {
+    if (primaryMatch) {
       const [, primaryR, primaryG, primaryB] = primaryMatch;
-      const [, secondaryR, secondaryG, secondaryB] = secondaryMatch;
       return {
-        bg: `rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.2)`,
-        border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, 1)`
+        bg: `rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BACKGROUND})`,
+        border: `rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BORDER})`
       };
     }
 
     // Fallback
     return {
-      bg: 'rgba(54, 162, 235, 0.2)',
+      bg: `rgba(54, 162, 235, ${USER_COLOR_OPACITIES.BACKGROUND})`,
       border: 'rgba(54, 162, 235, 1)'
     };
   };

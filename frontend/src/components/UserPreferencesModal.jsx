@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useUserPreferencesContext } from '../contexts/UserPreferencesContext';
 import { getApiUrl } from '../utils/apiUtils';
-import { updateUserColorStyles, updateUserTotalColors } from '../utils/userColorStyles';
+import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from '../utils/userColorStyles';
+import { USER_COLOR_OPACITIES, THEME_OPTIONS } from '../utils/colorConstants';
 
 /**
  * User Preferences Modal Component
@@ -25,6 +26,9 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [loadingUserPrefs, setLoadingUserPrefs] = useState(false);
+  
+  // Default opacity for the primary color
+  const DEFAULT_OPACITY = USER_COLOR_OPACITIES.BACKGROUND;
 
   // Update selected user when currentUserId changes
   useEffect(() => {
@@ -42,23 +46,25 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
       const response = await axios.get(getApiUrl(`/user-preferences/${userId}`));
       if (response.data.success) {
         const userPrefs = response.data.data;
+        // Ensure primary color has default opacity of 0.2
+        const primaryColor = userPrefs.primary ? {
+          ...userPrefs.primary,
+          a: DEFAULT_OPACITY
+        } : { r: 54, g: 162, b: 235, a: DEFAULT_OPACITY };
+        
         setLocalPreferences({
           user_id: userId,
-          primary: userPrefs.primary,
-          secondary: userPrefs.secondary,
-          tertiary: userPrefs.tertiary
+          primary: primaryColor
         });
         // Keep theme separate - it's global
-        setGlobalTheme(userPrefs.theme || 'light');
+        setGlobalTheme(userPrefs.theme || THEME_OPTIONS.LIGHT);
       }
     } catch (error) {
       console.error('Error loading user preferences:', error);
       // Set defaults for this user
       setLocalPreferences({
         user_id: userId,
-        primary: { r: 54, g: 162, b: 235, a: 1 },
-        secondary: { r: 255, g: 99, b: 132, a: 1 },
-        tertiary: { r: 75, g: 192, b: 192, a: 1 }
+        primary: { r: 54, g: 162, b: 235, a: DEFAULT_OPACITY }
       });
     } finally {
       setLoadingUserPrefs(false);
@@ -75,38 +81,31 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
   // Update local preferences when context preferences change (for current user)
   useEffect(() => {
     if (preferences && selectedUserId === currentUserId) {
+      const primaryColor = preferences.primary ? {
+        ...preferences.primary,
+        a: DEFAULT_OPACITY
+      } : { r: 54, g: 162, b: 235, a: DEFAULT_OPACITY };
+      
       setLocalPreferences({
         user_id: preferences.user_id,
-        primary: preferences.primary,
-        secondary: preferences.secondary,
-        tertiary: preferences.tertiary
+        primary: primaryColor
       });
-      setGlobalTheme(preferences.theme || 'light');
+      setGlobalTheme(preferences.theme || THEME_OPTIONS.LIGHT);
     }
   }, [preferences, selectedUserId, currentUserId]);
 
   // Handle color change
-  const handleColorChange = (colorType, hexValue) => {
+  const handleColorChange = (hexValue) => {
     if (!hexValue || hexValue.length < 7) return;
     
-    const newRgba = hexToRgba(hexValue, localPreferences[colorType]?.a || 1);
+    const newRgba = hexToRgba(hexValue, DEFAULT_OPACITY);
     setLocalPreferences(prev => ({
       ...prev,
-      [colorType]: newRgba
+      primary: newRgba
     }));
   };
 
-  // Handle alpha change
-  const handleAlphaChange = (colorType, alphaValue) => {
-    const alpha = parseFloat(alphaValue) || 0;
-    setLocalPreferences(prev => ({
-      ...prev,
-      [colorType]: {
-        ...prev[colorType],
-        a: Math.max(0, Math.min(1, alpha))
-      }
-    }));
-  };
+
 
   // Save preferences
   const handleSave = async () => {
@@ -117,8 +116,8 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
       // Save color preferences for selected user
       const colorPreferences = {
         primary: localPreferences.primary,
-        secondary: localPreferences.secondary,
-        tertiary: localPreferences.tertiary,
+        // Keep backward compatibility by saving the primary color as secondary too
+        secondary: localPreferences.primary,
         theme: globalTheme // Include theme in the save
       };
 
@@ -135,20 +134,28 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
         
         // Update the webpage colors immediately to reflect the new preferences
         if (users && users.length > 0) {
-          console.log('🎨 Color preferences saved - updating webpage colors and totals');
-          // Add a small delay to ensure the API changes are fully saved
-          setTimeout(async () => {
-            try {
-              // Update both transaction row colors and totals colors
-              await Promise.all([
-                updateUserColorStyles(users),
-                updateUserTotalColors(users)
-              ]);
-              console.log('🎨 Transaction rows and totals colors updated successfully');
-            } catch (error) {
-              console.error('Error updating colors after save:', error);
-            }
-          }, 100);
+          try {
+            // First, update the users array with the new preferences
+            const updatedUsers = users.map(user => {
+              if (user.id === selectedUserId) {
+                return {
+                  ...user,
+                  primary: colorPreferences.primary,
+                  theme: colorPreferences.theme
+                };
+              }
+              return user;
+            });
+            
+            // Update the preferences cache with the new data
+            setUserPreferencesCache(updatedUsers);
+            
+            // Update both transaction row colors and totals colors
+            updateUserColorStyles(updatedUsers);
+            updateUserTotalColors(updatedUsers);
+          } catch (error) {
+            console.error('Error updating colors after save:', error);
+          }
         }
         
         onClose();
@@ -166,11 +173,9 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
   const handleReset = () => {
     setLocalPreferences({
       user_id: selectedUserId,
-      primary: { r: 54, g: 162, b: 235, a: 1 },
-      secondary: { r: 255, g: 99, b: 132, a: 1 },
-      tertiary: { r: 75, g: 192, b: 192, a: 1 }
+      primary: { r: 54, g: 162, b: 235, a: DEFAULT_OPACITY }
     });
-    setGlobalTheme('light');
+    setGlobalTheme(THEME_OPTIONS.LIGHT);
   };
 
   // Cancel changes
@@ -236,7 +241,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
             fontSize: '20px',
             fontWeight: '600'
           }}>
-            Color Preferences{selectedUserId ? ` - ${getSelectedUserName()}` : ''}
+            User Settings{selectedUserId ? ` - ${getSelectedUserName()}` : ''}
           </h2>
           <button
             onClick={handleCancel}
@@ -273,7 +278,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
             fontSize: '14px',
             lineHeight: '1.5'
           }}>
-            Customize color preferences for different users. Select a user below to edit their color preferences.
+            Customize settings for different users. Select a user below to edit their preferences.
           </p>
 
           {/* User Selection */}
@@ -332,101 +337,139 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Color Inputs */}
+          {/* Color Input - Primary Only */}
           {selectedUserId && !loadingUserPrefs && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}> {/* Reduced from 16px */}
-            {['primary', 'secondary', 'tertiary'].map((colorType) => (
-              <div key={colorType} style={{
-                padding: '10px', // Reduced from 12px for tighter spacing
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb',
+            marginBottom: '12px'
+          }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '10px'
+            }}>
+              User Color
+            </label>
+            
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              {/* Color Preview with opacity applied */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  backgroundColor: `rgba(${localPreferences.primary?.r || 0}, ${localPreferences.primary?.g || 0}, ${localPreferences.primary?.b || 0}, ${DEFAULT_OPACITY})`,
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  {/* Show a border preview */}
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '6px',
+                    backgroundColor: `rgba(${localPreferences.primary?.r || 0}, ${localPreferences.primary?.g || 0}, ${localPreferences.primary?.b || 0}, ${USER_COLOR_OPACITIES.BORDER})`
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  color: '#6b7280',
+                  textAlign: 'center'
+                }}>
+                  Preview
+                </span>
+              </div>
+              
+              {/* Color Picker */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <input
+                  type="color"
+                  value={rgbaToHex(localPreferences.primary)}
+                  onChange={(e) => handleColorChange(e.target.value)}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: '#fff',
+                    padding: '4px'
+                  }}
+                />
+                <span style={{
+                  fontSize: '11px',
+                  color: '#6b7280'
+                }}>
+                  Select Color
+                </span>
+              </div>
+              
+              {/* Color Information */}
+              <div style={{
+                flex: 1,
+                minWidth: '200px',
+                backgroundColor: 'white',
+                padding: '10px',
+                borderRadius: '6px',
                 border: '1px solid #e5e7eb'
               }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '2px', // Reduced from 10px for tighter spacing
-                  textTransform: 'capitalize'
-                }}>
-                  {colorType} Color
-                </label>
-                
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px', // Reduced from 12px
-                  flexWrap: 'wrap'
+                  fontSize: '13px',
+                  color: '#374151',
+                  marginBottom: '8px',
+                  fontWeight: '500'
                 }}>
-                  {/* Color Preview */}
-                  <div style={{
-                    width: '50px',
-                    height: '50px',
-                    backgroundColor: `rgba(${localPreferences[colorType]?.r || 0}, ${localPreferences[colorType]?.g || 0}, ${localPreferences[colorType]?.b || 0}, ${localPreferences[colorType]?.a || 1})`,
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    flexShrink: 0
-                  }} />
-                  
-                  {/* Color Picker */}
-                  <input
-                    type="color"
-                    value={rgbaToHex(localPreferences[colorType])}
-                    onChange={(e) => handleColorChange(colorType, e.target.value)}
-                    style={{
-                      width: '60px',
-                      height: '40px',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                  />
-                  
-                  {/* Alpha Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1', minWidth: '140px' }}>
-                    <label style={{
-                      fontSize: '12px',
-                      color: '#6b7280',
-                      fontWeight: '500'
-                    }}>
-                      Opacity
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={localPreferences[colorType]?.a || 1}
-                      onChange={(e) => handleAlphaChange(colorType, e.target.value)}
-                      style={{
-                        width: '100%' // Changed from 100px to 100% to use available space
-                      }}
-                    />
-                    <span style={{
-                      fontSize: '12px',
-                      color: '#6b7280',
-                      textAlign: 'center'
-                    }}>
-                      {Math.round((localPreferences[colorType]?.a || 1) * 100)}%
-                    </span>
+                  Color Details
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '8px',
+                  fontSize: '12px',
+                  color: '#6b7280'
+                }}>
+                  <div>
+                    <span style={{ fontWeight: '500' }}>R:</span> {localPreferences.primary?.r || 0}
                   </div>
-                  
-                  {/* RGB Values */}
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px',
-                    fontSize: '12px',
-                    color: '#6b7280'
-                  }}>
-                    <div>R: {localPreferences[colorType]?.r || 0}</div>
-                    <div>G: {localPreferences[colorType]?.g || 0}</div>
-                    <div>B: {localPreferences[colorType]?.b || 0}</div>
+                  <div>
+                    <span style={{ fontWeight: '500' }}>G:</span> {localPreferences.primary?.g || 0}
+                  </div>
+                  <div>
+                    <span style={{ fontWeight: '500' }}>B:</span> {localPreferences.primary?.b || 0}
                   </div>
                 </div>
+                <div style={{
+                  marginTop: '6px',
+                  fontSize: '11px',
+                  color: '#9ca3af',
+                  fontStyle: 'italic'
+                }}>
+                  Background opacity: 20% • Border opacity: 80%
+                </div>
               </div>
-            ))}
+            </div>
           </div>
           )}
 
@@ -530,46 +573,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Preview Section */}
-          <div style={{
-            marginTop: '12px', // Reduced from 16px for tighter spacing
-            padding: '10px', // Reduced from 12px for tighter spacing
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h3 style={{
-              margin: '0 0 8px 0', // Reduced from 10px for tighter spacing
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#374151'
-            }}>
-              Preview
-            </h3>
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              flexWrap: 'wrap'
-            }}>
-              {['primary', 'secondary', 'tertiary'].map((colorType) => (
-                <div
-                  key={colorType}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: `rgba(${localPreferences[colorType]?.r || 0}, ${localPreferences[colorType]?.g || 0}, ${localPreferences[colorType]?.b || 0}, ${localPreferences[colorType]?.a || 1})`,
-                    color: 'white',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    textTransform: 'capitalize',
-                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                  }}
-                >
-                  {colorType}
-                </div>
-              ))}
-            </div>
-          </div>
+
         </div>
 
         {/* Footer */}
