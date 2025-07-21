@@ -1,10 +1,10 @@
 // Budgets.jsx
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+import { getApiUrl, getApiUrlWithParams } from '../utils/apiUtils';
 import { Bar } from 'react-chartjs-2';
-import { USER_CONFIG } from './config/userConfig';
-import { valuesAreEqual } from './utils/updateHandlers';
+import { USER_CONFIG } from '../config/userConfig';
+import { valuesAreEqual } from '../utils/updateHandlers';
 import {
   Chart as ChartJS,
   CategoryScale,
