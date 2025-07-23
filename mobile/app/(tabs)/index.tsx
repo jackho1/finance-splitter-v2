@@ -98,6 +98,28 @@ interface SelectedSegment {
   color: string;
 }
 
+// Add new interfaces for split allocations
+interface SplitAllocation {
+  id: number;
+  split_id: number;
+  user_id: number;
+  amount: string;
+  percentage: string | null;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  display_name: string;
+  split_type_code: string;
+  split_type_label: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  is_active: boolean;
+}
+
 // API Configuration
 const API_CONFIG = {
   development: {
@@ -247,27 +269,6 @@ const getBottomSheetTheme = (isDark: boolean) => ({
   cardBg: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
   buttonBg: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
 });
-
-// Helper function to get user colors based on label and theme
-const getUserColors = (label: string, isDark: boolean) => {
-  const theme = isDark ? 'dark' : 'light';
-  const normalizedLabel = label?.toLowerCase();
-  
-  if (normalizedLabel === 'ruby') {
-    return USER_COLORS.ruby[theme];
-  } else if (normalizedLabel === 'jack') {
-    return USER_COLORS.jack[theme];
-  } else if (normalizedLabel === 'both') {
-    return USER_COLORS.both[theme];
-  }
-  
-  // Default colors for unlabeled transactions
-  return {
-    background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-    border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-    accent: isDark ? '#666' : '#999'
-  };
-};
 
 // Helper function to get category from bank_category using mappings (like frontend)
 const getCategoryFromMapping = (bankCategory: string | null | undefined, categoryMappings: Record<string, string>): string | null => {
@@ -439,21 +440,18 @@ const TransactionItem = memo<{
   onPress: (event: any) => void;
   colorScheme: 'light' | 'dark';
   categoryMappings: Record<string, string>;
-}>(({ transaction, onPress, colorScheme, categoryMappings }) => {
+  getTransactionLabel: (transaction: Transaction) => string | null;
+  getUserColors: (transaction: Transaction) => any;
+}>(({ transaction, onPress, colorScheme, categoryMappings, getTransactionLabel, getUserColors }) => {
   const isDark = colorScheme === 'dark';
-  
   // Use the same category determination logic for consistent coloring
   const actualCategory = getTransactionCategory(transaction, categoryMappings);
   const categoryColor = useMemo(() => 
     CATEGORY_COLORS[actualCategory.charCodeAt(0) % CATEGORY_COLORS.length],
     [actualCategory]
   );
-  
-  const userColors = useMemo(() => 
-    getUserColors(transaction.label, isDark),
-    [transaction.label, isDark]
-  );
-  
+  const label = getTransactionLabel(transaction);
+  const userColors = useMemo(() => getUserColors(transaction), [transaction]);
   return (
     <Pressable
       style={({ pressed }) => [
@@ -476,28 +474,24 @@ const TransactionItem = memo<{
             >
               {transaction.description || 'No description'}
             </Text>
-            <Text style={[styles.transactionAmount, { color: userColors.accent }]}>
+            <Text style={[styles.transactionAmount, { color: userColors.accent }]}> 
               {parseFloat(transaction.amount || '0') < 0 ? '-' : ''}${Math.abs(parseFloat(transaction.amount || '0')).toFixed(2)}
             </Text>
           </View>
-          
           <View style={styles.transactionTags}>
             {transaction.bank_category && (
-              <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}>
-                <Text style={[styles.categoryTagText, { color: categoryColor }]}>
+              <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}> 
+                <Text style={[styles.categoryTagText, { color: categoryColor }]}> 
                   {transaction.bank_category}
                 </Text>
               </View>
             )}
-            
-            {transaction.label && (
+            {label && (
               <View style={[styles.labelTag, { 
-                backgroundColor: userColors.accent + '20',
-                borderWidth: 1,
-                borderColor: userColors.accent + '40'
-              }]}>
-                <Text style={[styles.labelTagText, { color: userColors.accent }]}>
-                  {transaction.label}
+                backgroundColor: userColors.background,
+              }]}> 
+                <Text style={[styles.labelTagText, { color: userColors.accent }]}> 
+                  {label}
                 </Text>
               </View>
             )}
@@ -535,6 +529,63 @@ export default function FinanceDashboard() {
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [isLoadingMappings, setIsLoadingMappings] = useState(false);
   
+  // New state for split allocations and users
+  const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
+  const [users, setUsers] = useState<User[]>([]);
+
+  // Helper function to get transaction label from split allocations
+  const getTransactionLabel = useCallback((transaction: Transaction): string | null => {
+    if (!splitAllocations || !users || users.length === 0) {
+      return null;
+    }
+    const allocations = splitAllocations[transaction.id];
+    if (!allocations || allocations.length === 0) {
+      return null;
+    }
+    // If only one allocation, return that user's display name
+    if (allocations.length === 1) {
+      return allocations[0].display_name;
+    }
+    // If multiple allocations with equal split, return "Both"
+    if (allocations.length > 1 && allocations[0].split_type_code === 'equal') {
+      // Check if all active users are included
+      const activeUsers = users.filter(u => u.is_active);
+      const allocationUserIds = allocations.map(a => a.user_id);
+      const allActiveUsersIncluded = activeUsers.every(u => allocationUserIds.includes(u.id));
+      if (allActiveUsersIncluded && allocations.length === activeUsers.length) {
+        return 'Both';
+      }
+    }
+    // For other cases, return comma-separated list of users
+    return allocations.map(a => a.display_name).join(', ');
+  }, [splitAllocations, users]);
+
+  // Helper function to get user colors based on label and theme
+  const getUserColors = useCallback((transaction: Transaction) => {
+    const label = getTransactionLabel(transaction);
+    if (!label) {
+      // Use neutral color scheme for unlabelled
+      return {
+        background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+        border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+        accent: isDark ? '#666' : '#999'
+      };
+    }
+    const normalizedLabel = label.toLowerCase();
+    if (normalizedLabel === 'ruby') {
+      return isDark ? USER_COLORS.ruby.dark : USER_COLORS.ruby.light;
+    } else if (normalizedLabel === 'jack') {
+      return isDark ? USER_COLORS.jack.dark : USER_COLORS.jack.light;
+    } else if (normalizedLabel === 'both') {
+      return isDark ? USER_COLORS.both.dark : USER_COLORS.both.light;
+    }
+    return {
+      background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+      border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      accent: isDark ? '#666' : '#999'
+    };
+  }, [isDark, getTransactionLabel]);
+  
   // Helper function to get bank categories for a given category
   const getBankCategoriesForCategory = useCallback((category: string): string[] => {
     return Object.entries(categoryMappings)
@@ -552,7 +603,7 @@ export default function FinanceDashboard() {
     // Filter transactions: only include those with labels and exclude transfers (matching index.tsx)
     const filteredTransactions = transactions.filter(transaction => {
       // Filter out unlabelled transactions (like index.tsx)
-      if (!transaction.label) {
+      if (!getTransactionLabel(transaction)) {
         return false;
       }
       
@@ -716,7 +767,7 @@ export default function FinanceDashboard() {
     // Use unfiltered monthly transactions to show all categories
     unfileredMonthlyTransactions.forEach(transaction => {
       // Skip transactions without labels (only show labeled transactions in summary)
-      if (!transaction.label) {
+      if (!getTransactionLabel(transaction)) {
         return;
       }
       
@@ -759,11 +810,18 @@ export default function FinanceDashboard() {
       
       const data = await response.json();
       
-      // Extract data from the response
-      const { transactions, categoryMappings } = data.data;
+      // Extract data from the response including new fields
+      const { 
+        transactions, 
+        categoryMappings, 
+        users: userData, 
+        splitAllocations: splitData 
+      } = data.data;
       
       setTransactions(transactions);
       setCategoryMappings(categoryMappings);
+      setUsers(userData || []);
+      setSplitAllocations(splitData || {});
     } catch (error) {
       console.error('Error fetching initial data:', error);
       Alert.alert('Error', 'Failed to load data. Please try again.');
@@ -1246,7 +1304,6 @@ export default function FinanceDashboard() {
                     handleCategorySummaryClick(cat.category);
                   }}
                 >
-              
                 <View style={[styles.categoryIndicator, { backgroundColor: cat.color }]} />
                 <Text style={[
                   styles.categoryName, 
@@ -1299,6 +1356,8 @@ export default function FinanceDashboard() {
           onPress={() => handleTransactionPress(item)}
           colorScheme={colorScheme || 'light'}
           categoryMappings={categoryMappings}
+          getTransactionLabel={getTransactionLabel}
+          getUserColors={getUserColors}
         />
       );
     }
@@ -1449,7 +1508,7 @@ export default function FinanceDashboard() {
                       ]}>
                         {getTransactionCategory(selectedTransaction, categoryMappings)}
                       </Text>
-                      {selectedTransaction.label && (
+                      {getTransactionLabel(selectedTransaction) && (
                         <>
                           <Text style={[
                             styles.metaSeparator,
@@ -1461,7 +1520,7 @@ export default function FinanceDashboard() {
                             styles.userLabel,
                             { color: getBottomSheetTheme(isDark).subtitleColor }
                           ]}>
-                            {selectedTransaction.label}
+                            {getTransactionLabel(selectedTransaction)}
                           </Text>
                         </>
                       )}
@@ -2087,10 +2146,6 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     flexWrap: 'wrap',
   },
-  categoryName: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
   metaSeparator: {
     fontSize: 12,
     fontWeight: '500',
@@ -2218,6 +2273,27 @@ const styles = StyleSheet.create({
   bottomSheetActionButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  labelDisplay: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  labelDisplayDark: {
+    backgroundColor: '#374151',
+    borderColor: '#4b5563',
+  },
+  labelDisplayText: {
+    fontSize: 15,
+    color: '#111827',
+  },
+  labelHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
   },
 
 
