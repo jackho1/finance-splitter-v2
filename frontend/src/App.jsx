@@ -29,6 +29,7 @@ import {
 } from './utils/updateHandlers';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
+import { getTransactionLabel, getUserTotalFromAllocations, calculateTotalsFromAllocations } from './utils/calculateTotals';
 
 import './ModernTables.css';
 import './SortableTableHeaders.css';
@@ -587,8 +588,17 @@ const AppContent = () => {
   const [isScreenGrabOpen, setIsScreenGrabOpen] = useState(false);
   const screenGrabRef = useRef(null);
 
+  // ===== REFACTORED TOTALS CALCULATION SYSTEM =====
+  // This section handles the calculation of user totals based on the new user management system
+  // Requirements addressed:
+  // 1. Ignore unlabelled transactions (transactions without split allocations or labels)
+  // 2. Handle "Both" transactions by dividing by 2 and adding to both users
+  // 3. Handle "All users" transactions by dividing by total active users and split between all
+  // 4. Respect date range filtering (transactions filtered by date range are used for totals)
+  // 5. Use users data from initial-data endpoint (usersResult from backend/index.js)
+  
   // Helper functions for new user management system
-  const getTransactionLabel = (transaction) => {
+  const getTransactionLabel = (transaction, splitAllocations, users, isTransactionsLoading) => {
     // Early return for loading states
     if (isTransactionsLoading || !users || users.length === 0) {
       return null;
@@ -665,7 +675,21 @@ const AppContent = () => {
     }
   };
 
-  const getUserTotalFromAllocations = (userId, filteredTransactions) => {
+  /**
+   * Calculate total amount for a specific user from filtered transactions
+   * @param {number} userId - The user ID to calculate totals for
+   * @param {Array} filteredTransactions - Transactions filtered by date/other criteria
+   * @returns {number} Total amount allocated to the user
+   * 
+   * Logic:
+   * 1. For transactions with split allocations: Use the user's allocated amount
+   * 2. For legacy label-based transactions:
+   *    - Single user: Full amount if labeled with user's name
+   *    - "Both": Split equally between active users (minimum 2)
+   *    - "All users": Split equally between all active users
+   * 3. Unlabelled transactions (no allocations, no label): Ignored
+   */
+  const getUserTotalFromAllocations = (userId, filteredTransactions, splitAllocations, users) => {
     let total = 0;
     
     if (!Array.isArray(filteredTransactions)) {
@@ -675,29 +699,49 @@ const AppContent = () => {
     filteredTransactions.forEach(transaction => {
       const allocations = splitAllocations[transaction.id];
       if (allocations && Array.isArray(allocations)) {
+        // NEW SYSTEM: Use split allocations data
         const userAllocation = allocations.find(allocation => allocation.user_id === userId);
         if (userAllocation && typeof userAllocation.amount === 'number') {
           total += userAllocation.amount;
         }
       } else {
-        // Fallback to legacy label system for backward compatibility
-        // Guard clause: only process legacy labels if users is loaded
-        if (users && Array.isArray(users)) {
+        // LEGACY SYSTEM: Fallback to label-based system for backward compatibility
+        // Only process legacy labels if users is loaded and transaction has a label
+        if (users && Array.isArray(users) && transaction.label) {
           const user = users.find(u => u.id === userId);
+          const activeUsers = users.filter(u => u.username !== 'default' && u.is_active);
+          
           if (user && transaction.label === user.display_name) {
+            // Single user transaction
             total += parseFloat(transaction.amount) || 0;
-          } else if (user && transaction.label === 'Both' && users.length >= 2) {
-            // For legacy "Both" transactions, split equally
-            total += (parseFloat(transaction.amount) || 0) / 2;
+          } else if (user && transaction.label === 'Both' && activeUsers.length >= 2) {
+            // "Both" transaction - split equally between all active users (legacy assumed 2 users)
+            total += (parseFloat(transaction.amount) || 0) / Math.max(2, activeUsers.length);
+          } else if (user && transaction.label === 'All users' && activeUsers.length >= 2) {
+            // "All users" transaction - split equally between all active users
+            total += (parseFloat(transaction.amount) || 0) / activeUsers.length;
           }
         }
+        // NOTE: If transaction has no label or no valid allocations, it's ignored (as required)
       }
     });
     
     return typeof total === 'number' && !isNaN(total) ? total : 0;
   };
 
-  const calculateTotalsFromAllocations = (filteredTransactions) => {
+  /**
+   * Calculate totals for all users based on filtered transactions
+   * @param {Array} filteredTransactions - Transactions filtered by date range, labels, etc.
+   * @returns {Object} Object with user display names as keys and their totals as values
+   * 
+   * This is the main function that orchestrates total calculations for the UI.
+   * It respects:
+   * - Date filtering (only calculates totals for transactions in the filtered date range)
+   * - Month filtering (when no specific date range is selected)
+   * - User management system (fetches users from initial-data endpoint)
+   * - Split allocations for proper transaction splitting
+   */
+  const calculateTotalsFromAllocations = (filteredTransactions, users, splitAllocations) => {
     const totals = {};
     
     // Guard clause: return empty totals if users is not loaded yet
@@ -705,9 +749,11 @@ const AppContent = () => {
       return totals;
     }
     
-    // Calculate totals for each user using split allocations
-    users.forEach(user => {
-      const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions);
+    // Calculate totals for each active user (excluding default system user)
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    activeUsers.forEach(user => {
+      const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions, splitAllocations, users);
       // Ensure all totals are numeric (handle undefined, null, NaN cases)
       totals[user.display_name] = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
     });
@@ -957,7 +1003,7 @@ const AppContent = () => {
         setFilteredTransactions(tableFiltered);
         
         // Recalculate totals
-        const newTotals = calculateTotalsFromAllocations(tableFiltered);
+        const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
         setTotals(newTotals);
         
       } else {
@@ -1056,7 +1102,7 @@ const AppContent = () => {
     setFilteredTransactions(tableFiltered);
 
     // Calculate totals using the new allocation-based system
-    const newTotals = calculateTotalsFromAllocations(tableFiltered);
+    const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
     setTotals(newTotals);
   }, [
     transactions, 
@@ -1857,7 +1903,7 @@ const AppContent = () => {
         >
         {field === 'label' ? (
           (() => {
-            const label = getTransactionLabel(transaction);
+            const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
             
             // Show loading indicator if data is still loading
             if (isTransactionsLoading || splitAllocations === null) {
@@ -2062,7 +2108,7 @@ const AppContent = () => {
             setFilteredTransactions(prev => [addedTransaction, ...prev]);
             
             // Update totals
-            const newTotals = calculateTotalsFromAllocations([...filteredTransactions, addedTransaction]);
+            const newTotals = calculateTotalsFromAllocations([...filteredTransactions, addedTransaction], users, splitAllocations);
             setTotals(newTotals);
           }
         }
@@ -2375,7 +2421,7 @@ const AppContent = () => {
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
                   <tr 
-                    className={getRowLabelClass(getTransactionLabel(transaction))} 
+                    className={getRowLabelClass(getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading))} 
                     style={{ 
                       backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
                                      transaction.split_from_id ? '#f7fbff' : 
@@ -3112,7 +3158,7 @@ const AppContent = () => {
         setFilteredTransactions(tableFiltered);
 
         // Calculate totals using the new allocation-based system
-        const newTotals = calculateTotalsFromAllocations(tableFiltered);
+        const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
         setTotals(newTotals);
       } else {
         // Show error notification
@@ -4707,6 +4753,14 @@ const AppContent = () => {
             <LoadingSpinner />
           ) : (
             <div className="totals-container" key={`totals-${colorRefreshCounter}`}>
+              {/* ===== REFACTORED USER TOTALS DISPLAY ===== */}
+              {/* This section displays totals calculated by the refactored system that: */}
+              {/* - Ignores unlabelled transactions */}
+              {/* - Splits "Both" transactions equally between users */}
+              {/* - Splits "All users" transactions equally between all active users */}
+              {/* - Respects date filtering and shows totals for filtered date ranges */}
+              {/* - Uses user data from the initial-data endpoint */}
+              
               {/* Dynamically render user totals */}
               {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map((user, index) => {
                 const colors = getDynamicUserTotalColors(user.display_name);
@@ -4808,7 +4862,7 @@ const AppContent = () => {
         </div>
       )}
       {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
-      {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} />}
+      {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} users={users} splitAllocations={splitAllocations} />}
       {activeTab === 'offset' && <OffsetTransactions helpTextVisible={helpTextVisible} />}
       
       {/* User Preferences Modal */}
@@ -5302,7 +5356,7 @@ const AppContent = () => {
                           style={{ animation: 'spin 1s linear infinite' }}>
                           <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
                         </svg>
-                        Processing...
+                        Processing...  
                       </>
                     ) : (
                       <>
