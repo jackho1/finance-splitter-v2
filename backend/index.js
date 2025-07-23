@@ -3406,7 +3406,13 @@ app.get('/shared-transactions-filtered', async (req, res) => {
   try {
     const { startDate, endDate, user = 'Jack', userId: userIdParam } = req.query;
 
-    // Build dynamic query with filters
+    // Get the shared transaction type ID
+    const transactionTypeResult = await pool.query(
+      "SELECT id FROM transaction_types WHERE code = 'shared'"
+    );
+    const sharedTransactionTypeId = transactionTypeResult.rows[0]?.id || 1;
+
+    // Build dynamic query with filters - get all transactions in date range
     let query = 'SELECT * FROM shared_transactions_generalized WHERE 1=1';
     const values = [];
     let paramIndex = 1;
@@ -3424,15 +3430,38 @@ app.get('/shared-transactions-filtered', async (req, res) => {
       paramIndex++;
     }
 
-    // Filter by user (user's transactions and Both transactions)
-    query += ` AND (label = $${paramIndex} OR label = 'Both')`;
-    values.push(user);
-    paramIndex++;
-
     // Add ordering
     query += ' ORDER BY date DESC';
 
     const { rows } = await pool.query(query, values);
+
+    // Get split allocations for all transactions in the date range
+    const transactionIds = rows.map(row => row.id);
+    let splitAllocations = {};
+    
+    if (transactionIds.length > 0) {
+      const allocationsQuery = `
+        SELECT 
+          tsc.transaction_id,
+          tsa.user_id,
+          tsa.amount,
+          tsa.percentage
+        FROM transaction_split_allocations tsa
+        JOIN transaction_split_configs tsc ON tsa.split_id = tsc.id
+        WHERE tsc.transaction_id::text = ANY($1::text[])
+        AND tsc.transaction_type_id = $2
+      `;
+      
+      const allocationsResult = await pool.query(allocationsQuery, [transactionIds, sharedTransactionTypeId]);
+      
+      // Group allocations by transaction_id
+      allocationsResult.rows.forEach(allocation => {
+        if (!splitAllocations[allocation.transaction_id]) {
+          splitAllocations[allocation.transaction_id] = [];
+        }
+        splitAllocations[allocation.transaction_id].push(allocation);
+      });
+    }
 
     // Convert userId to integer (handle 'default' or string values)
     let userId = 1; // fallback default
@@ -3462,17 +3491,18 @@ app.get('/shared-transactions-filtered', async (req, res) => {
 
     rows.forEach(transaction => {
       const category = transaction.category || 'Uncategorized';
-      let amount = parseFloat(transaction.amount) || 0;
-
-      // Only process transactions with label "user" or "Both"
-      if (transaction.label !== user && transaction.label !== 'Both') {
+      const transactionAllocations = splitAllocations[transaction.id] || [];
+      
+      // Find the user's allocation for this transaction
+      const userAllocation = transactionAllocations.find(allocation => allocation.user_id === userId);
+      
+      // Skip transactions where the user has no allocation
+      if (!userAllocation) {
         return; // Skip this transaction
       }
-
-      // For "Both" transactions, divide by 2 to get user's portion
-      if (transaction.label === 'Both') {
-        amount = amount / 2;
-      }
+      
+      // Use the user's allocated amount (already calculated correctly by the split system)
+      const amount = parseFloat(userAllocation.amount) || 0;
 
       if (!categoryTotals[category]) {
         categoryTotals[category] = {

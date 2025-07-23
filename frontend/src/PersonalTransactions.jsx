@@ -3,7 +3,6 @@ import axios from 'axios';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 
 // Import utility functions
-import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
 import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
@@ -502,7 +501,7 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
     );
 };
 
-const PersonalTransactions = ({ helpTextVisible }) => {
+const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
@@ -2144,69 +2143,73 @@ const PersonalTransactions = ({ helpTextVisible }) => {
 
   // Smart Split Functions - Updated to use database configuration
   const loadSmartSplitData = async () => {
-    // Check if personal split is enabled and configured
+    // 1. Check config
     if (!personalSplitEnabled) {
       showErrorNotification('Personal split is not enabled. Please enable it in settings first.');
       return;
     }
-    
     if (personalSplitGroups.length === 0) {
       showErrorNotification('No split groups configured. Please configure split groups in settings first.');
       return;
     }
-    
-    // Automatically fill in today's date if end date is missing
+    if (!Array.isArray(users) || users.length === 0) {
+      showErrorNotification('User data not loaded. Please refresh and try again.');
+      return;
+    }
+    // Dynamically select the current user (preferably from context, else first non-default, else fallback)
+    let currentUser = users.find(u => u.is_current) || users.find(u => u.username !== 'default') || users[0];
+    if (!currentUser) {
+      showErrorNotification('No valid user found for smart split.');
+      return;
+    }
+    const userId = currentUser.id;
     const today = new Date().toISOString().split('T')[0];
     const effectiveFilters = { ...smartSplitFilters };
-    
     if (!effectiveFilters.endDate) {
       effectiveFilters.endDate = today;
       setSmartSplitFilters(prev => ({ ...prev, endDate: today }));
     }
-    
     if (!useSmartSplit || !effectiveFilters.startDate) {
       showErrorNotification('Please provide a start date for smart split');
       return;
     }
-    
     try {
       setIsLoadingSmartSplit(true);
-      const response = await axios.get(getApiUrl('/shared-transactions-filtered'), {
-        params: { ...effectiveFilters, userId }
+      
+      // 3. Fetch shared transactions for the date range using the API
+      const sharedTransactionsResponse = await axios.get(getApiUrl('/shared-transactions-filtered'), {
+        params: {
+          startDate: effectiveFilters.startDate,
+          endDate: effectiveFilters.endDate,
+          user: currentUser.display_name || currentUser.username,
+          userId: userId
+        }
       });
       
-      if (response.data.success) {
-        setSmartSplitData(response.data.data);
-        
-        const newSplitTransactions = [];
-        const groupedTotals = response.data.data.groupedTotals;
-        
-        // Create a readable date range for the transaction descriptions
-        const dateRangeText = formatDateRangeConcise(effectiveFilters.startDate, effectiveFilters.endDate);
-        
-        // Use database-driven configuration instead of hardcoded mapping
-        Object.entries(groupedTotals).forEach(([groupName, data]) => {
-          // Find the corresponding group configuration
-          const groupConfig = personalSplitGroups.find(g => g.group_name === groupName);
-          
-          // Only create split transactions for groups that have a personal category (not "original")
-          if (groupConfig && 
-              groupConfig.personal_category && 
-              groupConfig.personal_category !== 'original' && 
-              data.total < 0) { // For expenses
-            newSplitTransactions.push({
-              description: `${groupName} ${dateRangeText}`,
-              amount: data.total.toFixed(2), // Keep the negative amount as-is
-              category: groupConfig.personal_category
-            });
-          }
-        });
-        
-        if (newSplitTransactions.length > 0) {
-          setSplitTransactions(newSplitTransactions);
-        } else {
-          showErrorNotification('No split transactions were generated. Check your split group configuration.');
+      if (!sharedTransactionsResponse.data.success) {
+        throw new Error('Failed to fetch shared transactions for smart split');
+      }
+      
+      const sharedTransactionsData = sharedTransactionsResponse.data.data;
+      const sharedTransactions = sharedTransactionsData.transactions || [];
+      const groupedTotals = sharedTransactionsData.groupedTotals || {};
+      
+      // 4. Create split transactions based on the grouped totals from the API
+      const newSplitTransactions = [];
+      Object.entries(groupedTotals).forEach(([groupName, data]) => {
+        if (data.personalCategory && data.personalCategory !== 'original' && data.total !== 0) {
+          newSplitTransactions.push({
+            description: `${groupName} ${formatDateRangeConcise(effectiveFilters.startDate, effectiveFilters.endDate)}`,
+            amount: data.total.toFixed(2),
+            category: data.personalCategory
+          });
         }
+      });
+      
+      if (newSplitTransactions.length > 0) {
+        setSplitTransactions(newSplitTransactions);
+      } else {
+        showErrorNotification('No split transactions were generated. Check your split group configuration and date range.');
       }
     } catch (error) {
       console.error('Error loading smart split data:', error);
@@ -2690,6 +2693,9 @@ const PersonalTransactions = ({ helpTextVisible }) => {
       console.error('Error updating distribution rule:', error);
     }
   };
+  
+  // State for mapping bank_category/subcategory to main category
+  // Remove unused categoryMainMap logic since we use existing categoryMappings
   
   return (
     <div style={{ position: 'relative' }}>
