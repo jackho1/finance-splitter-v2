@@ -405,7 +405,7 @@
 
   - Update the budgets progress bar color to change depending on the % spent. ideally it is a smooth transition change, however incremental changes e.g., 50%, 75% would also suffice.
 
-- [ ] **Color management system**:
+- [x] **Color management system**:
 
   - Create a proper color management system so that user color preferences can be stored and is associated with selected users. Current solution simply arbitrarily selects a hardcoded color.
 
@@ -425,6 +425,6 @@
 
   - Use icons instead of category names. When users open the transaction record, we can display the category name there instead (displays both sub and main category)
 
-- [ ] **App.jsx labelling is broken**:
+- [x] **App.jsx labelling is broken**:
 
   - Fix the labelling behaviour. Upon page refresh, the label value is not retained.
