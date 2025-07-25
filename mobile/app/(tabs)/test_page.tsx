@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 // Lucide React Native icons
 import { 
@@ -96,6 +96,28 @@ interface SelectedSegment {
   amount: number;
   month: number;
   color: string;
+}
+
+// Add new interfaces for split allocations
+interface SplitAllocation {
+  id: number;
+  split_id: number;
+  user_id: number;
+  amount: string;
+  percentage: string | null;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  display_name: string;
+  split_type_code: string;
+  split_type_label: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  is_active: boolean;
 }
 
 // API Configuration
@@ -178,6 +200,7 @@ const CATEGORY_ICONS = {
   'Other': HelpCircle,
   'Personal Items': ShoppingBag,
   'Savings': PiggyBank,
+  'Transfer': HelpCircle,
   'Travel': MapPin,
   'Vehicle': Car,
 };
@@ -185,7 +208,7 @@ const CATEGORY_ICONS = {
 // Month labels
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Helper function to format date to "17th July, 2025" style
+  // Helper function to format date to "17th July, 2025" style
 const formatDateWithOrdinal = (dateString: string): string => {
   if (!dateString) return '';
   
@@ -208,11 +231,44 @@ const formatDateWithOrdinal = (dateString: string): string => {
   return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
 };
 
+// Helper function to format date in "17th July, 2025" format (for display)
+const formatDateDisplay = (dateString: string): string => {
+  if (!dateString) return 'Unknown Date';
+  
+  const date = new Date(dateString);
+  
+  const day = date.getDate();
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  const year = date.getFullYear();
+  
+  // Add ordinal suffix to day
+  const getOrdinalSuffix = (day: number): string => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+  
+  return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+};
+
 // Helper function to get category icon
 const getCategoryIcon = (category: string) => {
   return CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS] || HelpCircle;
 };
-
+// Helper function to get optimal icon color that works with all transaction colors
+const getCategoryIconColor = (isDark: boolean): string => {
+  // Use a neutral icon color that works well with all transaction background colors
+  // and maintains good contrast in both light and dark modes
+  if (isDark) {
+  return '#94A3B8'; // Light slate-gray for dark mode - softer and more modern
+  } else {
+  return '#475569'; // Dark slate-gray for light mode - professional and readable
+  }
+  };
 // Helper function to get bottom sheet theme
 const getBottomSheetTheme = (isDark: boolean) => ({
   backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
@@ -223,27 +279,6 @@ const getBottomSheetTheme = (isDark: boolean) => ({
   cardBg: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
   buttonBg: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
 });
-
-// Helper function to get user colors based on label and theme
-const getUserColors = (label: string, isDark: boolean) => {
-  const theme = isDark ? 'dark' : 'light';
-  const normalizedLabel = label?.toLowerCase();
-  
-  if (normalizedLabel === 'ruby') {
-    return USER_COLORS.ruby[theme];
-  } else if (normalizedLabel === 'jack') {
-    return USER_COLORS.jack[theme];
-  } else if (normalizedLabel === 'both') {
-    return USER_COLORS.both[theme];
-  }
-  
-  // Default colors for unlabeled transactions
-  return {
-    background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-    border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-    accent: isDark ? '#666' : '#999'
-  };
-};
 
 // Helper function to get category from bank_category using mappings (like frontend)
 const getCategoryFromMapping = (bankCategory: string | null | undefined, categoryMappings: Record<string, string>): string | null => {
@@ -415,21 +450,35 @@ const TransactionItem = memo<{
   onPress: (event: any) => void;
   colorScheme: 'light' | 'dark';
   categoryMappings: Record<string, string>;
-}>(({ transaction, onPress, colorScheme, categoryMappings }) => {
+  getTransactionLabel: (transaction: Transaction) => string | null;
+  getUserColors: (transaction: Transaction) => any;
+}>(({ transaction, onPress, colorScheme, categoryMappings, getTransactionLabel, getUserColors }) => {
   const isDark = colorScheme === 'dark';
-  
   // Use the same category determination logic for consistent coloring
   const actualCategory = getTransactionCategory(transaction, categoryMappings);
-  const categoryColor = useMemo(() => 
+  const categoryColor = useMemo(() =>
     CATEGORY_COLORS[actualCategory.charCodeAt(0) % CATEGORY_COLORS.length],
     [actualCategory]
   );
+  const label = getTransactionLabel(transaction);
+  const userColors = useMemo(() => getUserColors(transaction), [transaction]);
   
-  const userColors = useMemo(() => 
-    getUserColors(transaction.label, isDark),
-    [transaction.label, isDark]
-  );
-  
+  // Determine if this is a user background (Ruby, Jack, Both)
+  const normalizedLabel = label ? label.toLowerCase() : '';
+  const isUserBackground = normalizedLabel === 'ruby' || normalizedLabel === 'jack' || normalizedLabel === 'both';
+
+  // Match the icon color to the bottom sheet view
+  const vibrantIconColor = isDark ? '#a78bfa' : '#6366f1';
+  // Consistent background tint (still slightly colored for vibrancy)
+  const iconBgColor = isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)';
+  // Consistent subtle border color
+  const iconBorderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  // Consistent shadow
+  const iconShadow = isDark ? '#000' : '#aaa';
+
+  // Get the appropriate icon for the category
+  const CategoryIcon = getCategoryIcon(actualCategory);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -443,37 +492,62 @@ const TransactionItem = memo<{
       onPress={onPress}
     >
       <View style={styles.transactionRow}>
+        {/* Vibrant Category Icon on the left */}
+        <View style={[
+          styles.categoryIconContainer,
+          {
+            backgroundColor: iconBgColor,
+            shadowColor: iconShadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 6,
+            elevation: 4,
+          },
+        ]}>
+          <CategoryIcon
+            size={18}
+            color={vibrantIconColor}
+            strokeWidth={2.5}
+          />
+        </View>
         <View style={styles.transactionContent}>
           <View style={styles.transactionHeader}>
-            <Text 
+            <Text
               style={[styles.transactionDescription, { color: isDark ? '#fff' : '#000' }]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
               {transaction.description || 'No description'}
             </Text>
-            <Text style={[styles.transactionAmount, { color: userColors.accent }]}>
+            <Text
+              style={[
+                styles.transactionAmount,
+                {
+                  color:
+                    parseFloat(transaction.amount || '0') < 0
+                      ? '#ef4444' // Red for expenses
+                      : '#10b981', // Green for income
+                },
+              ]}
+            >
               {parseFloat(transaction.amount || '0') < 0 ? '-' : ''}${Math.abs(parseFloat(transaction.amount || '0')).toFixed(2)}
             </Text>
           </View>
-          
           <View style={styles.transactionTags}>
-            {transaction.bank_category && (
-              <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}>
-                <Text style={[styles.categoryTagText, { color: categoryColor }]}>
+            {/* Only show bank_category tag if it's different from the mapped category */}
+            {transaction.bank_category && actualCategory === 'Unknown' && (
+              <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}> 
+                <Text style={[styles.categoryTagText, { color: categoryColor }]}> 
                   {transaction.bank_category}
                 </Text>
               </View>
             )}
-            
-            {transaction.label && (
-              <View style={[styles.labelTag, { 
-                backgroundColor: userColors.accent + '20',
-                borderWidth: 1,
-                borderColor: userColors.accent + '40'
-              }]}>
-                <Text style={[styles.labelTagText, { color: userColors.accent }]}>
-                  {transaction.label}
+            {label && (
+              <View style={[styles.labelTag, {
+                backgroundColor: userColors.background,
+              }]}> 
+                <Text style={[styles.labelTagText, { color: userColors.accent }]}> 
+                  {label}
                 </Text>
               </View>
             )}
@@ -511,6 +585,63 @@ export default function FinanceDashboard() {
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [isLoadingMappings, setIsLoadingMappings] = useState(false);
   
+  // New state for split allocations and users
+  const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
+  const [users, setUsers] = useState<User[]>([]);
+
+  // Helper function to get transaction label from split allocations
+  const getTransactionLabel = useCallback((transaction: Transaction): string | null => {
+    if (!splitAllocations || !users || users.length === 0) {
+      return null;
+    }
+    const allocations = splitAllocations[transaction.id];
+    if (!allocations || allocations.length === 0) {
+      return null;
+    }
+    // If only one allocation, return that user's display name
+    if (allocations.length === 1) {
+      return allocations[0].display_name;
+    }
+    // If multiple allocations with equal split, return "Both"
+    if (allocations.length > 1 && allocations[0].split_type_code === 'equal') {
+      // Check if all active users are included
+      const activeUsers = users.filter(u => u.is_active);
+      const allocationUserIds = allocations.map(a => a.user_id);
+      const allActiveUsersIncluded = activeUsers.every(u => allocationUserIds.includes(u.id));
+      if (allActiveUsersIncluded && allocations.length === activeUsers.length) {
+        return 'Both';
+      }
+    }
+    // For other cases, return comma-separated list of users
+    return allocations.map(a => a.display_name).join(', ');
+  }, [splitAllocations, users]);
+
+  // Helper function to get user colors based on label and theme
+  const getUserColors = useCallback((transaction: Transaction) => {
+    const label = getTransactionLabel(transaction);
+    if (!label) {
+      // Use neutral color scheme for unlabelled
+      return {
+        background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+        border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+        accent: isDark ? '#666' : '#999'
+      };
+    }
+    const normalizedLabel = label.toLowerCase();
+    if (normalizedLabel === 'ruby') {
+      return isDark ? USER_COLORS.ruby.dark : USER_COLORS.ruby.light;
+    } else if (normalizedLabel === 'jack') {
+      return isDark ? USER_COLORS.jack.dark : USER_COLORS.jack.light;
+    } else if (normalizedLabel === 'both') {
+      return isDark ? USER_COLORS.both.dark : USER_COLORS.both.light;
+    }
+    return {
+      background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+      border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      accent: isDark ? '#666' : '#999'
+    };
+  }, [isDark, getTransactionLabel]);
+  
   // Helper function to get bank categories for a given category
   const getBankCategoriesForCategory = useCallback((category: string): string[] => {
     return Object.entries(categoryMappings)
@@ -528,7 +659,7 @@ export default function FinanceDashboard() {
     // Filter transactions: only include those with labels and exclude transfers (matching index.tsx)
     const filteredTransactions = transactions.filter(transaction => {
       // Filter out unlabelled transactions (like index.tsx)
-      if (!transaction.label) {
+      if (!getTransactionLabel(transaction)) {
         return false;
       }
       
@@ -692,7 +823,7 @@ export default function FinanceDashboard() {
     // Use unfiltered monthly transactions to show all categories
     unfileredMonthlyTransactions.forEach(transaction => {
       // Skip transactions without labels (only show labeled transactions in summary)
-      if (!transaction.label) {
+      if (!getTransactionLabel(transaction)) {
         return;
       }
       
@@ -735,11 +866,18 @@ export default function FinanceDashboard() {
       
       const data = await response.json();
       
-      // Extract data from the response
-      const { transactions, categoryMappings } = data.data;
+      // Extract data from the response including new fields
+      const { 
+        transactions, 
+        categoryMappings, 
+        users: userData, 
+        splitAllocations: splitData 
+      } = data.data;
       
       setTransactions(transactions);
       setCategoryMappings(categoryMappings);
+      setUsers(userData || []);
+      setSplitAllocations(splitData || {});
     } catch (error) {
       console.error('Error fetching initial data:', error);
       Alert.alert('Error', 'Failed to load data. Please try again.');
@@ -1222,7 +1360,6 @@ export default function FinanceDashboard() {
                     handleCategorySummaryClick(cat.category);
                   }}
                 >
-              
                 <View style={[styles.categoryIndicator, { backgroundColor: cat.color }]} />
                 <Text style={[
                   styles.categoryName, 
@@ -1275,6 +1412,8 @@ export default function FinanceDashboard() {
           onPress={() => handleTransactionPress(item)}
           colorScheme={colorScheme || 'light'}
           categoryMappings={categoryMappings}
+          getTransactionLabel={getTransactionLabel}
+          getUserColors={getUserColors}
         />
       );
     }
@@ -1313,7 +1452,7 @@ export default function FinanceDashboard() {
       <BottomSheetModal
         ref={bottomSheetModalRef}
         index={0}
-        snapPoints={['45%', '75%']} // Reduced for thumb reachability
+        snapPoints={['40%', '85%']} // Reduced from 60% to 40% for thumb-reachable default size
         backdropComponent={(props) => (
           <BottomSheetBackdrop
             {...props}
@@ -1335,7 +1474,11 @@ export default function FinanceDashboard() {
         enableDynamicSizing={false}
         onDismiss={hideBottomSheet}
       >
-        <BottomSheetView style={styles.bottomSheetContent}>
+        <BottomSheetScrollView 
+          style={styles.bottomSheetContent}
+          contentContainerStyle={styles.bottomSheetScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.bottomSheetHeader}>
             <Text style={[
@@ -1358,7 +1501,7 @@ export default function FinanceDashboard() {
 
           {selectedTransaction && (
             <View style={styles.transactionDetailsContainer}>
-              {/* Transaction Card - Non-scrollable */}
+              {/* Transaction Card */}
               <View style={[
                 styles.transactionCard,
                 {
@@ -1367,12 +1510,12 @@ export default function FinanceDashboard() {
                   borderColor: getBottomSheetTheme(isDark).borderColor,
                 }
               ]}>
-                <View style={styles.transactionInfoRow}>
+                <View style={styles.transactionRow}>
                   <View style={[
                     styles.categoryIconContainer,
                     { 
                       backgroundColor: isDark 
-                        ? 'rgba(99,102,241,0.2)' 
+                        ? 'rgba(99,102,241,0.15)' 
                         : 'rgba(99,102,241,0.1)' 
                     }
                   ]}>
@@ -1393,7 +1536,7 @@ export default function FinanceDashboard() {
                     {isEditing ? (
                       <TextInput
                         style={[
-                          styles.editableTitle,
+                          styles.editableDescription,
                           {
                             color: getBottomSheetTheme(isDark).textColor,
                             backgroundColor: getBottomSheetTheme(isDark).buttonBg,
@@ -1406,52 +1549,63 @@ export default function FinanceDashboard() {
                         }
                         placeholder="Transaction description"
                         placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
+                        multiline
                       />
                     ) : (
-                      <Text style={[styles.transactionTitle, { color: getBottomSheetTheme(isDark).textColor }]}>
+                      <Text style={[styles.merchantName, { color: getBottomSheetTheme(isDark).textColor }]}>
                         {selectedTransaction.description}
                       </Text>
                     )}
                     
                     <View style={styles.transactionMeta}>
-                      <Text style={[styles.categoryText, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
+                      <Text style={[
+                        styles.categoryName,
+                        { color: getBottomSheetTheme(isDark).subtitleColor }
+                      ]}>
                         {getTransactionCategory(selectedTransaction, categoryMappings)}
                       </Text>
-                      <Text style={[styles.dateText, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
-                        • {formatDateWithOrdinal(selectedTransaction.date)}
-                      </Text>
+                      {getTransactionLabel(selectedTransaction) && (
+                        <>
+                          <Text style={[
+                            styles.metaSeparator,
+                            { color: getBottomSheetTheme(isDark).subtitleColor }
+                          ]}>
+                            •
+                          </Text>
+                          <Text style={[
+                            styles.userLabel,
+                            { color: getBottomSheetTheme(isDark).subtitleColor }
+                          ]}>
+                            {getTransactionLabel(selectedTransaction)}
+                          </Text>
+                        </>
+                      )}
                     </View>
                     
-                    {/* Display assigned user */}
-                    {selectedTransaction.label && (
-                      <View style={styles.userRow}>
-                        <User size={12} color={getBottomSheetTheme(isDark).subtitleColor} />
-                        <Text style={[styles.userText, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
-                          Assigned to {selectedTransaction.label}
-                        </Text>
-                      </View>
-                    )}
+                    <Text style={[
+                      styles.transactionDate,
+                      { color: getBottomSheetTheme(isDark).subtitleColor }
+                    ]}>
+                      {formatDateDisplay(selectedTransaction.date)}
+                    </Text>
                   </View>
                 </View>
 
-                {/* Amount Display */}
-                <View style={styles.amountContainer}>
-                  <Text style={[
-                    styles.amountText,
-                    { 
-                      color: selectedTransaction.amount.startsWith('-') 
-                        ? '#ef4444' 
-                        : '#10b981' 
-                    }
-                  ]}>
-                    {selectedTransaction.amount}
-                  </Text>
-                </View>
+                <Text style={[
+                  styles.amountDisplay,
+                  { 
+                    color: selectedTransaction.amount.startsWith('-') 
+                      ? '#ef4444' 
+                      : '#10b981',
+                  }
+                ]}>
+                  {selectedTransaction.amount}
+                </Text>
               </View>
 
               {/* Edit Fields - Only shown when editing */}
               {isEditing && (
-                <View style={styles.editFieldsContainer}>
+                <View style={styles.editSection}>
                   <View style={styles.editField}>
                     <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
                       CATEGORY
@@ -1476,7 +1630,7 @@ export default function FinanceDashboard() {
 
                   <View style={styles.editField}>
                     <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
-                      ASSIGNED TO
+                      LABEL
                     </Text>
                     <TextInput
                       style={[
@@ -1491,7 +1645,7 @@ export default function FinanceDashboard() {
                       onChangeText={(text) => 
                         setEditedTransaction(prev => prev ? { ...prev, label: text } : null)
                       }
-                      placeholder="Enter user"
+                      placeholder="Enter label"
                       placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
                     />
                   </View>
@@ -1536,7 +1690,7 @@ export default function FinanceDashboard() {
               </View>
             </View>
           )}
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheetModal>
     </SafeAreaView>
   );
@@ -1974,8 +2128,11 @@ const styles = StyleSheet.create({
   // Enhanced Bottom Sheet Styles
   bottomSheetContent: {
     flex: 1,
-    paddingHorizontal: 18,
+  },
+  bottomSheetScrollContent: {
+    paddingHorizontal: 20,
     paddingTop: 6,
+    paddingBottom: 30,
   },
   bottomSheetHeader: {
     flexDirection: 'row',
@@ -2011,44 +2168,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  leftCategoryIcon: {
+    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    },
   categoryIconContainer: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 12, // Soft square edges
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
   },
   transactionInfo: {
     flex: 1,
   },
-  transactionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 5,
+  merchantName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    lineHeight: 20,
   },
-  editableTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 5,
-    paddingHorizontal: 10,
+  editableDescription: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    paddingHorizontal: 8,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
+    textAlignVertical: 'top',
+    minHeight: 38,
   },
   transactionMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 3,
     flexWrap: 'wrap',
   },
-  categoryText: {
+  metaSeparator: {
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
+    marginHorizontal: 6,
   },
-  dateText: {
+  userLabel: {
     fontSize: 12,
+    fontWeight: '500',
+  },
+  transactionDate: {
+    fontSize: 11,
     fontWeight: '400',
-    marginLeft: 0,
   },
   userRow: {
     flexDirection: 'row',
@@ -2060,21 +2238,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
   },
-  amountContainer: {
-    alignItems: 'center',
+  amountDisplay: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  amountText: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
   
   // Edit Fields
-  editFieldsContainer: {
-    marginBottom: 18,
+  editSection: {
+    marginBottom: 16,
   },
   editField: {
     marginBottom: 16,
@@ -2166,6 +2342,27 @@ const styles = StyleSheet.create({
   bottomSheetActionButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  labelDisplay: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  labelDisplayDark: {
+    backgroundColor: '#374151',
+    borderColor: '#4b5563',
+  },
+  labelDisplayText: {
+    fontSize: 15,
+    color: '#111827',
+  },
+  labelHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
   },
 
 

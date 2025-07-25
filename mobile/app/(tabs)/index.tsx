@@ -200,6 +200,7 @@ const CATEGORY_ICONS = {
   'Other': HelpCircle,
   'Personal Items': ShoppingBag,
   'Savings': PiggyBank,
+  'Transfer': HelpCircle,
   'Travel': MapPin,
   'Vehicle': Car,
 };
@@ -258,7 +259,16 @@ const formatDateDisplay = (dateString: string): string => {
 const getCategoryIcon = (category: string) => {
   return CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS] || HelpCircle;
 };
-
+// Helper function to get optimal icon color that works with all transaction colors
+const getCategoryIconColor = (isDark: boolean): string => {
+  // Use a neutral icon color that works well with all transaction background colors
+  // and maintains good contrast in both light and dark modes
+  if (isDark) {
+  return '#94A3B8'; // Light slate-gray for dark mode - softer and more modern
+  } else {
+  return '#475569'; // Dark slate-gray for light mode - professional and readable
+  }
+  };
 // Helper function to get bottom sheet theme
 const getBottomSheetTheme = (isDark: boolean) => ({
   backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
@@ -446,12 +456,29 @@ const TransactionItem = memo<{
   const isDark = colorScheme === 'dark';
   // Use the same category determination logic for consistent coloring
   const actualCategory = getTransactionCategory(transaction, categoryMappings);
-  const categoryColor = useMemo(() => 
+  const categoryColor = useMemo(() =>
     CATEGORY_COLORS[actualCategory.charCodeAt(0) % CATEGORY_COLORS.length],
     [actualCategory]
   );
   const label = getTransactionLabel(transaction);
   const userColors = useMemo(() => getUserColors(transaction), [transaction]);
+  
+  // Determine if this is a user background (Ruby, Jack, Both)
+  const normalizedLabel = label ? label.toLowerCase() : '';
+  const isUserBackground = normalizedLabel === 'ruby' || normalizedLabel === 'jack' || normalizedLabel === 'both';
+
+  // Match the icon color to the bottom sheet view
+  const vibrantIconColor = isDark ? '#a78bfa' : '#6366f1';
+  // Consistent background tint (still slightly colored for vibrancy)
+  const iconBgColor = isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)';
+  // Consistent subtle border color
+  const iconBorderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  // Consistent shadow
+  const iconShadow = isDark ? '#000' : '#aaa';
+
+  // Get the appropriate icon for the category
+  const CategoryIcon = getCategoryIcon(actualCategory);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -465,21 +492,47 @@ const TransactionItem = memo<{
       onPress={onPress}
     >
       <View style={styles.transactionRow}>
+        {/* Vibrant Category Icon on the left */}
+        <View style={[
+          styles.categoryIconContainer,
+          {
+            backgroundColor: iconBgColor,
+            shadowColor: iconShadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 6,
+            elevation: 4,
+          },
+        ]}>
+          <CategoryIcon
+            size={18}
+            color={vibrantIconColor}
+            strokeWidth={2.5}
+          />
+        </View>
         <View style={styles.transactionContent}>
           <View style={styles.transactionHeader}>
-            <Text 
+            <Text
               style={[styles.transactionDescription, { color: isDark ? '#fff' : '#000' }]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
               {transaction.description || 'No description'}
             </Text>
-            <Text style={[styles.transactionAmount, { color: userColors.accent }]}> 
+            <Text
+              style={[
+                styles.transactionAmount,
+                {
+                  color: isDark ? '#ccc' : '#666',
+                },
+              ]}
+            >
               {parseFloat(transaction.amount || '0') < 0 ? '-' : ''}${Math.abs(parseFloat(transaction.amount || '0')).toFixed(2)}
             </Text>
           </View>
           <View style={styles.transactionTags}>
-            {transaction.bank_category && (
+            {/* Only show bank_category tag if it's different from the mapped category */}
+            {transaction.bank_category && actualCategory === 'Unknown' && (
               <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}> 
                 <Text style={[styles.categoryTagText, { color: categoryColor }]}> 
                   {transaction.bank_category}
@@ -487,7 +540,7 @@ const TransactionItem = memo<{
               </View>
             )}
             {label && (
-              <View style={[styles.labelTag, { 
+              <View style={[styles.labelTag, {
                 backgroundColor: userColors.background,
               }]}> 
                 <Text style={[styles.labelTagText, { color: userColors.accent }]}> 
@@ -2112,13 +2165,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  leftCategoryIcon: {
+    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    },
   categoryIconContainer: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 12, // Soft square edges
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
   },
   transactionInfo: {
     flex: 1,
