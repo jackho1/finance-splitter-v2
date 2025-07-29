@@ -9,7 +9,7 @@
 }
 
 .sortable-header:hover {
-  color: #3498db;
+  color: var(--color-buttonPrimary);
 }
 
 .sort-indicator {
@@ -37,20 +37,20 @@
 
 .sort-arrow.up {
   border-width: 0 4px 6px 4px;
-  border-color: transparent transparent #6c757d transparent;
+  border-color: transparent transparent var(--color-textSecondary) transparent;
 }
 
 .sort-arrow.down {
   border-width: 6px 4px 0 4px;
-  border-color: #6c757d transparent transparent transparent;
+  border-color: var(--color-textSecondary) transparent transparent transparent;
 }
 
 .sort-arrow.up.active {
-  border-color: transparent transparent #3498db transparent;
+  border-color: transparent transparent var(--color-buttonPrimary) transparent;
 }
 
 .sort-arrow.down.active {
-  border-color: #3498db transparent transparent transparent;
+  border-color: var(--color-buttonPrimary) transparent transparent transparent;
 }
 
 /* Add separation between sortable header and filter button */

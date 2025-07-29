@@ -118,8 +118,8 @@ export const generateUserRowCSS = (users) => {
   let cssRules = `
     /* Fallback for unlabeled rows */
     .modern-table tbody tr:not([class*="row-"]) {
-      background-color: white !important;
-      border-left: 4px solid #d1d1d1 !important;
+      background-color: var(--color-tableRow) !important;
+      border-left: 4px solid var(--color-borderSecondary) !important;
     }
   `;
 

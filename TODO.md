@@ -428,3 +428,19 @@
 - [x] **App.jsx labelling is broken**:
 
   - Fix the labelling behaviour. Upon page refresh, the label value is not retained.
+
+- [x] **Fix bank category dropdown to not use existing values**:
+
+  - Update it to use the actual bank category list from psql instead of searching all existing transactions for valid bank category values.
+
+- [x] **Fix trg_delete_shared_transactions trigger**:
+
+  - When deleting records manually, this trigger causes errors which does not allow users to delete the record.
+
+- [x] **Fix split transaction user labelling**:
+
+  - Note: When new transactions are created here, the program needs to create the transaction first, then the split config and allocations records can be created after because it needs the primary key of the transaction first.
+
+- [ ] **Abstract split transaction modal **:
+
+  - Abstract this so only one code needs to update all three views for this component.
