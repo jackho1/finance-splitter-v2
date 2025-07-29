@@ -487,7 +487,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     dragGhost.style.position = 'absolute';
     dragGhost.style.top = '-1000px';
     dragGhost.style.opacity = '1.0'; // Full opacity
-    dragGhost.style.backgroundColor = '#fff';
+    dragGhost.style.backgroundColor = 'var(--color-backgroundSecondary)';
     dragGhost.style.boxShadow = '0 5px 15px rgba(0,0,0,0.5)';
     dragGhost.style.width = rowElement.offsetWidth + 'px';
     dragGhost.style.borderCollapse = 'collapse';
@@ -500,13 +500,13 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     // Clone the row content with complete styling
     const clonedRow = rowElement.cloneNode(true);
     clonedRow.style.opacity = '1.0'; // Ensure full opacity
-    clonedRow.style.backgroundColor = 'white';
+    clonedRow.style.backgroundColor = 'var(--color-backgroundSecondary)';
     
     // Make sure all cells in the cloned row are visible
     Array.from(clonedRow.children).forEach(cell => {
       cell.style.opacity = '1';
-      cell.style.backgroundColor = 'white';
-      cell.style.color = 'black';
+      cell.style.backgroundColor = 'var(--color-backgroundSecondary)';
+      cell.style.color = 'var(--color-text)';
       cell.style.border = '1px solid #2196F3';
     });
     
@@ -798,25 +798,25 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           font-size: 16px;
           font-weight: 500;
           padding: 0 15px;
-          color: #2c3e50;
+          color: var(--color-text);
         }
         
         .help-text {
           display: flex;
           align-items: flex-start;
-          background-color: #f8f9fa;
+          background-color: var(--color-infoLight);
           padding: 10px 12px;
           border-radius: 6px;
-          border-left: 3px solid #4a90e2;
+          border-left: 3px solid var(--color-info);
           margin-bottom: 12px;
           font-size: 12px;
-          color: #505050;
+          color: var(--color-text);
           line-height: 1.4;
           font-family: 'Inter', sans-serif;
         }
         
         .help-text-icon {
-          color: #4a90e2;
+          color: var(--color-info);
           margin-right: 10px;
           flex-shrink: 0;
         }
@@ -872,7 +872,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           border: 1px solid #2196F3;
           padding: 8px;
           opacity: 1 !important;
-          background-color: white !important;
+          background-color: var(--color-backgroundSecondary) !important;
         }
         
         /* Override any default browser drag opacity */
@@ -906,9 +906,9 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
 
         /* Modern button styles */
         .modern-button {
-          background-color: #ffffff;
-          color: #2c3e50;
-          border: 1px solid #e0e0e0;
+          background-color: var(--color-buttonSecondary);
+          color: var(--color-buttonSecondaryText);
+          border: 1px solid var(--color-buttonSecondaryBorder);
           padding: 10px 16px;
           border-radius: 6px;
           font-size: 14px;
@@ -924,29 +924,29 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         }
 
         .modern-button:hover {
-          background-color: #f8f9fa;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          background-color: var(--color-buttonSecondaryHover);
+          box-shadow: 0 4px 8px var(--color-shadow);
           transform: translateY(-1px);
         }
 
         .modern-button:active {
-          background-color: #e9ecef;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          background-color: var(--color-backgroundHover);
+          box-shadow: 0 1px 3px var(--color-shadow);
           transform: translateY(0);
         }
 
         .modern-button.primary {
-          background-color: #3498db;
-          color: white;
-          border: 1px solid #2980b9;
+          background-color: var(--color-buttonPrimary);
+          color: var(--color-buttonPrimaryText);
+          border: 1px solid var(--color-buttonPrimary);
         }
 
         .modern-button.primary:hover {
-          background-color: #2980b9;
+          background-color: var(--color-buttonPrimaryHover);
         }
 
         .modern-button.primary:active {
-          background-color: #2471a3;
+          background-color: var(--color-buttonPrimaryHover);
         }
 
         .modern-button.navigation {
@@ -980,7 +980,7 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           border-radius: 8px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
           overflow: hidden;
-          background-color: #ffffff;
+          background-color: var(--color-backgroundSecondary);
         }
         
         .modern-table {

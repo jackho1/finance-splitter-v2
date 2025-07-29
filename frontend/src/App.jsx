@@ -31,100 +31,12 @@ import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
 import { getTransactionLabel, getUserTotalFromAllocations, calculateTotalsFromAllocations } from './utils/calculateTotals';
 
+import './theme.css';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
 
-// Add CSS styles for buttons and help text
-const buttonStyles = `
-  .modern-button {
-    background-color: #ffffff;
-    color: #2c3e50;
-    border: 1px solid #e0e0e0;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    outline: none;
-  }
 
-  .modern-button:hover {
-    background-color: #f8f9fa;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transform: translateY(-1px);
-  }
-
-  .modern-button:active {
-    background-color: #e9ecef;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transform: translateY(0);
-  }
-
-  .modern-button.navigation {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 12px;
-  }
-
-  .modern-button.navigation.prev {
-    padding-left: 2px;
-  }
-
-  .modern-button.navigation.next {
-    padding-right: 2px;
-  }
-
-  .modern-button.navigation svg {
-    margin: 0 5px;
-  }
-
-  .month-navigation {
-    display: flex;
-    margin-bottom: 15px;
-    align-items: center;
-  }
-
-  .month-display {
-    font-family: 'Inter', sans-serif;
-    font-size: 16px;
-    font-weight: 500;
-    padding: 0 8px;
-    color: #2c3e50;
-  }
-
-  .help-text {
-    display: flex;
-    align-items: flex-start;
-    background-color: #f8f9fa;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border-left: 3px solid #4a90e2;
-    margin-bottom: 12px;
-    font-size: 12px;
-    color: #505050;
-    line-height: 1.4;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  .help-text-icon {
-    color: #4a90e2;
-    margin-right: 10px;
-    flex-shrink: 0;
-  }
-  
-  .help-text-content {
-    flex: 1;
-    margin: 0;
-    padding: 0;
-  }
-`;
 
 ChartJS.register(
   CategoryScale,
@@ -194,10 +106,10 @@ const TableDropdownMenu = ({
         position: 'absolute',
         top: '100%',
         zIndex: 1000,
-        background: 'white',
-        border: '1px solid #e5e7eb',
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
         borderRadius: '6px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px var(--color-shadow)',
         width: width === '220px' ? '220px' : width, // Increase default width
         marginTop: '5px',
         display: 'flex',
@@ -207,7 +119,7 @@ const TableDropdownMenu = ({
     >
       {/* Search field - optional enhancement */}
       {availableOptions.length > 10 && !skipSearch && (
-        <div className="filter-search" style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+        <div className="filter-search" style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border)' }}>
           <input
             type="text"
             placeholder="Search..."
@@ -215,8 +127,10 @@ const TableDropdownMenu = ({
               width: '100%',
               padding: '6px 10px',
               fontSize: '13px',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--color-inputBorder)',
               borderRadius: '4px',
+              backgroundColor: 'var(--color-inputBackground)',
+              color: 'var(--color-inputText)'
             }}
           />
         </div>
@@ -241,7 +155,7 @@ const TableDropdownMenu = ({
                 display: 'flex',
                 alignItems: 'center',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               onClick={(e) => {
                 e.stopPropagation();
@@ -254,7 +168,7 @@ const TableDropdownMenu = ({
                 onChange={() => {}} // Handled by parent div onClick
                 style={{ marginRight: '6px', cursor: 'pointer' }}
               />
-              <span style={{ fontSize: '13px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--color-text)' }}>
                 {option}
               </span>
             </div>
@@ -271,11 +185,11 @@ const TableDropdownMenu = ({
               transition: 'background 0.2s',
               display: 'flex',
               alignItems: 'center',
-              borderTop: '1px solid #f0f0f0',
+              borderTop: '1px solid var(--color-border)',
               marginTop: '4px',
               paddingTop: '8px',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             onClick={(e) => {
               e.stopPropagation();
@@ -288,7 +202,7 @@ const TableDropdownMenu = ({
               onChange={() => {}} // Handled by parent div onClick
               style={{ marginRight: '6px', cursor: 'pointer' }}
             />
-            <span style={{ fontSize: '13px', fontStyle: 'italic', color: '#6b7280' }}>
+            <span style={{ fontSize: '13px', fontStyle: 'italic', color: 'var(--color-textSecondary)' }}>
               {emptyLabel}
             </span>
           </div>
@@ -301,8 +215,8 @@ const TableDropdownMenu = ({
           display: 'flex', 
           justifyContent: 'flex-start', 
           padding: '3px 4px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: 'white',
+          borderTop: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-backgroundElevated)',
           borderBottomLeftRadius: '6px',
           borderBottomRightRadius: '6px',
           position: 'sticky',
@@ -317,20 +231,20 @@ const TableDropdownMenu = ({
             style={{ 
               padding: '3px 6px',
               backgroundColor: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-borderSecondary)',
               borderRadius: '4px',
               fontSize: '12px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.color = '#374151';
+              e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.target.style.color = 'var(--color-text)';
             }}
             onMouseLeave={(e) => {
               e.target.style.backgroundColor = 'transparent';
-              e.target.style.color = '#6b7280';
+              e.target.style.color = 'var(--color-textSecondary)';
             }}
           >
             Clear
@@ -363,10 +277,10 @@ const DateFilterDropdown = ({
         position: 'absolute',
         top: '100%',
         zIndex: 1000,
-        background: 'white',
-        border: '1px solid #e5e7eb',
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
         borderRadius: '6px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px var(--color-shadow)',
         width: width,
         marginTop: '5px',
         padding: '12px',
@@ -377,7 +291,7 @@ const DateFilterDropdown = ({
           display: 'block', 
           fontSize: '12px', 
           fontWeight: '500', 
-          color: '#374151', 
+          color: 'var(--color-text)', 
           marginBottom: '4px' 
         }}>
           From:
@@ -393,8 +307,10 @@ const DateFilterDropdown = ({
             width: '100%',
             padding: '6px 8px',
             fontSize: '13px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--color-inputBorder)',
             borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
             boxSizing: 'border-box'
           }}
         />
@@ -404,7 +320,7 @@ const DateFilterDropdown = ({
           display: 'block', 
           fontSize: '12px', 
           fontWeight: '500', 
-          color: '#374151', 
+          color: 'var(--color-text)', 
           marginBottom: '4px' 
         }}>
           To:
@@ -420,8 +336,10 @@ const DateFilterDropdown = ({
             width: '100%',
             padding: '6px 8px',
             fontSize: '13px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--color-inputBorder)',
             borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
             boxSizing: 'border-box'
           }}
         />
@@ -431,7 +349,7 @@ const DateFilterDropdown = ({
           display: 'flex', 
           justifyContent: 'flex-end', 
           paddingTop: '8px',
-          borderTop: '1px solid #f0f0f0'
+          borderTop: '1px solid var(--color-border)'
         }}>
           <button 
             onClick={(e) => {
@@ -441,20 +359,20 @@ const DateFilterDropdown = ({
             style={{ 
               padding: '4px 8px',
               backgroundColor: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-borderSecondary)',
               borderRadius: '4px',
               fontSize: '12px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.color = '#374151';
+              e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.target.style.color = 'var(--color-text)';
             }}
             onMouseLeave={(e) => {
               e.target.style.backgroundColor = 'transparent';
-              e.target.style.color = '#6b7280';
+              e.target.style.color = 'var(--color-textSecondary)';
             }}
           >
             Clear
@@ -796,6 +714,11 @@ const AppContent = () => {
   
   // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
+    // Initialize theme from localStorage
+    const storedTheme = localStorage.getItem('theme') || 'light';
+    document.body.classList.remove('theme-light', 'theme-dark');
+    document.body.classList.add(`theme-${storedTheme}`);
+    
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
       setIsLabelsLoading(true);
@@ -1821,7 +1744,7 @@ const AppContent = () => {
                   position: 'relative',
                   zIndex: 1001,
                   pointerEvents: 'auto',
-                  backgroundColor: 'white',
+                  backgroundColor: 'var(--color-inputBackground)',
                   border: '2px solid #4a90e2',
                   outline: 'none'
                 }}
@@ -1940,9 +1863,9 @@ const AppContent = () => {
                   height: '14px',
                   marginLeft: '6px',
                   flexShrink: 0,
-                  backgroundColor: '#f8fafc',
-                  color: '#64748b',
-                  border: '1px solid #cbd5e1',
+                  backgroundColor: 'var(--color-backgroundTertiary)',
+                  color: 'var(--color-textSecondary)',
+                  border: '1px solid var(--color-border)',
                   opacity: 0.85,
                   fontWeight: '600'
                 }}
@@ -2423,7 +2346,7 @@ const AppContent = () => {
                   <tr 
                     className={getRowLabelClass(getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading))} 
                     style={{ 
-                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
+                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' : 
                                      transaction.split_from_id ? '#f7fbff' : 
                                      getTransactionRowColor(transaction, users, splitAllocations),
                       transition: 'background-color 0.2s',
@@ -2511,8 +2434,8 @@ const AppContent = () => {
                     <tr>
                       <td colSpan="5" style={{ 
                         padding: '0',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0'
+                        backgroundColor: 'var(--color-backgroundTertiary)',
+                        border: '1px solid var(--color-border)'
                       }}>
                         <div style={{ 
                           padding: '12px',
@@ -2609,7 +2532,7 @@ const AppContent = () => {
                                   fontSize: '14px', 
                                   fontWeight: '500', 
                                   marginBottom: '8px',
-                                  color: '#475569'
+                                  color: 'var(--color-text)'
                                 }}>
                                   {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
                                 </div>
@@ -2619,9 +2542,9 @@ const AppContent = () => {
                                       display: 'flex', 
                                       justifyContent: 'space-between',
                                       padding: '8px',
-                                      backgroundColor: 'white',
+                                      backgroundColor: 'var(--color-backgroundSecondary)',
                                       borderRadius: '4px',
-                                      border: '1px solid #e2e8f0'
+                                      border: '1px solid var(--color-border)'
                                     }}>
                                       <div style={{ 
                                         display: 'flex', 
@@ -2704,7 +2627,7 @@ const AppContent = () => {
     return (
       <div ref={screenGrabRef} style={{
         padding: '10px',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--color-backgroundSecondary)',
         maxWidth: '500px',
         margin: '0 auto',
         fontFamily: 'Arial, sans-serif'
@@ -3467,7 +3390,7 @@ const AppContent = () => {
       <h1 className="dashboard-title">Finance Dashboard</h1>
       
       {/* Global CSS styles */}
-      <style>{buttonStyles}</style>
+      
       <style>
       {`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -3481,7 +3404,7 @@ const AppContent = () => {
           font-family: 'Inter', sans-serif;
           font-weight: 600;
           font-size: 28px;
-          color: #2c3e50;
+          color: var(--color-text);
           margin-bottom: 24px;
           position: relative;
           display: block;
@@ -3505,7 +3428,7 @@ const AppContent = () => {
           font-family: 'Inter', sans-serif;
           font-weight: 600;
           font-size: 22px;
-          color: #2c3e50;
+          color: var(--color-text);
           margin: 20px 0 10px 0;
           display: flex;
           align-items: center;
@@ -3570,7 +3493,7 @@ const AppContent = () => {
         .modern-table th {
           padding: 6px;
           font-weight: 600;
-          background-color: #f8fafc;
+          background-color: var(--color-backgroundTertiary);
           text-align: center;
           position: sticky;
           top: 0;
@@ -3769,33 +3692,41 @@ const AppContent = () => {
           cursor: pointer;
           font-weight: 500;
           transition: all 0.2s ease;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          box-shadow: 0 2px 5px var(--color-shadowLight);
           font-family: 'Inter', sans-serif;
         }
         
         .nav-button.active {
-          background-color: #4a90e2;
-          color: white;
+          background-color: var(--color-buttonPrimary);
+          color: var(--color-buttonPrimaryText);
         }
         
         .nav-button:not(.active) {
-          background-color: #f0f0f0;
-          color: #333;
+          background-color: var(--color-buttonSecondary);
+          color: var(--color-buttonSecondaryText);
+          border: 1px solid var(--color-buttonSecondaryBorder);
         }
         
         .nav-button:hover {
           transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+          box-shadow: 0 4px 8px var(--color-shadow);
+        }
+        
+        .nav-button.active:hover {
+          background-color: var(--color-buttonPrimaryHover);
+        }
+        
+        .nav-button:not(.active):hover {
+          background-color: var(--color-buttonSecondaryHover);
         }
         
         .help-toggle {
-          background-color: #f8f9fa;
-          background-image: linear-gradient(to bottom, #ffffff, #f5f5f5);
-          border: 1px solid #e0e0e0;
+          background-color: var(--color-buttonSecondary);
+          border: 1px solid var(--color-buttonSecondaryBorder);
           border-radius: 20px;
           padding: 6px 12px;
           font-size: 13px;
-          color: #4a6785;
+          color: var(--color-buttonSecondaryText);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -3804,12 +3735,12 @@ const AppContent = () => {
           font-family: 'Inter', sans-serif;
           font-weight: 500;
           transition: all 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          box-shadow: 0 1px 3px var(--color-shadowLight);
         }
         
         .help-toggle:hover {
-          background-image: linear-gradient(to bottom, #f8f9fa, #f0f0f0);
-          box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+          background-color: var(--color-buttonSecondaryHover);
+          box-shadow: 0 2px 5px var(--color-shadow);
           transform: translateY(-1px);
         }
         
@@ -3861,9 +3792,9 @@ const AppContent = () => {
           justify-content: center;
           width: 14px;
           height: 14px;
-          background-color: #f8fafc;
-          color: #64748b;
-          border: 1px solid #cbd5e1;
+          background-color: var(--color-backgroundTertiary);
+          color: var(--color-textSecondary);
+          border: 1px solid var(--color-border);
           border-radius: 50%;
           font-size: 9px;
           font-weight: 600;
@@ -4078,7 +4009,7 @@ const AppContent = () => {
               left: '0', 
               width: '100%', 
               height: '100%', 
-              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+              backgroundColor: 'var(--color-modalOverlay)', 
               display: 'flex', 
               justifyContent: 'center', 
               alignItems: 'center',
@@ -4099,7 +4030,7 @@ const AppContent = () => {
                   borderTop: '3px solid #4a90e2',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                <div style={{ fontWeight: 'bold', color: '#333' }}>Updating transaction...</div>
+                <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
               </div>
               <style>{`
                 @keyframes spin {
@@ -4229,9 +4160,9 @@ const AppContent = () => {
                       onClick={clearFilters}
                       style={{ 
                         padding: '8px 14px',
-                        backgroundColor: 'white',
-                        color: '#374151',
-                        border: '1px solid #d1d5db',
+                        backgroundColor: 'var(--color-buttonSecondary)',
+                        color: 'var(--color-buttonSecondaryText)',
+                        border: '1px solid var(--color-buttonSecondaryBorder)',
                         borderRadius: '6px',
                         cursor: 'pointer',
                         fontWeight: '500',
@@ -4267,7 +4198,7 @@ const AppContent = () => {
                   <h3 style={{
                     fontSize: '24px',
                     fontWeight: 'bold',
-                    color: '#2c3e50',
+                    color: 'var(--color-text)',
                     margin: 0,
                     fontFamily: 'Inter, sans-serif',
                     textAlign: 'center'
@@ -4294,17 +4225,18 @@ const AppContent = () => {
                         padding: '5px 10px',
                         margin: '0px',
                         borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        backgroundColor: 'white',
+                        border: '1px solid var(--color-inputBorder)',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
                         cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        boxShadow: '0 1px 3px var(--color-shadowLight)',
                         outline: 'none',
                         fontSize: '13px'
                       }}
                     >
-                      <option value="All">All Users Combined</option>
+                      <option value="All" style={{ backgroundColor: 'var(--color-inputBackground)', color: 'var(--color-inputText)' }}>All Users Combined</option>
                       {users.filter(user => user.username !== 'default').map(user => (
-                        <option key={user.id} value={user.display_name}>
+                        <option key={user.id} value={user.display_name} style={{ backgroundColor: 'var(--color-inputBackground)', color: 'var(--color-inputText)' }}>
                           {user.display_name}'s
                         </option>
                       ))}
@@ -4318,7 +4250,8 @@ const AppContent = () => {
                       className="modern-button"
                       style={{ 
                         padding: '6px 12px',
-                        backgroundColor: categoryFilter.length > 0 ? '#e6f7ff' : 'white',
+                        backgroundColor: categoryFilter.length > 0 ? 'var(--color-infoLight)' : 'var(--color-buttonSecondary)',
+                        color: categoryFilter.length > 0 ? 'var(--color-info)' : 'var(--color-buttonSecondaryText)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -4331,8 +4264,8 @@ const AppContent = () => {
                       <span>Categories</span>
                       {categoryFilter.length > 0 && (
                         <span style={{ 
-                          backgroundColor: '#4a90e2', 
-                          color: 'white', 
+                          backgroundColor: 'var(--color-buttonPrimary)', 
+                          color: 'var(--color-buttonPrimaryText)', 
                           borderRadius: '50%', 
                           width: '16px', 
                           height: '16px', 
@@ -4355,11 +4288,11 @@ const AppContent = () => {
                             top: '100%',
                             right: '0',
                             zIndex: 1000,
-                            background: 'white',
-                            border: '1px solid #ccc',
+                            background: 'var(--color-backgroundElevated)',
+                            border: '1px solid var(--color-border)',
                             padding: '10px',
                             borderRadius: '4px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            boxShadow: '0 4px 12px var(--color-shadow)',
                             width: '250px',
                             maxHeight: '350px',
                             overflowY: 'auto',
@@ -4371,7 +4304,7 @@ const AppContent = () => {
                             .filter(category => category !== null && category !== undefined && category !== '')
                             .map(category => (
                               <div key={category} style={{ marginBottom: '6px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                <label style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text)' }} onClick={(e) => e.stopPropagation()}>
                                   <input 
                                     type="checkbox" 
                                     checked={categoryFilter.includes(category)}
@@ -4386,8 +4319,8 @@ const AppContent = () => {
                           
                           {/* Display null/empty category at the bottom if it exists */}
                           {availableCategories.some(category => category === null || category === undefined || category === '') && (
-                            <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                              <label style={{ display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', color: 'var(--color-textSecondary)' }} onClick={(e) => e.stopPropagation()}>
                                 <input 
                                   type="checkbox" 
                                   checked={categoryFilter.includes(null)}
@@ -4407,13 +4340,19 @@ const AppContent = () => {
                               }}
                               style={{ 
                                 padding: '6px 12px',
-                                backgroundColor: '#f0f0f0',
-                                color: '#333',
-                                border: 'none',
+                                backgroundColor: 'var(--color-buttonSecondary)',
+                                color: 'var(--color-buttonSecondaryText)',
+                                border: '1px solid var(--color-buttonSecondaryBorder)',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                boxShadow: '0 1px 3px var(--color-shadowLight)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
                               }}
                             >
                               Clear
@@ -4425,13 +4364,19 @@ const AppContent = () => {
                               }}
                               style={{ 
                                 padding: '6px 12px',
-                                backgroundColor: '#4a90e2',
-                                color: 'white',
+                                backgroundColor: 'var(--color-buttonPrimary)',
+                                color: 'var(--color-buttonPrimaryText)',
                                 border: 'none',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                boxShadow: '0 1px 3px var(--color-shadowLight)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = 'var(--color-buttonPrimaryHover)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'var(--color-buttonPrimary)';
                               }}
                             >
                               Apply
@@ -4508,8 +4453,8 @@ const AppContent = () => {
                   alignItems: 'center',
                   gap: '5px',
                   padding: '8px 15px',
-                  backgroundColor: isRefreshing ? '#95a5a6' : '#3498db',
-                  color: 'white',
+                  backgroundColor: isRefreshing ? 'var(--color-textTertiary)' : 'var(--color-buttonPrimary)',
+                  color: 'var(--color-buttonPrimaryText)',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: isRefreshing ? 'not-allowed' : 'pointer',
@@ -4543,8 +4488,8 @@ const AppContent = () => {
                   alignItems: 'center',
                   gap: '5px',
                   padding: '8px 15px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
+                  backgroundColor: 'var(--color-success)',
+                  color: 'var(--color-textInverse)',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
@@ -4580,16 +4525,16 @@ const AppContent = () => {
               zIndex: 1000
             }}>
               <div style={{
-                backgroundColor: 'white',
+                backgroundColor: 'var(--color-modalBackground)',
                 padding: '20px',
                 borderRadius: '8px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                boxShadow: '0 4px 20px var(--color-shadowDark)',
                 width: '400px',
                 maxWidth: '90%',
                 maxHeight: '90vh',
                 overflowY: 'auto'
               }}>
-                <h2 style={{ marginTop: 0, color: '#333', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Add New Transaction</h2>
+                <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add New Transaction</h2>
                 
                 <form onSubmit={handleAddTransaction}>
                   <div style={{ marginBottom: '15px' }}>
@@ -4605,9 +4550,11 @@ const AppContent = () => {
                         width: '100%',
                         padding: '10px',
                         borderRadius: '4px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-inputBorder)',
                         fontSize: '14px',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
                       }}
                       required
                     />
@@ -4626,9 +4573,11 @@ const AppContent = () => {
                         width: '100%',
                         padding: '10px',
                         borderRadius: '4px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-inputBorder)',
                         fontSize: '14px',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
                       }}
                       placeholder="Enter transaction description"
                       required
@@ -4649,9 +4598,11 @@ const AppContent = () => {
                         width: '100%',
                         padding: '10px',
                         borderRadius: '4px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-inputBorder)',
                         fontSize: '14px',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
                       }}
                       placeholder="Enter amount (negative for expenses)"
                       required
@@ -4670,9 +4621,10 @@ const AppContent = () => {
                         width: '100%',
                         padding: '10px',
                         borderRadius: '4px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-inputBorder)',
                         fontSize: '14px',
-                        backgroundColor: 'white',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
                         boxSizing: 'border-box'
                       }}
                     >
@@ -4698,9 +4650,10 @@ const AppContent = () => {
                         width: '100%',
                         padding: '10px',
                         borderRadius: '4px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-inputBorder)',
                         fontSize: '14px',
-                        backgroundColor: 'white',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
                         boxSizing: 'border-box'
                       }}
                     >
@@ -4718,9 +4671,9 @@ const AppContent = () => {
                       onClick={cancelAddTransaction}
                       style={{
                         padding: '10px 16px',
-                        backgroundColor: '#f0f0f0',
-                        color: '#333',
-                        border: 'none',
+                        backgroundColor: 'var(--color-buttonSecondary)',
+                        color: 'var(--color-buttonSecondaryText)',
+                        border: '1px solid var(--color-buttonSecondaryBorder)',
                         borderRadius: '4px',
                         cursor: 'pointer'
                       }}
@@ -4731,8 +4684,8 @@ const AppContent = () => {
                       type="submit"
                       style={{
                         padding: '10px 20px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
+                        backgroundColor: 'var(--color-success)',
+                        color: 'var(--color-textInverse)',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: 'pointer'
@@ -4839,8 +4792,8 @@ const AppContent = () => {
                     alignItems: 'center',
                     gap: '8px',
                     padding: '10px 20px',
-                    backgroundColor: '#6c5ce7',
-                    color: 'white',
+                    backgroundColor: 'var(--color-buttonPrimary)',
+                    color: 'var(--color-buttonPrimaryText)',
                     border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
@@ -4886,16 +4839,16 @@ const AppContent = () => {
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--color-modalBackground)',
             padding: '20px',
             borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 4px 20px var(--color-shadowDark)',
             maxWidth: '90%',
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#333' }}>Mobile View</h2>
+                              <h2 style={{ margin: 0, color: 'var(--color-text)' }}>Mobile View</h2>
               <button
                 onClick={() => setIsScreenGrabOpen(false)}
                 style={{
@@ -4932,10 +4885,10 @@ const AppContent = () => {
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--color-modalBackground)',
             padding: '24px',
             borderRadius: '12px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            boxShadow: '0 8px 32px var(--color-shadowDark)',
             width: '600px',
             maxWidth: '90%',
             maxHeight: '85vh',
@@ -4949,12 +4902,12 @@ const AppContent = () => {
               justifyContent: 'space-between', 
               alignItems: 'center', 
               marginBottom: '20px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
               <h2 style={{ 
                 margin: 0, 
-                color: '#1f2937',
+                color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
               }}>
@@ -4967,11 +4920,11 @@ const AppContent = () => {
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: 'var(--color-textSecondary)',
                   borderRadius: '6px',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-backgroundHover)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -4987,9 +4940,9 @@ const AppContent = () => {
                 <div style={{ 
                   marginBottom: '16px', 
                   padding: '12px', 
-                  backgroundColor: '#f9fafb', 
+                  backgroundColor: 'var(--color-backgroundTertiary)', 
                   borderRadius: '8px',
-                  border: '1px solid #e5e7eb'
+                  border: '1px solid var(--color-border)'
                 }}>
                   <div style={{ 
                     display: 'flex', 
@@ -4999,7 +4952,7 @@ const AppContent = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ 
                         fontSize: '13px', 
-                        color: '#6b7280', 
+                        color: 'var(--color-textSecondary)', 
                         marginBottom: '4px',
                         fontWeight: '500'
                       }}>
@@ -5007,7 +4960,7 @@ const AppContent = () => {
                       </div>
                       <div style={{ 
                         fontSize: '14px', 
-                        color: '#1f2937',
+                        color: 'var(--color-text)',
                         fontWeight: '500'
                       }}>
                         {transactionToSplit.description}
@@ -5020,12 +4973,12 @@ const AppContent = () => {
                       }}>
                         <span style={{
                           padding: '4px 8px',
-                          backgroundColor: '#dbeafe',
-                          color: '#1e40af',
+                          backgroundColor: 'var(--color-infoLight)',
+                          color: 'var(--color-info)',
                           borderRadius: '4px',
                           fontSize: '11px',
                           fontWeight: '500',
-                          border: '1px solid #bfdbfe'
+                          border: '1px solid var(--color-info)'
                         }}>
                           📅 {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
                             day: 'numeric',
@@ -5036,12 +4989,12 @@ const AppContent = () => {
                         {transactionToSplit.bank_category && (
                           <span style={{
                             padding: '4px 8px',
-                            backgroundColor: '#f0fdf4',
-                            color: '#166534',
+                            backgroundColor: 'var(--color-successLight)',
+                            color: 'var(--color-success)',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: '500',
-                            border: '1px solid #bbf7d0'
+                            border: '1px solid var(--color-success)'
                           }}>
                             🏷️ {transactionToSplit.bank_category}
                           </span>
@@ -5049,12 +5002,12 @@ const AppContent = () => {
                         {transactionToSplit.label && (
                           <span style={{
                             padding: '4px 8px',
-                            backgroundColor: '#fef3c7',
-                            color: '#92400e',
+                            backgroundColor: 'var(--color-warningLight)',
+                            color: 'var(--color-warning)',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: '500',
-                            border: '1px solid #fde68a'
+                            border: '1px solid var(--color-warning)'
                           }}>
                             👤 {transactionToSplit.label}
                           </span>
@@ -5064,7 +5017,7 @@ const AppContent = () => {
                     <div style={{
                       fontSize: '18px',
                       fontWeight: '600',
-                      color: parseFloat(transactionToSplit.amount) < 0 ? '#dc2626' : '#059669',
+                      color: parseFloat(transactionToSplit.amount) < 0 ? 'var(--color-error)' : 'var(--color-success)',
                       marginLeft: '16px'
                     }}>
                       {parseFloat(transactionToSplit.amount) < 0 
@@ -5078,16 +5031,16 @@ const AppContent = () => {
                 <div style={{ 
                   marginBottom: '16px',
                   padding: '10px 12px',
-                  backgroundColor: calculateRemainingAmount() === 0 ? '#dcfce7' : '#fef3c7',
+                  backgroundColor: calculateRemainingAmount() === 0 ? 'var(--color-successLight)' : 'var(--color-warningLight)',
                   borderRadius: '8px',
-                  border: `1px solid ${calculateRemainingAmount() === 0 ? '#bef264' : '#fde047'}`,
+                  border: `1px solid ${calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'}`,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <span style={{ 
                     fontSize: '13px', 
-                    color: '#374151',
+                    color: 'var(--color-text)',
                     fontWeight: '500',
                     display: 'flex',
                     alignItems: 'center',
@@ -5095,7 +5048,7 @@ const AppContent = () => {
                   }}>
                     <span>Remaining:</span>
                     <span style={{ 
-                      color: calculateRemainingAmount() < 0 ? '#dc2626' : '#059669',
+                      color: calculateRemainingAmount() < 0 ? 'var(--color-error)' : 'var(--color-success)',
                       fontWeight: '600'
                     }}>
                       {calculateRemainingAmount() < 0 
@@ -5105,7 +5058,7 @@ const AppContent = () => {
                   </span>
                   <span style={{ 
                     fontSize: '12px', 
-                    color: calculateRemainingAmount() === 0 ? '#059669' : '#92400e'
+                    color: calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'
                   }}>
                     {calculateRemainingAmount() === 0 
                       ? '✓ Fully allocated' 
@@ -5122,7 +5075,7 @@ const AppContent = () => {
                   <h3 style={{ 
                     fontSize: '14px', 
                     fontWeight: '600',
-                    color: '#374151',
+                    color: 'var(--color-text)',
                     marginBottom: '12px'
                   }}>
                     Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
@@ -5132,9 +5085,9 @@ const AppContent = () => {
                     <div key={index} style={{ 
                       marginBottom: '12px', 
                       padding: '12px', 
-                      backgroundColor: '#ffffff', 
+                      backgroundColor: 'var(--color-backgroundSecondary)', 
                       borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid var(--color-border)',
                       position: 'relative'
                     }}>
                       {splitTransactions.length > 1 && (
@@ -5145,7 +5098,7 @@ const AppContent = () => {
                             top: '8px',
                             right: '8px',
                             padding: '2px',
-                            backgroundColor: '#fee2e2',
+                            backgroundColor: 'var(--color-errorLight)',
                             border: 'none',
                             borderRadius: '4px',
                             display: 'flex',
@@ -5157,7 +5110,7 @@ const AppContent = () => {
                           }}
                           title="Remove split"
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="3">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                           </svg>
@@ -5173,15 +5126,17 @@ const AppContent = () => {
                           style={{
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--color-inputBorder)',
                             fontSize: '14px',
                             width: '100%',
                             boxSizing: 'border-box',
-                            transition: 'border-color 0.2s'
+                            transition: 'border-color 0.2s',
+                            backgroundColor: 'var(--color-inputBackground)',
+                            color: 'var(--color-inputText)'
                           }}
                           placeholder="Description"
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         />
                         
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
@@ -5193,14 +5148,16 @@ const AppContent = () => {
                             style={{
                               padding: '8px 10px',
                               borderRadius: '6px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--color-inputBorder)',
                               fontSize: '14px',
                               boxSizing: 'border-box',
-                              transition: 'border-color 0.2s'
+                              transition: 'border-color 0.2s',
+                              backgroundColor: 'var(--color-inputBackground)',
+                              color: 'var(--color-inputText)'
                             }}
                             placeholder="Amount"
-                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                           />
                           
                           <select
@@ -5209,15 +5166,16 @@ const AppContent = () => {
                             style={{
                               padding: '8px 10px',
                               borderRadius: '6px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--color-inputBorder)',
                               fontSize: '14px',
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--color-inputBackground)',
+                              color: 'var(--color-inputText)',
                               boxSizing: 'border-box',
                               cursor: 'pointer',
                               transition: 'border-color 0.2s'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                           >
                             <option value="">Category</option>
                             {availableBankCategories
@@ -5234,15 +5192,16 @@ const AppContent = () => {
                             style={{
                               padding: '8px 10px',
                               borderRadius: '6px',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid var(--color-inputBorder)',
                               fontSize: '14px',
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--color-inputBackground)',
+                              color: 'var(--color-inputText)',
                               boxSizing: 'border-box',
                               cursor: 'pointer',
                               transition: 'border-color 0.2s'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                           >
                             <option value="">Label</option>
                             {labels.map(label => (
@@ -5261,8 +5220,8 @@ const AppContent = () => {
                       width: '100%',
                       padding: '10px',
                       backgroundColor: 'transparent',
-                      color: '#3b82f6',
-                      border: '1px dashed #3b82f6',
+                      color: 'var(--color-buttonPrimary)',
+                      border: '1px dashed var(--color-buttonPrimary)',
                       borderRadius: '8px',
                       display: 'flex',
                       alignItems: 'center',
@@ -5273,16 +5232,16 @@ const AppContent = () => {
                       fontWeight: '500',
                       transition: 'all 0.2s'
                     }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#eff6ff';
-                      e.target.style.borderColor = '#2563eb';
-                      e.target.style.color = '#2563eb';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                      e.target.style.borderColor = '#3b82f6';
-                      e.target.style.color = '#3b82f6';
-                    }}
+                                      onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+                    e.target.style.borderColor = 'var(--color-buttonPrimaryHover)';
+                    e.target.style.color = 'var(--color-buttonPrimaryHover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.borderColor = 'var(--color-buttonPrimary)';
+                    e.target.style.color = 'var(--color-buttonPrimary)';
+                  }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -5298,15 +5257,15 @@ const AppContent = () => {
                   justifyContent: 'flex-end', 
                   gap: '8px',
                   paddingTop: '16px',
-                  borderTop: '1px solid #e5e7eb'
+                  borderTop: '1px solid var(--color-border)'
                 }}>
                   <button
                     onClick={cancelSplit}
                     style={{
                       padding: '10px 16px',
-                      backgroundColor: '#ffffff',
-                      color: '#374151',
-                      border: '1px solid #d1d5db',
+                      backgroundColor: 'var(--color-buttonSecondary)',
+                      color: 'var(--color-buttonSecondaryText)',
+                      border: '1px solid var(--color-buttonSecondaryBorder)',
                       borderRadius: '8px',
                       cursor: 'pointer',
                       fontSize: '14px',
@@ -5314,10 +5273,10 @@ const AppContent = () => {
                       transition: 'all 0.2s'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
                     }}
                   >
                     Cancel
@@ -5327,8 +5286,8 @@ const AppContent = () => {
                     disabled={isSavingSplit}
                     style={{
                       padding: '10px 20px',
-                      backgroundColor: isSavingSplit ? '#9ca3af' : '#3b82f6',
-                      color: 'white',
+                      backgroundColor: isSavingSplit ? 'var(--color-textTertiary)' : 'var(--color-buttonPrimary)',
+                      color: 'var(--color-buttonPrimaryText)',
                       border: 'none',
                       borderRadius: '8px',
                       cursor: isSavingSplit ? 'not-allowed' : 'pointer',
@@ -5341,12 +5300,12 @@ const AppContent = () => {
                     }}
                     onMouseEnter={(e) => {
                       if (!isSavingSplit) {
-                        e.target.style.backgroundColor = '#2563eb';
+                        e.target.style.backgroundColor = 'var(--color-buttonPrimaryHover)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSavingSplit) {
-                        e.target.style.backgroundColor = '#3b82f6';
+                        e.target.style.backgroundColor = 'var(--color-buttonPrimary)';
                       }
                     }}
                   >

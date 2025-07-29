@@ -184,6 +184,11 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
     if (selectedUserId && isOpen) {
       loadPreferencesForUser(selectedUserId);
     }
+    // If we're editing the current user, revert theme changes
+    if (selectedUserId === currentUserId && preferences.theme) {
+      document.body.classList.remove('theme-light', 'theme-dark');
+      document.body.classList.add(`theme-${preferences.theme}`);
+    }
     onClose();
   };
 
@@ -217,10 +222,10 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: 'white',
+        backgroundColor: 'var(--color-modalBackground)',
         padding: '16px', // Reduced from 24px to match other modals
         borderRadius: '12px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)', // Updated to match other modals
+        boxShadow: '0 10px 40px var(--color-shadowDark)', // Updated to match other modals
         width: '500px',
         maxWidth: '90%',
         maxHeight: '80vh',
@@ -232,12 +237,12 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '12px', // Reduced from 24px to match other modals
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--color-border)',
           paddingBottom: '8px' // Reduced from 16px to match other modals
         }}>
           <h2 style={{
             margin: 0,
-            color: '#1f2937',
+            color: 'var(--color-text)',
             fontSize: '20px',
             fontWeight: '600'
           }}>
@@ -251,16 +256,16 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
               cursor: 'pointer',
               padding: '4px',
               borderRadius: '6px',
-              color: '#6b7280',
+              color: 'var(--color-textSecondary)',
               transition: 'all 0.2s ease'
             }}
             onMouseOver={e => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#374151';
+              e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.currentTarget.style.color = 'var(--color-text)';
             }}
             onMouseOut={e => {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#6b7280';
+              e.currentTarget.style.color = 'var(--color-textSecondary)';
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -274,7 +279,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
         <div style={{ marginBottom: '12px' }}> {/* Reduced from 16px for tighter spacing */}
           <p style={{
             margin: '0 0 12px 0', // Reduced from 16px for tighter spacing
-            color: '#6b7280',
+            color: 'var(--color-textSecondary)',
             fontSize: '14px',
             lineHeight: '1.5'
           }}>
@@ -285,15 +290,15 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
           <div style={{
             marginBottom: '16px',
             padding: '12px',
-            backgroundColor: '#f9fafb',
+            backgroundColor: 'var(--color-backgroundTertiary)',
             borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            border: '1px solid var(--color-border)'
           }}>
             <label style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#374151',
+              color: 'var(--color-text)',
               marginBottom: '8px',
               marginTop: '4px'
             }}>
@@ -307,10 +312,10 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                 width: '100%',
                 padding: '8px 12px',
                 borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-backgroundSecondary)',
                 fontSize: '14px',
-                color: '#374151',
+                color: 'var(--color-text)',
                 cursor: loadingUserPrefs ? 'not-allowed' : 'pointer',
                 opacity: loadingUserPrefs ? 0.6 : 1
               }}
@@ -330,7 +335,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
             <div style={{
               textAlign: 'center',
               padding: '16px',
-              color: '#6b7280',
+              color: 'var(--color-textSecondary)',
               fontSize: '14px'
             }}>
               Loading user preferences...
@@ -341,16 +346,16 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
           {selectedUserId && !loadingUserPrefs && (
           <div style={{
             padding: '12px',
-            backgroundColor: '#f9fafb',
+            backgroundColor: 'var(--color-backgroundTertiary)',
             borderRadius: '8px',
-            border: '1px solid #e5e7eb',
+            border: '1px solid var(--color-border)',
             marginBottom: '12px'
           }}>
             <label style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#374151',
+              color: 'var(--color-text)',
               marginBottom: '10px'
             }}>
               User Color
@@ -373,7 +378,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                   width: '60px',
                   height: '60px',
                   backgroundColor: `rgba(${localPreferences.primary?.r || 0}, ${localPreferences.primary?.g || 0}, ${localPreferences.primary?.b || 0}, ${DEFAULT_OPACITY})`,
-                  border: '2px solid #e5e7eb',
+                  border: '2px solid var(--color-border)',
                   borderRadius: '8px',
                   position: 'relative',
                   overflow: 'hidden'
@@ -390,7 +395,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                 </div>
                 <span style={{
                   fontSize: '11px',
-                  color: '#6b7280',
+                  color: 'var(--color-textSecondary)',
                   textAlign: 'center'
                 }}>
                   Preview
@@ -414,13 +419,13 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                     border: 'none',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    backgroundColor: '#fff',
+                    backgroundColor: 'var(--color-backgroundSecondary)',
                     padding: '4px'
                   }}
                 />
                 <span style={{
                   fontSize: '11px',
-                  color: '#6b7280'
+                  color: 'var(--color-textSecondary)'
                 }}>
                   Select Color
                 </span>
@@ -430,14 +435,14 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
               <div style={{
                 flex: 1,
                 minWidth: '200px',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--color-backgroundSecondary)',
                 padding: '10px',
                 borderRadius: '6px',
-                border: '1px solid #e5e7eb'
+                border: '1px solid var(--color-border)'
               }}>
                 <div style={{
                   fontSize: '13px',
-                  color: '#374151',
+                  color: 'var(--color-text)',
                   marginBottom: '8px',
                   fontWeight: '500'
                 }}>
@@ -448,7 +453,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                   gridTemplateColumns: 'repeat(3, 1fr)',
                   gap: '8px',
                   fontSize: '12px',
-                  color: '#6b7280'
+                  color: 'var(--color-textSecondary)'
                 }}>
                   <div>
                     <span style={{ fontWeight: '500' }}>R:</span> {localPreferences.primary?.r || 0}
@@ -463,7 +468,7 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                 <div style={{
                   marginTop: '6px',
                   fontSize: '11px',
-                  color: '#9ca3af',
+                  color: 'var(--color-textTertiary)',
                   fontStyle: 'italic'
                 }}>
                   Background opacity: 20% • Border opacity: 80%
@@ -477,15 +482,15 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
           <div style={{
             marginTop: '12px',
             padding: '10px',
-            backgroundColor: '#f9fafb',
+            backgroundColor: 'var(--color-backgroundTertiary)',
             borderRadius: '8px',
-            border: '1px solid #e5e7eb'
+            border: '1px solid var(--color-border)'
           }}>
             <label style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#374151',
+              color: 'var(--color-text)',
               marginBottom: '8px'
             }}>
               Theme
@@ -525,22 +530,22 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                     cursor: 'pointer',
                     padding: '8px 16px',
                     borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: globalTheme === themeOption.value ? '#e0e7ff' : 'white',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: globalTheme === themeOption.value ? 'var(--color-backgroundHover)' : 'var(--color-backgroundSecondary)',
                     transition: 'all 0.2s',
                     minWidth: '120px',
                     justifyContent: 'flex-start'
                   }}
                   onMouseOver={e => {
                     if (globalTheme !== themeOption.value) {
-                      e.currentTarget.style.backgroundColor = '#f3f4f6';
-                      e.currentTarget.style.borderColor = '#9ca3af';
+                      e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)';
+                      e.currentTarget.style.borderColor = 'var(--color-borderSecondary)';
                     }
                   }}
                   onMouseOut={e => {
                     if (globalTheme !== themeOption.value) {
-                      e.currentTarget.style.backgroundColor = 'white';
-                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.backgroundColor = 'var(--color-backgroundSecondary)';
+                      e.currentTarget.style.borderColor = 'var(--color-border)';
                     }
                   }}
                 >
@@ -550,7 +555,12 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                     value={themeOption.value}
                     checked={globalTheme === themeOption.value}
                     onChange={(e) => {
-                      setGlobalTheme(e.target.value);
+                      const newTheme = e.target.value;
+                      setGlobalTheme(newTheme);
+                      // Apply theme immediately for preview
+                      document.body.classList.remove('theme-light', 'theme-dark');
+                      document.body.classList.add(`theme-${newTheme}`);
+                      localStorage.setItem('theme', newTheme);
                     }}
                     style={{
                       margin: 0,
@@ -558,12 +568,12 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                       height: '16px'
                     }}
                   />
-                  <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', color: 'var(--color-textSecondary)' }}>
                     {themeOption.icon}
                   </span>
                   <span style={{
                     fontSize: '14px',
-                    color: '#374151',
+                    color: 'var(--color-text)',
                     fontWeight: globalTheme === themeOption.value ? '600' : '400'
                   }}>
                     {themeOption.label}
@@ -582,15 +592,15 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
           justifyContent: 'space-between',
           alignItems: 'center',
           paddingTop: '12px', // Reduced from 16px
-          borderTop: '1px solid #e5e7eb'
+          borderTop: '1px solid var(--color-border)'
         }}>
           <button
             onClick={handleReset}
             style={{
               padding: '8px 16px',
               backgroundColor: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '14px',
@@ -607,8 +617,8 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
               style={{
                 padding: '8px 16px',
                 backgroundColor: 'transparent',
-                color: '#374151',
-                border: '1px solid #d1d5db',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',

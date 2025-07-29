@@ -13,96 +13,7 @@ import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
 
-// Add CSS styles for buttons and help text
-const buttonStyles = `
-  .modern-button {
-    background-color: #ffffff;
-    color: #2c3e50;
-    border: 1px solid #e0e0e0;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    outline: none;
-  }
 
-  .modern-button:hover {
-    background-color: #f8f9fa;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transform: translateY(-1px);
-  }
-
-  .modern-button:active {
-    background-color: #e9ecef;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transform: translateY(0);
-  }
-
-  .modern-button.navigation {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 12px;
-  }
-
-  .modern-button.navigation.prev {
-    padding-left: 2px;
-  }
-
-  .modern-button.navigation.next {
-    padding-right: 2px;
-  }
-
-  .modern-button.navigation svg {
-    margin: 0 5px;
-  }
-
-  .month-navigation {
-    display: flex;
-    margin-bottom: 15px;
-    align-items: center;
-  }
-
-  .month-display {
-    font-family: 'Inter', sans-serif;
-    font-size: 16px;
-    font-weight: 500;
-    padding: 0 15px;
-    color: #2c3e50;
-  }
-
-  .help-text {
-    display: flex;
-    align-items: flex-start;
-    background-color: #f8f9fa;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border-left: 3px solid #4a90e2;
-    margin-bottom: 12px;
-    font-size: 12px;
-    color: #505050;
-    line-height: 1.4;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  .help-text-icon {
-    color: #4a90e2;
-    margin-right: 10px;
-    flex-shrink: 0;
-  }
-  
-  .help-text-content {
-    flex: 1;
-    margin: 0;
-    padding: 0;
-  }
-`;
 
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
@@ -163,10 +74,10 @@ const TableDropdownMenu = ({
         position: 'absolute',
         top: '100%',
         zIndex: 1000,
-        background: 'white',
-        border: '1px solid #e5e7eb',
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
         borderRadius: '6px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px var(--color-shadow)',
         width: width === '220px' ? '240px' : width,
         marginTop: '5px',
         display: 'flex',
@@ -270,8 +181,8 @@ const TableDropdownMenu = ({
           display: 'flex', 
           justifyContent: 'flex-end', 
           padding: '3px 4px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: 'white',
+          borderTop: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-backgroundElevated)',
           borderBottomLeftRadius: '6px',
           borderBottomRightRadius: '6px',
           position: 'sticky',
@@ -332,10 +243,10 @@ const DateFilterDropdown = ({
         position: 'absolute',
         top: '100%',
         zIndex: 1000,
-        background: 'white',
-        border: '1px solid #e5e7eb',
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
         borderRadius: '6px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px var(--color-shadow)',
         width: width,
         marginTop: '5px',
         padding: '12px',
@@ -346,7 +257,7 @@ const DateFilterDropdown = ({
           display: 'block', 
           fontSize: '12px', 
           fontWeight: '500', 
-          color: '#374151', 
+          color: 'var(--color-text)', 
           marginBottom: '4px' 
         }}>
           From:
@@ -362,8 +273,10 @@ const DateFilterDropdown = ({
             width: '100%',
             padding: '6px 8px',
             fontSize: '13px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--color-inputBorder)',
             borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
             boxSizing: 'border-box'
           }}
         />
@@ -373,7 +286,7 @@ const DateFilterDropdown = ({
           display: 'block', 
           fontSize: '12px', 
           fontWeight: '500', 
-          color: '#374151', 
+          color: 'var(--color-text)', 
           marginBottom: '4px' 
         }}>
           To:
@@ -389,8 +302,10 @@ const DateFilterDropdown = ({
             width: '100%',
             padding: '6px 8px',
             fontSize: '13px',
-            border: '1px solid #d1d5db',
+            border: '1px solid var(--color-inputBorder)',
             borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
             boxSizing: 'border-box'
           }}
         />
@@ -400,7 +315,7 @@ const DateFilterDropdown = ({
           display: 'flex', 
           justifyContent: 'flex-end', 
           paddingTop: '8px',
-          borderTop: '1px solid #f0f0f0'
+          borderTop: '1px solid var(--color-border)'
         }}>
           <button 
             onClick={(e) => {
@@ -410,20 +325,20 @@ const DateFilterDropdown = ({
             style={{ 
               padding: '4px 8px',
               backgroundColor: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-borderSecondary)',
               borderRadius: '4px',
               fontSize: '12px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.color = '#374151';
+              e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.target.style.color = 'var(--color-text)';
             }}
             onMouseLeave={(e) => {
               e.target.style.backgroundColor = 'transparent';
-              e.target.style.color = '#6b7280';
+              e.target.style.color = 'var(--color-textSecondary)';
             }}
           >
             Clear
@@ -1911,7 +1826,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   <tr 
                     className={getRowLabelClass(transaction)} 
                     style={{ 
-                      backgroundColor: expandedRow === transaction.id ? '#f8fafc' : 
+                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' : 
                                      transaction.split_from_id ? '#f7fbff' : undefined,
                       transition: 'background-color 0.2s',
                       borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
@@ -1996,8 +1911,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     <tr>
                       <td colSpan="5" style={{ 
                         padding: '0',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0'
+                        backgroundColor: 'var(--color-backgroundTertiary)',
+                        border: '1px solid var(--color-border)'
                       }}>
                         <div style={{ 
                           padding: '12px',
@@ -2043,7 +1958,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                                 fontSize: '14px', 
                                 fontWeight: '500', 
                                 marginBottom: '8px',
-                                color: '#475569'
+                                color: 'var(--color-text)'
                               }}>
                                 {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
                               </div>
@@ -2053,9 +1968,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                                     display: 'flex', 
                                     justifyContent: 'space-between',
                                     padding: '8px',
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--color-backgroundSecondary)',
                                     borderRadius: '4px',
-                                    border: '1px solid #e2e8f0'
+                                    border: '1px solid var(--color-border)'
                                   }}>
                                     <div style={{ 
                                       display: 'flex', 
@@ -2540,7 +2455,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   
   return (
     <div style={{ position: 'relative' }}>
-      <style>{buttonStyles}</style>
+
       {isUpdating && (
         <div style={{ 
           position: 'absolute', 
@@ -2569,7 +2484,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               borderTop: '3px solid #4a90e2',
               animation: 'spin 1s linear infinite'
             }}></div>
-            <div style={{ fontWeight: 'bold', color: '#333' }}>Updating transaction...</div>
+                            <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
           </div>
         </div>
       )}
@@ -2912,15 +2827,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                             onDragEnd={handleDragEnd}
                             onDoubleClick={() => handleCategoryDoubleClick(category)}
                             style={{  
-                              backgroundColor: 'white',
+                              backgroundColor: 'var(--color-backgroundSecondary)',
                               padding: '16px',
                               borderRadius: '12px',
                               border: draggedCategory === category 
                                 ? `2px dashed ${color.bg}` 
-                                : '1px solid rgba(0,0,0,0.06)',
+                                : '1px solid var(--color-border)',
                               boxShadow: draggedCategory === category
-                                ? '0 15px 35px rgba(0,0,0,0.08)'
-                                : '0 4px 24px rgba(0,0,0,0.02)',
+                                ? '0 15px 35px var(--color-shadow)'
+                                : '0 4px 24px var(--color-shadowLight)',
                               opacity: isDragging && draggedCategory !== category ? 0.5 : 1,
                               cursor: 'move',
                               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -2984,7 +2899,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                             <div style={{ 
                               fontSize: '15px',
                               fontWeight: '600',
-                              color: '#475569',
+                              color: 'var(--color-text)',
                               marginBottom: '8px',
                               marginTop: '12px'  // Removed marginLeft
                             }}>
@@ -3009,7 +2924,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                               display: 'flex',
                               justifyContent: 'space-between',
                               fontSize: '12px',
-                              color: '#64748b'  // Removed marginLeft
+                              color: 'var(--color-textSecondary)'  // Removed marginLeft
                             }}>
                               <span style={{ fontWeight: '500' }}>
                                 {isIncludedInSum 
@@ -3050,12 +2965,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             <div style={{
               marginTop: '20px', // Reduced from 24px
               padding: '16px', // Reduced from 20px
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              background: 'var(--color-backgroundElevated)',
               borderRadius: '10px', // Reduced from 12px
-              border: '1px solid rgba(0,0,0,0.06)',
+              border: '1px solid var(--color-border)',
               maxWidth: '560px', // Reduced from 600px
               margin: '20px auto', // Reduced from 24px
-              boxShadow: '0 6px 28px rgba(0,0,0,0.05)', // Reduced shadow
+              boxShadow: '0 6px 28px var(--color-shadowLight)', // Reduced shadow
             }}>
               {(() => {
                 try {
@@ -3408,17 +3323,17 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           left: 0,
           width: '100%',
           height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'var(--color-modalOverlay)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--color-modalBackground)',
             padding: '24px',
             borderRadius: '12px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 10px 40px var(--color-shadowDark)',
             width: '500px',
             maxWidth: '90%',
             maxHeight: '80vh',
@@ -3429,12 +3344,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               justifyContent: 'space-between', 
               alignItems: 'center',
               marginBottom: '20px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
               <h2 style={{ 
                 margin: 0, 
-                color: '#1f2937',
+                color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
               }}>
@@ -3448,16 +3363,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   cursor: 'pointer',
                   padding: '4px',
                   borderRadius: '6px',
-                  color: '#6b7280',
+                  color: 'var(--color-textSecondary)',
                   transition: 'all 0.2s ease'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                  e.currentTarget.style.color = '#374151';
+                  e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)';
+                  e.currentTarget.style.color = 'var(--color-text)';
                 }}
                 onMouseOut={e => {
                   e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.color = 'var(--color-textSecondary)';
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3535,14 +3450,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               
               <div style={{
                 padding: '16px',
-                backgroundColor: '#f0f9ff',
+                backgroundColor: 'var(--color-infoLight)',
                 borderRadius: '8px',
-                border: '1px solid #bae6fd',
+                border: '1px solid var(--color-info)',
+                borderLeft: '4px solid var(--color-info)',
                 marginBottom: '12px'
               }}>
                 <div style={{ 
                   fontSize: '14px',
-                  color: '#0369a1',
+                  color: 'var(--color-info)',
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
@@ -3550,7 +3466,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 </div>
                 <div style={{ 
                   fontSize: '13px',
-                  color: '#0284c7',
+                  color: 'var(--color-info)',
                   lineHeight: '1.4',
                   marginBottom: '12px'
                 }}>
@@ -3564,10 +3480,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     width: '100%',
                     padding: '10px',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid var(--color-border)',
                     fontSize: '14px',
-                    backgroundColor: 'white',
-                    color: '#374151'
+                    backgroundColor: 'var(--color-backgroundSecondary)',
+                    color: 'var(--color-text)'
                   }}
                 >
                   <option value="">No offset bucket selected</option>
@@ -3582,10 +3498,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   <div style={{
                     marginTop: '8px',
                     padding: '8px',
-                    backgroundColor: '#dcfce7',
+                    backgroundColor: 'var(--color-successLight)',
                     borderRadius: '4px',
                     fontSize: '12px',
-                    color: '#15803d'
+                    color: '#10b981',
+                    fontWeight: '500'
                   }}>
                     ✓ Negative amounts will be deducted from <strong>{selectedNegativeOffsetBucket}</strong>
                   </div>
@@ -3652,7 +3569,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
-            <h2 style={{ marginTop: 0, color: '#333', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Add Transaction</h2>
+                          <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add Transaction</h2>
             
             <form onSubmit={handleAddTransaction}>
               <div style={{ marginBottom: '15px' }}>
@@ -3814,17 +3731,17 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           left: 0,
           width: '100%',
           height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'var(--color-modalOverlay)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--color-modalBackground)',
             padding: '24px',
             borderRadius: '12px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            boxShadow: '0 8px 32px var(--color-shadowDark)',
             width: '600px',
             maxWidth: '90%',
             maxHeight: '85vh',
@@ -3838,12 +3755,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               justifyContent: 'space-between', 
               alignItems: 'center', 
               marginBottom: '20px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
               <h2 style={{ 
                 margin: 0, 
-                color: '#1f2937',
+                color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
               }}>
@@ -3856,11 +3773,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: 'var(--color-textSecondary)',
                   borderRadius: '6px',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-backgroundHover)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3875,9 +3792,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               <div style={{ 
                 marginBottom: '16px', 
                 padding: '12px', 
-                backgroundColor: '#f9fafb', 
+                backgroundColor: 'var(--color-backgroundTertiary)', 
                 borderRadius: '8px',
-                border: '1px solid #e5e7eb'
+                border: '1px solid var(--color-border)'
               }}>
                 <div style={{ 
                   display: 'flex', 
@@ -3887,7 +3804,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   <div style={{ flex: 1 }}>
                     <div style={{ 
                       fontSize: '13px', 
-                      color: '#6b7280', 
+                      color: 'var(--color-textSecondary)', 
                       marginBottom: '4px',
                       fontWeight: '500'
                     }}>
@@ -3895,7 +3812,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     </div>
                     <div style={{ 
                       fontSize: '14px', 
-                      color: '#1f2937',
+                      color: 'var(--color-text)',
                       fontWeight: '500'
                     }}>
                       {transactionToSplit.description}
@@ -3908,12 +3825,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     }}>
                       <span style={{
                         padding: '4px 8px',
-                        backgroundColor: '#dbeafe',
-                        color: '#1e40af',
+                        backgroundColor: 'var(--color-infoLight)',
+                        color: 'var(--color-info)',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: '500',
-                        border: '1px solid #bfdbfe'
+                        border: '1px solid var(--color-info)'
                       }}>
                         📅 {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
                           day: 'numeric',
@@ -3924,12 +3841,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                       {transactionToSplit.category && (
                         <span style={{
                           padding: '4px 8px',
-                          backgroundColor: '#f0fdf4',
-                          color: '#166534',
+                          backgroundColor: 'var(--color-successLight)',
+                          color: 'var(--color-success)',
                           borderRadius: '4px',
                           fontSize: '11px',
                           fontWeight: '500',
-                          border: '1px solid #bbf7d0'
+                          border: '1px solid var(--color-success)'
                         }}>
                           🏷️ {transactionToSplit.category}
                         </span>
@@ -3937,12 +3854,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                       {transactionToSplit.label && (
                         <span style={{
                           padding: '4px 8px',
-                          backgroundColor: '#fef3c7',
-                          color: '#92400e',
+                          backgroundColor: 'var(--color-warningLight)',
+                          color: 'var(--color-warning)',
                           borderRadius: '4px',
                           fontSize: '11px',
                           fontWeight: '500',
-                          border: '1px solid #fde68a'
+                          border: '1px solid var(--color-warning)'
                         }}>
                           👤 {transactionToSplit.label}
                         </span>
@@ -3966,16 +3883,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               <div style={{ 
                 marginBottom: '16px',
                 padding: '10px 12px',
-                backgroundColor: calculateRemainingAmount() === 0 ? '#dcfce7' : '#fef3c7',
+                backgroundColor: calculateRemainingAmount() === 0 ? 'var(--color-successLight)' : 'var(--color-warningLight)',
                 borderRadius: '8px',
-                border: `1px solid ${calculateRemainingAmount() === 0 ? '#bef264' : '#fde047'}`,
+                border: `1px solid ${calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'}`,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
                 <span style={{ 
                   fontSize: '13px', 
-                  color: '#374151',
+                  color: 'var(--color-text)',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
@@ -3983,7 +3900,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 }}>
                   <span>Remaining:</span>
                   <span style={{ 
-                    color: calculateRemainingAmount() < 0 ? '#dc2626' : '#059669',
+                    color: calculateRemainingAmount() < 0 ? 'var(--color-error)' : 'var(--color-success)',
                     fontWeight: '600'
                   }}>
                     {calculateRemainingAmount() < 0 
@@ -3993,7 +3910,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 </span>
                 <span style={{ 
                   fontSize: '12px', 
-                  color: calculateRemainingAmount() === 0 ? '#059669' : '#92400e'
+                  color: calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'
                 }}>
                   {calculateRemainingAmount() === 0 
                     ? '✓ Fully allocated' 
@@ -4010,7 +3927,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 <h3 style={{ 
                   fontSize: '14px', 
                   fontWeight: '600',
-                  color: '#374151',
+                  color: 'var(--color-text)',
                   marginBottom: '12px'
                 }}>
                   Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
@@ -4020,9 +3937,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   <div key={index} style={{ 
                     marginBottom: '12px', 
                     padding: '12px', 
-                    backgroundColor: '#ffffff', 
+                    backgroundColor: 'var(--color-backgroundSecondary)', 
                     borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid var(--color-border)',
                     position: 'relative'
                   }}>
                     {splitTransactions.length > 1 && (
@@ -4033,7 +3950,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           top: '8px',
                           right: '8px',
                           padding: '2px',
-                          backgroundColor: '#fee2e2',
+                          backgroundColor: 'var(--color-errorLight)',
                           border: 'none',
                           borderRadius: '4px',
                           display: 'flex',
@@ -4045,7 +3962,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                         }}
                         title="Remove split"
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="3">
                           <line x1="18" y1="6" x2="6" y2="18"></line>
                           <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
@@ -4061,15 +3978,17 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                         style={{
                           padding: '8px 10px',
                           borderRadius: '6px',
-                          border: '1px solid #d1d5db',
+                          border: '1px solid var(--color-inputBorder)',
                           fontSize: '14px',
                           width: '100%',
                           boxSizing: 'border-box',
-                          transition: 'border-color 0.2s'
+                          transition: 'border-color 0.2s',
+                          backgroundColor: 'var(--color-inputBackground)',
+                          color: 'var(--color-inputText)'
                         }}
                         placeholder="Description"
-                        onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                        onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                       />
                       
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
@@ -4081,14 +4000,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           style={{
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--color-inputBorder)',
                             fontSize: '14px',
                             boxSizing: 'border-box',
-                            transition: 'border-color 0.2s'
+                            transition: 'border-color 0.2s',
+                            backgroundColor: 'var(--color-inputBackground)',
+                            color: 'var(--color-inputText)'
                           }}
                           placeholder="Amount"
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         />
                         
                         <select
@@ -4097,15 +4018,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           style={{
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--color-inputBorder)',
                             fontSize: '14px',
-                            backgroundColor: 'white',
+                            backgroundColor: 'var(--color-inputBackground)',
+                            color: 'var(--color-inputText)',
                             boxSizing: 'border-box',
                             cursor: 'pointer',
                             transition: 'border-color 0.2s'
                           }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         >
                           <option value="">Category</option>
                           {availableCategories.map(category => (
@@ -4119,15 +4041,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           style={{
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--color-inputBorder)',
                             fontSize: '14px',
-                            backgroundColor: 'white',
+                            backgroundColor: 'var(--color-inputBackground)',
+                            color: 'var(--color-inputText)',
                             boxSizing: 'border-box',
                             cursor: 'pointer',
                             transition: 'border-color 0.2s'
                           }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
+                          onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         >
                           {getLabelDropdownOptions().map(option => (
                             <option key={option.value} value={option.value}>
@@ -4147,8 +4070,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     width: '100%',
                     padding: '10px',
                     backgroundColor: 'transparent',
-                    color: '#3b82f6',
-                    border: '1px dashed #3b82f6',
+                    color: 'var(--color-buttonPrimary)',
+                    border: '1px dashed var(--color-buttonPrimary)',
                     borderRadius: '8px',
                     display: 'flex',
                     alignItems: 'center',
@@ -4160,14 +4083,14 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     transition: 'all 0.2s'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#eff6ff';
-                    e.target.style.borderColor = '#2563eb';
-                    e.target.style.color = '#2563eb';
+                    e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+                    e.target.style.borderColor = 'var(--color-buttonPrimaryHover)';
+                    e.target.style.color = 'var(--color-buttonPrimaryHover)';
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.backgroundColor = 'transparent';
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.color = '#3b82f6';
+                    e.target.style.borderColor = 'var(--color-buttonPrimary)';
+                    e.target.style.color = 'var(--color-buttonPrimary)';
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -4184,15 +4107,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 justifyContent: 'flex-end', 
                 gap: '8px',
                 paddingTop: '16px',
-                borderTop: '1px solid #e5e7eb'
+                borderTop: '1px solid var(--color-border)'
               }}>
                 <button
                   onClick={cancelSplit}
                   style={{
                     padding: '10px 16px',
-                    backgroundColor: '#ffffff',
-                    color: '#374151',
-                    border: '1px solid #d1d5db',
+                    backgroundColor: 'var(--color-buttonSecondary)',
+                    color: 'var(--color-buttonSecondaryText)',
+                    border: '1px solid var(--color-buttonSecondaryBorder)',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     fontSize: '14px',
@@ -4200,10 +4123,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     transition: 'all 0.2s'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
                   }}
                 >
                   Cancel
@@ -4213,8 +4136,8 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   disabled={isSavingSplit}
                   style={{
                     padding: '10px 20px',
-                    backgroundColor: isSavingSplit ? '#9ca3af' : '#3b82f6',
-                    color: 'white',
+                    backgroundColor: isSavingSplit ? 'var(--color-textTertiary)' : 'var(--color-buttonPrimary)',
+                    color: 'var(--color-buttonPrimaryText)',
                     border: 'none',
                     borderRadius: '8px',
                     cursor: isSavingSplit ? 'not-allowed' : 'pointer',
@@ -4227,12 +4150,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   }}
                   onMouseEnter={(e) => {
                     if (!isSavingSplit) {
-                      e.target.style.backgroundColor = '#2563eb';
+                      e.target.style.backgroundColor = 'var(--color-buttonPrimaryHover)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isSavingSplit) {
-                      e.target.style.backgroundColor = '#3b82f6';
+                      e.target.style.backgroundColor = 'var(--color-buttonPrimary)';
                     }
                   }}
                 >

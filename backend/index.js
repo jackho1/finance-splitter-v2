@@ -437,7 +437,7 @@ app.get('/initial-data', async (req, res) => {
       client.query('SELECT * FROM shared_category ORDER BY bank_category'),
       client.query('SELECT * FROM shared_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM users'),
-      client.query('SELECT DISTINCT bank_category FROM shared_transactions_generalized WHERE bank_category IS NOT NULL ORDER BY bank_category'),
+      client.query('SELECT * FROM shared_category'),
       // New: Fetch all active users with their preferences
       client.query(`
         SELECT u.id, u.username, u.display_name, u.email, u.is_active, u.created_at, u.preferences, u.metadata,

@@ -4,7 +4,7 @@
 .nav-button {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--color-textSecondary);
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 6px;
@@ -17,29 +17,29 @@
 }
 
 .nav-button:hover {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: var(--color-backgroundHover);
+  color: var(--color-text);
 }
 
 .nav-button:active {
-  background-color: #e5e7eb;
+  background-color: var(--color-border);
   transform: scale(0.98);
 }
 
 .nav-button.active {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--color-buttonPrimary);
+  color: var(--color-buttonPrimaryText);
 }
 
 .nav-button.active:hover {
-  background-color: #2563eb;
+  background-color: var(--color-buttonPrimaryHover);
 }
 
 /* Preferences button styling */
 .preferences-toggle {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--color-textSecondary);
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 6px;
@@ -53,12 +53,12 @@
 }
 
 .preferences-toggle:hover {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: var(--color-backgroundHover);
+  color: var(--color-text);
 }
 
 .preferences-toggle:active {
-  background-color: #e5e7eb;
+  background-color: var(--color-border);
   transform: scale(0.98);
 }
 
@@ -111,8 +111,8 @@
   margin-bottom: 2rem;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  background-color: white;
+  box-shadow: 0 2px 10px var(--color-shadowLight);
+  background-color: var(--color-backgroundSecondary);
   max-width: 1300px;
   margin-left: auto;
   margin-right: auto;
@@ -127,12 +127,12 @@
 }
 
 .modern-table th {
-  background-color: #f8f9fa;
+  background-color: var(--color-tableHeader) !important;
   padding: 1rem;
   text-align: left;
   font-weight: 600;
-  color: #495057;
-  border-bottom: 1px solid #eaecef;
+  color: var(--color-tableHeaderText) !important;
+  border-bottom: 1px solid var(--color-border);
   position: relative;
 }
 
@@ -144,7 +144,7 @@
 
 .modern-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eaecef;
+  border-bottom: 1px solid var(--color-border);
   position: relative;
 }
 
@@ -153,7 +153,7 @@
 }
 
 .modern-table tbody tr:hover:not([class*="row-"]) {
-  background-color: #08080800;
+  background-color: var(--color-tableRowHover);
 }
 
 /* Row color classes - Now dynamically generated based on user preferences */
@@ -173,22 +173,22 @@
 }
 
 .editable-cell:hover {
-  background-color: rgba(0, 123, 255, 0.05);
+  background-color: var(--color-backgroundHover);
 }
 
 .empty-value {
   font-style: italic;
-  color: #adb5bd;
+  color: var(--color-textTertiary);
   font-size: 0.85rem;
 }
 
 .amount-negative {
-  color: #dc3545;
+  color: var(--color-error);
   font-weight: 500;
 }
 
 .amount-positive {
-  color: #28a745;
+  color: var(--color-success);
   font-weight: 500;
 }
 
@@ -196,16 +196,17 @@
 .modern-input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-inputBorder);
   border-radius: 4px;
+  background-color: var(--color-inputBackground);
   transition: all 0.15s ease-in-out;
   font-size: 0.9rem;
-  color: #495057;
+  color: var(--color-inputText);
 }
 
 .modern-input:focus {
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 3px var(--color-shadowLight);
   outline: none;
 }
 
@@ -213,8 +214,9 @@
   width: 100%;
   padding: 0.5rem 0.75rem;
   padding-right: 1.75rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-inputBorder);
   border-radius: 4px;
+  background-color: var(--color-inputBackground);
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -222,12 +224,12 @@
   background-size: 1rem;
   transition: all 0.15s ease-in-out;
   font-size: 0.9rem;
-  color: #495057;
+  color: var(--color-inputText);
 }
 
 .modern-select:focus {
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 3px var(--color-shadowLight);
   outline: none;
 }
 
@@ -249,18 +251,18 @@
   height: 24px;
   border-radius: 4px;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--color-textSecondary);
   transition: all 0.15s ease;
 }
 
 .filter-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  color: #4a90e2;
+  background-color: var(--color-backgroundHover);
+  color: var(--color-buttonPrimary);
 }
 
 .filter-button.active {
-  color: #4a90e2;
-  background-color: rgba(74, 144, 226, 0.1);
+  color: var(--color-buttonPrimary);
+  background-color: var(--color-infoLight);
 }
 
 .filter-dropdown {
@@ -269,9 +271,9 @@
   right: 0; /* Position from right edge instead of left */
   z-index: 1000;
   width: 250px; /* Fixed width for consistency */
-  background-color: white;
+  background-color: var(--color-backgroundElevated);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px var(--color-shadowDark);
   padding: 1rem;
   margin-top: 0.5rem;
   max-height: 350px;
@@ -287,7 +289,7 @@
   margin-bottom: 0.25rem;
   font-weight: 500;
   font-size: 0.85rem;
-  color: #495057;
+  color: var(--color-text);
 }
 
 .filter-options {
@@ -314,7 +316,7 @@
 }
 
 .filter-option:hover {
-  background-color: #f8f9fa;
+  background-color: var(--color-backgroundHover);
 }
 
 .modern-checkbox {
@@ -328,7 +330,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 0.75rem;
-  border-top: 1px solid #eaecef;
+  border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
 }
 
@@ -344,8 +346,8 @@
 }
 
 .btn-primary {
-  background-color: #4a90e2;
-  color: white;
+  background-color: var(--color-buttonPrimary);
+  color: var(--color-buttonPrimaryText);
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -355,13 +357,13 @@
 }
 
 .btn-primary:hover {
-  background-color: #3a80d2;
+  background-color: var(--color-buttonPrimaryHover);
 }
 
 .btn-secondary {
-  background-color: #f8f9fa;
-  color: #495057;
-  border: 1px solid #ddd;
+  background-color: var(--color-buttonSecondary);
+  color: var(--color-buttonSecondaryText);
+  border: 1px solid var(--color-buttonSecondaryBorder);
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
@@ -370,19 +372,19 @@
 }
 
 .btn-secondary:hover {
-  background-color: #e9ecef;
+  background-color: var(--color-buttonSecondaryHover);
 }
 
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: 3rem 1rem;
-  color: #6c757d;
+  color: var(--color-textSecondary);
 }
 
 .empty-state-icon {
   margin-bottom: 1rem;
-  color: #adb5bd;
+  color: var(--color-textTertiary);
 }
 
 .empty-state h3 {
@@ -408,8 +410,8 @@
   content: "";
   width: 40px;
   height: 40px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4a90e2;
+  border: 3px solid var(--color-backgroundHover);
+  border-top: 3px solid var(--color-buttonPrimary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

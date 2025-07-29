@@ -5,9 +5,9 @@
   width: 100%;
   overflow-x: auto;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px var(--color-shadowLight);
   margin: 20px 0;
-  background-color: white;
+  background-color: var(--color-backgroundSecondary);
   transition: all 0.3s ease;
 }
 
@@ -21,27 +21,27 @@
 
 /* Table header */
 .modern-table thead th {
-  background-color: #f8fafc;
-  color: #334155;
+  background-color: var(--color-tableHeader) !important;
+  color: var(--color-tableHeaderText) !important;
   font-weight: 600;
   font-size: 0.875rem;
   text-align: left;
   padding: 16px;
   position: relative;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--color-border);
   transition: background-color 0.2s ease;
 }
 
 .modern-table thead th:hover {
-  background-color: #f1f5f9;
+  background-color: var(--color-backgroundHover) !important;
 }
 
 /* Table cells */
 .modern-table tbody td {
   padding: 14px 16px;
-  color: #334155;
+  color: var(--color-text);
   font-size: 0.875rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
   transition: background-color 0.2s ease;
 }
 
@@ -51,19 +51,19 @@
 }
 
 .modern-table tbody tr:hover:not([class*="row-"]) {
-  background-color: #f8fafc;
+  background-color: var(--color-tableRowHover);
 }
 
 /* Color-coded rows - Now dynamically generated based on user preferences */
 
 /* Amount colors */
 .amount-positive {
-  color: #10b981;
+  color: var(--color-success);
   font-weight: 500;
 }
 
 .amount-negative {
-  color: #ef4444;
+  color: var(--color-error);
   font-weight: 500;
 }
 
@@ -84,18 +84,18 @@
   border-radius: 4px;
   display: flex;
   align-items: center;
-  color: #64748b;
+  color: var(--color-textSecondary);
   transition: all 0.2s ease;
 }
 
 .filter-button:hover {
-  background-color: #e2e8f0;
-  color: #334155;
+  background-color: var(--color-backgroundHover);
+  color: var(--color-text);
 }
 
 .filter-button.active {
-  color: #3b82f6;
-  background-color: #eff6ff;
+  color: var(--color-buttonPrimary);
+  background-color: var(--color-infoLight);
 }
 
 /* Filter dropdown */
@@ -104,13 +104,13 @@
   top: 100%;
   left: 0;
   min-width: 250px;
-  background: white;
+  background: var(--color-backgroundElevated);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px var(--color-shadow);
   padding: 16px;
   margin-top: 4px;
   z-index: 1000;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   animation: slideDown 0.2s ease;
 }
 
@@ -133,7 +133,7 @@
 .filter-group label {
   display: block;
   margin-bottom: 6px;
-  color: #4b5563;
+  color: var(--color-text);
   font-weight: 500;
   font-size: 0.875rem;
 }
@@ -155,7 +155,7 @@
 }
 
 .filter-option:hover {
-  background-color: #f8fafc;
+  background-color: var(--color-backgroundHover);
 }
 
 /* Modern checkbox */
@@ -165,7 +165,7 @@
   margin-right: 8px;
   border-radius: 4px;
   cursor: pointer;
-  accent-color: #3b82f6;
+  accent-color: var(--color-buttonPrimary);
 }
 
 /* Filter actions */
@@ -174,13 +174,13 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-border);
 }
 
 /* Modern buttons */
 .btn-primary {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--color-buttonPrimary);
+  color: var(--color-buttonPrimaryText);
   border: none;
   padding: 8px 12px;
   border-radius: 6px;
@@ -190,13 +190,13 @@
 }
 
 .btn-primary:hover {
-  background-color: #2563eb;
+  background-color: var(--color-buttonPrimaryHover);
 }
 
 .btn-secondary {
-  background-color: #f1f5f9;
-  color: #475569;
-  border: none;
+  background-color: var(--color-buttonSecondary);
+  color: var(--color-buttonSecondaryText);
+  border: 1px solid var(--color-buttonSecondaryBorder);
   padding: 8px 12px;
   border-radius: 6px;
   font-weight: 500;
@@ -205,24 +205,25 @@
 }
 
 .btn-secondary:hover {
-  background-color: #e2e8f0;
+  background-color: var(--color-buttonSecondaryHover);
 }
 
 /* Modern inputs */
 .modern-input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-inputBorder);
   border-radius: 6px;
   font-size: 0.875rem;
-  color: #334155;
+  color: var(--color-inputText);
+  background-color: var(--color-inputBackground);
   transition: all 0.2s ease;
 }
 
 .modern-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
 }
 
 /* Modern select */
@@ -232,8 +233,8 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 0.875rem;
-  color: #334155;
-  background-color: white;
+  color: var(--color-inputText);
+  background-color: var(--color-inputBackground);
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
@@ -245,30 +246,30 @@
 
 .modern-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
 }
 
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-  color: #64748b;
+  color: var(--color-textSecondary);
 }
 
 .empty-state-icon {
   margin-bottom: 16px;
-  color: #94a3b8;
+  color: var(--color-textTertiary);
 }
 
 .empty-state h3 {
-  color: #334155;
+  color: var(--color-text);
   font-size: 1.125rem;
   margin-bottom: 8px;
 }
 
 .empty-state p {
-  color: #64748b;
+  color: var(--color-textSecondary);
   font-size: 0.875rem;
 }
 
@@ -277,9 +278,9 @@
   display: inline-block;
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(59, 130, 246, 0.1);
+  border: 3px solid var(--color-shadowLight);
   border-radius: 50%;
-  border-top-color: #3b82f6;
+  border-top-color: var(--color-buttonPrimary);
   animation: spin 0.8s linear infinite;
   margin: 40px auto;
 }
@@ -302,7 +303,7 @@
 }
 
 .editable-cell:hover {
-  background-color: rgba(59, 130, 246, 0.05);
+  background-color: var(--color-backgroundHover);
 }
 
 .editable-cell::after {
@@ -322,7 +323,7 @@
 
 /* Empty value styling */
 .empty-value {
-  color: #94a3b8;
+  color: var(--color-textTertiary);
   font-style: italic;
   font-size: 0.813rem;
 }
