@@ -441,6 +441,6 @@
 
   - Note: When new transactions are created here, the program needs to create the transaction first, then the split config and allocations records can be created after because it needs the primary key of the transaction first.
 
-- [x] **Abstract split transaction modal **:
+- [ ] **Abstract split transaction modal **:
 
   - Abstract this so only one code needs to update all three views for this component.
