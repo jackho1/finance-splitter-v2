@@ -5,10 +5,10 @@ import { useUserPreferencesContext } from './contexts/UserPreferencesContext';
 import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
 
 // Import utility functions
-//import { calculateTotals } from './utils/calculateTotals';
 import { applyFilters } from './utils/filterTransactions';
 import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
+import { getLabelFilterOptions, getLabelDropdownOptions } from './utils/getLabelFilterOptions';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
@@ -418,9 +418,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   // Add label-related states
-  const [labels, setLabels] = useState([]);
   const [labelFilter, setLabelFilter] = useState([]);
   const [isLabelsLoading, setIsLabelsLoading] = useState(false);
+
 
   // New: Add user management states
   const [users, setUsers] = useState([]);
@@ -541,42 +541,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     return totals;
   };
 
-  // Helper function to generate dynamic dropdown options based on active users
-  const getLabelDropdownOptions = () => {
-    // Guard clause: return default options if users is not loaded yet
-    if (!users || !Array.isArray(users)) {
-      return [{ value: '', label: 'None' }];
-    }
-    
-    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
-    
-    const options = [
-      { value: '', label: 'None' }
-    ];
-    
-    // Add individual user options
-    activeUsers.forEach(user => {
-      options.push({
-        value: user.display_name,
-        label: user.display_name
-      });
-    });
-    
-    // Add collective option based on number of users
-    if (activeUsers.length === 2) {
-      options.push({
-        value: 'Both',
-        label: 'Both (Equal Split)'
-      });
-    } else if (activeUsers.length >= 3) {
-      options.push({
-        value: 'All users',
-        label: 'All users (Equal Split)'
-      });
-    }
-    
-    return options;
-  };
+
 
   // Add refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -719,7 +684,6 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
-      setIsLabelsLoading(true);
       
       try {
         // Single API call to get all offset initial data
@@ -736,8 +700,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           
           setAvailableCategories(offsetCategories);
           
-          setLabels(labels);
-          setIsLabelsLoading(false);
+          // Note: We no longer set labels - they are generated dynamically from users
 
           // New: Set users and split allocations
           setUsers(users || []);
@@ -751,7 +714,6 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       } catch (error) {
         console.error('Error fetching offset initial data:', error);
         setIsTransactionsLoading(false);
-        setIsLabelsLoading(false);
       }
     };
     
@@ -910,7 +872,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           const { offsetTransactions, offsetCategories, labels, users, splitAllocations } = transactionsResponse.data.data;
           setTransactions(offsetTransactions);
           setAvailableCategories(offsetCategories);
-          setLabels(labels);
+          // Note: We no longer set labels - they are generated dynamically from users
           setUsers(users);
           setSplitAllocations(splitAllocations);
         } else {
@@ -921,7 +883,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         let filtered = applyFilters(transactionsResponse.data, {
           dateFilter,
           sortBy: filters.sortBy
-        });
+        }, getTransactionLabel);
         
         if (categoryFilter.length > 0) {
           filtered = filtered.filter(transaction => {
@@ -1001,7 +963,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     let filtered = applyFilters(transactions, {
       dateFilter,
       sortBy: filters.sortBy
-    });
+    }, getTransactionLabel);
 
     if (categoryFilter.length > 0) {
       filtered = filtered.filter(transaction => {
@@ -1548,7 +1510,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
               style={{ textAlign: 'center' }}
               autoFocus
             >
-              {getLabelDropdownOptions().map(option => (
+              {getLabelDropdownOptions(users).map(option => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -1798,11 +1760,11 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 <TableDropdownMenu
                   isActive={activeFilterColumn === 'label'}
                   onClose={() => setActiveFilterColumn(null)}
-                  availableOptions={getLabelDropdownOptions()}
+                  availableOptions={getLabelFilterOptions(users, splitAllocations, transactions)}
                   selectedOptions={labelFilter}
                   onChange={handleLabelFilterChange}
                   onClear={() => setLabelFilter([])}
-                  width="75px"
+                  width="240px"
                 />
               </th>
             </tr>
@@ -3681,7 +3643,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     boxSizing: 'border-box'
                   }}
                 >
-                  {getLabelDropdownOptions().map(option => (
+                  {getLabelDropdownOptions(users).map(option => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -4052,7 +4014,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                           onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
                           onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         >
-                          {getLabelDropdownOptions().map(option => (
+                          {getLabelDropdownOptions(users).map(option => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>

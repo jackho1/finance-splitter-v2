@@ -30,6 +30,7 @@ import {
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
 import { getTransactionLabel, getUserTotalFromAllocations, calculateTotalsFromAllocations } from './utils/calculateTotals';
+import { getLabelFilterOptions, getLabelDropdownOptions } from './utils/getLabelFilterOptions';
 
 import './theme.css';
 import './ModernTables.css';
@@ -445,12 +446,10 @@ const AppContent = () => {
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
   const [filters, setFilters] = useState({ sortBy: 'date-desc' });
   const [totals, setTotals] = useState({});
-  const [labels, setLabels] = useState([]);
   const [editCell, setEditCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   // Add loading state variables
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
-  const [isLabelsLoading, setIsLabelsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   // Add category mapping state
   const [categoryMappings, setCategoryMappings] = useState({});
@@ -493,7 +492,7 @@ const AppContent = () => {
     description: '',
     amount: '',
     bank_category: '',
-    label: labels[0] || ''
+    label: ''
   });
   
   // Add help text visibility state
@@ -721,7 +720,6 @@ const AppContent = () => {
     
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
-      setIsLabelsLoading(true);
       setIsCategoryMappingsLoading(true);
       
       try {
@@ -736,7 +734,7 @@ const AppContent = () => {
           setTransactions(transactions || []);
           setFilteredTransactions(transactions);
           setAllFilteredTransactions(transactions);
-          setLabels(labels);
+          // Note: We no longer set labels - they are generated dynamically from users
           setAvailableBankCategories(bankCategories);
           
           // Set new user management system data
@@ -752,14 +750,12 @@ const AppContent = () => {
           // Update loading states
           setIsCategoryMappingsLoading(false);
           setIsTransactionsLoading(false);
-          setIsLabelsLoading(false);
         } else {
           throw new Error(response.data.error || 'Failed to fetch initial data');
         }
       } catch (error) {
         console.error('Error fetching initial data:', error);
         setIsTransactionsLoading(false);
-        setIsLabelsLoading(false);
         setIsCategoryMappingsLoading(false);
       }
     };
@@ -985,7 +981,7 @@ const AppContent = () => {
       bankCategoryFilter,
       labelFilter,
       sortBy: filters.sortBy
-    });
+    }, (transaction) => getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading));
 
     // Apply additional category filtering if needed
     if (categoryFilter.length > 0) {
@@ -1034,11 +1030,11 @@ const AppContent = () => {
     bankCategoryFilter, 
     labelFilter, 
     categoryFilter, 
-    labels, 
     currentMonth,
     currentYear,
     users,
-    splitAllocations
+    splitAllocations,
+    isTransactionsLoading
   ]);
 
   // Update user color styles when users change
@@ -1280,11 +1276,26 @@ const AppContent = () => {
     });
   };
   
-  const handleLabelFilterChange = (label) => {
+  const handleLabelFilterChange = (label, e) => {
+    // Stop event propagation to prevent closing the dropdown
+    if (e) {
+      e.stopPropagation();
+    }
+    
     setLabelFilter(prev => {
-      if (prev.includes(label)) {
-        return prev.filter(l => l !== label);
+      // Check if the label is already in the filter
+      const isAlreadyIncluded = prev.some(item => 
+        // Handle null equality properly
+        (item === null && label === null) || item === label
+      );
+
+      if (isAlreadyIncluded) {
+        // Remove the label if it's already included
+        return prev.filter(item => 
+          !((item === null && label === null) || item === label)
+        );
       } else {
+        // Add the label if it's not already included
         return [...prev, label];
       }
     });
@@ -2240,7 +2251,7 @@ const AppContent = () => {
   // Transactions table modernized render - update the renderCell for the description field
   const renderTransactionsTable = () => (
     <div className="modern-table-container fade-in" style={{ marginTop: '2px' }}>
-      {isTransactionsLoading || isLabelsLoading ? (
+      {isTransactionsLoading ? (
         <div className="loading-spinner" />
       ) : (
         <table className="modern-table">
@@ -2318,11 +2329,11 @@ const AppContent = () => {
                 <TableDropdownMenu
                   isActive={activeFilterColumn === 'label'}
                   onClose={() => setActiveFilterColumn(null)}
-                  availableOptions={labels}
+                  availableOptions={getLabelFilterOptions(users, splitAllocations, transactions)}
                   selectedOptions={labelFilter}
                   onChange={handleLabelFilterChange}
                   onClear={() => setLabelFilter([])}
-                  width="75px"
+                  width="240px"
                 />
               </th>
             </tr>
@@ -2648,16 +2659,16 @@ const AppContent = () => {
             marginBottom: '8px',
             padding: '8px',
             borderRadius: '4px',
-            backgroundColor: transaction.label === labels[0] ? 'rgba(255, 99, 132, 0.1)' :
-                           transaction.label === labels[1] ? 'rgba(54, 162, 235, 0.1)' :
-                           transaction.label === labels[2] ? 'rgba(75, 192, 95, 0.1)' :
-                           '#f8f9fa',
-            borderLeft: `3px solid ${
-              transaction.label === labels[0] ? 'rgba(255, 99, 132, 0.8)' :
-              transaction.label === labels[1] ? 'rgba(54, 162, 235, 0.8)' :
-              transaction.label === labels[2] ? 'rgba(75, 192, 95, 0.8)' :
-              '#d1d1d1'
-            }`,
+            backgroundColor: (() => {
+              const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
+              const userColors = getUserTotalColors(label);
+              return userColors ? userColors.bg : '#f8f9fa';
+            })(),
+            borderLeft: `3px solid ${(() => {
+              const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
+              const userColors = getUserTotalColors(label);
+              return userColors ? userColors.border : '#d1d1d1';
+            })()}`,
             fontSize: '13px',
             lineHeight: '1.3'
           }}>
@@ -4181,7 +4192,7 @@ const AppContent = () => {
 
           {/* Chart section with loading indicator */}
           <div style={{ height: '500px', marginBottom: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {isTransactionsLoading || isLabelsLoading ? (
+            {isTransactionsLoading ? (
               <LoadingSpinner />
             ) : (
               <>
@@ -4702,7 +4713,7 @@ const AppContent = () => {
           {/* Transactions table with modern styling */}
           {renderTransactionsTable()}
           
-          {isTransactionsLoading || isLabelsLoading ? (
+          {isTransactionsLoading ? (
             <LoadingSpinner />
           ) : (
             <div className="totals-container" key={`totals-${colorRefreshCounter}`}>
@@ -5204,8 +5215,8 @@ const AppContent = () => {
                             onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                           >
                             <option value="">Label</option>
-                            {labels.map(label => (
-                              <option key={label} value={label}>{label}</option>
+                            {getLabelDropdownOptions(users).map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         </div>
