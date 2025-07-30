@@ -6,6 +6,12 @@ import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { applyFilters } from './utils/filterTransactions';
 import { groupSplitTransactions } from './utils/transactionGrouping';
 import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
+import { 
+  createDragImage, 
+  handleDragOverWithReorder, 
+  handleDragEndCleanup,
+  getDraggableContainerStyles 
+} from './utils/dragAndDropUtils';
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
@@ -1927,51 +1933,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     return sum + (tx.amount || 0);
   }, 0);
 
-  // Drag and Drop handlers
+  // Drag and Drop handlers using shared utilities for consistency
   const handleDragStart = (e, category) => {
-    setDraggedCategory(category);
-    setIsDragging(true);
-    
-    // Set drag image and effect
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', category);
-    
-    // For better UX, we can set a custom drag image
-    // This is optional but makes the dragging experience better
-    const dragImage = e.target.cloneNode(true);
-    dragImage.style.opacity = '0.8';
-    dragImage.style.position = 'absolute';
-    dragImage.style.top = '-1000px';
-    document.body.appendChild(dragImage);
-    e.dataTransfer.setDragImage(dragImage, 20, 20);
-    
-    // Remove the cloned element after the drag operation
-    setTimeout(() => {
-      document.body.removeChild(dragImage);
-    }, 0);
+    createDragImage(e, setDraggedCategory, setIsDragging, category);
   };
   
   const handleDragOver = (e, category) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
-    if (category !== draggedCategory) {
-      // Reorder the categories on dragover for a live preview
-      const newOrder = [...categoryOrder];
-      const fromIndex = newOrder.indexOf(draggedCategory);
-      const toIndex = newOrder.indexOf(category);
-      
-      if (fromIndex !== -1 && toIndex !== -1) {
-        newOrder.splice(fromIndex, 1);
-        newOrder.splice(toIndex, 0, draggedCategory);
-        setCategoryOrder(newOrder);
-      }
-    }
+    handleDragOverWithReorder(e, category, draggedCategory, categoryOrder, setCategoryOrder);
   };
   
   const handleDragEnd = () => {
-    setDraggedCategory(null);
-    setIsDragging(false);
+    handleDragEndCleanup(setDraggedCategory, setIsDragging);
     
     // Persist the new order to database
     savePersonalSettings({ category_order: categoryOrder });
@@ -3156,25 +3128,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             onDragOver={(e) => handleDragOver(e, category)}
                             onDragEnd={handleDragEnd}
                             onDoubleClick={() => handleCategoryDoubleClick(category)}
-                            style={{  
-                              backgroundColor: 'var(--color-backgroundSecondary)',
-                              padding: '16px',
-                              borderRadius: '12px',
-                              border: draggedCategory === category 
-                                ? `2px dashed ${color.bg}` 
-                                : '1px solid var(--color-border)',
-                              boxShadow: draggedCategory === category
-                                ? '0 15px 35px var(--color-shadow)'
-                                : '0 4px 24px var(--color-shadowLight)',
-                              opacity: isDragging && draggedCategory !== category ? 0.5 : 1,
-                              cursor: 'move',
-                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                              transform: draggedCategory === category 
-                                ? 'scale(1.02) rotate(1deg)' 
-                                : 'scale(1)',
-                              position: 'relative',
-                              overflow: 'hidden',
-                            }}
+                            style={getDraggableContainerStyles(category, draggedCategory, isDragging, color)}
                           >
                             {/* Background accent */}
                             <div style={{
