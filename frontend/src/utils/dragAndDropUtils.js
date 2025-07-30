@@ -35,48 +35,115 @@ export const createDragImage = (e, setDraggedCategory, setIsDragging, category) 
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', category);
   
-  // Check if we have a cached drag image for this element
+  // Find the entire row that contains the dragged element
   const target = e.target;
-  let dragImage = dragImageCache.get(target);
+  const row = target.closest('tr');
   
-  if (!dragImage) {
-    // Create and cache custom drag image
-    dragImage = target.cloneNode(true);
-    
-    // Get the computed styles and dimensions of the original element
+  if (!row) {
+    // Fallback to original behavior if no row found
+    const dragImage = target.cloneNode(true);
     const originalRect = target.getBoundingClientRect();
-    const computedStyle = window.getComputedStyle(target);
-    
-    // Use Object.assign for better performance than individual assignments
     Object.assign(dragImage.style, {
       width: `${originalRect.width}px`,
       height: `${originalRect.height}px`,
-      opacity: '0.8',
+      opacity: '0.9',
       position: 'absolute',
       top: '-1000px',
       left: '-1000px',
       transform: 'scale(0.95)',
-      borderRadius: computedStyle.borderRadius,
-      backgroundColor: computedStyle.backgroundColor,
-      padding: computedStyle.padding,
-      boxSizing: 'border-box',
       pointerEvents: 'none',
       zIndex: '9999',
-      fontFamily: computedStyle.fontFamily,
-      fontSize: computedStyle.fontSize,
-      fontWeight: computedStyle.fontWeight,
-      lineHeight: computedStyle.lineHeight,
       boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
     });
     
-    // Cache the drag image for reuse
-    dragImageCache.set(target, dragImage);
+    document.body.appendChild(dragImage);
+    const offsetX = e.clientX - originalRect.left;
+    const offsetY = e.clientY - originalRect.top;
+    e.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
+    
+    requestAnimationFrame(() => {
+      if (dragImage && dragImage.parentNode) {
+        document.body.removeChild(dragImage);
+      }
+    });
+    return;
   }
+  
+  // Create drag image from the entire row
+  const dragImage = row.cloneNode(true);
+  
+  // Get the computed styles and dimensions of the original row
+  const originalRect = row.getBoundingClientRect();
+  const computedStyle = window.getComputedStyle(row);
+  
+  // Add a specific class for drag image styling
+  dragImage.classList.add('drag-image-row');
+  
+  // Calculate the actual height needed for the row content
+  const dragCells = dragImage.querySelectorAll('td, th');
+  let maxCellHeight = 0;
+  dragCells.forEach(cell => {
+    const cellHeight = cell.scrollHeight || cell.offsetHeight;
+    maxCellHeight = Math.max(maxCellHeight, cellHeight);
+  });
+  
+  // Use the calculated height or fall back to original height
+  const dragImageHeight = Math.max(maxCellHeight + 12, originalRect.height);
+  
+  // Style the drag image to look like a prominent, non-faded row
+  Object.assign(dragImage.style, {
+    width: `${originalRect.width}px`,
+    height: `${dragImageHeight}px`,
+    minHeight: `${dragImageHeight}px`,
+    opacity: '1', // Full opacity - not faded
+    position: 'absolute',
+    top: '-1000px',
+    left: '-1000px',
+    transform: 'scale(1)', // No scaling down
+    borderRadius: '8px',
+    backgroundColor: 'var(--color-backgroundSecondary)',
+    border: '3px solid var(--color-primary)', // Thicker border for more prominence
+    boxSizing: 'border-box',
+    pointerEvents: 'none',
+    zIndex: '9999',
+    fontFamily: computedStyle.fontFamily,
+    fontSize: computedStyle.fontSize,
+    fontWeight: computedStyle.fontWeight,
+    lineHeight: computedStyle.lineHeight,
+    boxShadow: '0 20px 40px rgba(0,0,0,0.5)', // Stronger shadow for more prominence
+    // Ensure all cells in the row are visible and not faded
+    color: 'var(--color-text)',
+    textShadow: 'none',
+    // Ensure the row is fully visible
+    overflow: 'visible',
+    display: 'table-row',
+    tableLayout: 'fixed'
+  });
+  
+  // Style all cells in the drag image to ensure they're not faded and remove borders
+  dragCells.forEach(cell => {
+    Object.assign(cell.style, {
+      opacity: '1',
+      backgroundColor: 'var(--color-backgroundSecondary)', // Match row background for consistency
+      color: 'var(--color-text)',
+      border: 'none', // Remove all borders
+      padding: '8px 12px', // Slightly larger padding for better visibility
+      // Ensure cell content is fully visible
+      overflow: 'visible',
+      whiteSpace: 'nowrap',
+      verticalAlign: 'middle',
+      fontWeight: computedStyle.fontWeight, // Preserve original font weight
+      textAlign: 'left' // Consistent text alignment
+    });
+  });
+  
+  // Remove any dragging classes or attributes from the cloned row
+  dragImage.classList.remove('dragging');
+  dragImage.removeAttribute('dragging');
   
   document.body.appendChild(dragImage);
   
-  // Set the drag image with proper offset (cursor position relative to element)
-  const originalRect = target.getBoundingClientRect();
+  // Set the drag image with proper offset (cursor position relative to the row)
   const offsetX = e.clientX - originalRect.left;
   const offsetY = e.clientY - originalRect.top;
   e.dataTransfer.setDragImage(dragImage, offsetX, offsetY);

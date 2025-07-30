@@ -16,6 +16,14 @@ import {
   LogarithmicScale
 } from 'chart.js';
 
+// Import drag and drop utilities for consistency
+import { 
+  createDragImage, 
+  handleDragOverWithReorder, 
+  handleDragEndCleanup,
+  getDraggableContainerStyles
+} from './utils/dragAndDropUtils';
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -153,13 +161,12 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
       },
     ]
   });
+  
+  // Drag and drop states - consistent with other components
   const [draggedCategory, setDraggedCategory] = useState(null);
-  const [draggedRowStyle, setDraggedRowStyle] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [editBudgetValue, setEditBudgetValue] = useState('');
-  
-  // Reference to hold drag ghost element
-  const dragGhostRef = useRef(null);
 
   // Function to get category from bank_category using mappings
   const getCategoryFromMapping = (bankCategory) => {
@@ -468,140 +475,43 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
     return calculateSummaryData();
   }, [transactions, budgets, monthlySpendCategories, currentMonth, currentYear, categoryOrder, categoryMappings, users, splitAllocations]);
 
-  // Enhanced drag and drop handling functions
-  const handleDragStart = (e, category, rowElement) => {
-    // Only proceed if the drag started from a category name cell
-    if (!e.target.classList.contains('category-name-cell')) {
+  // Improved drag and drop handlers using shared utilities for consistency with other pages
+  const handleDragStart = (e, category) => {
+    // Only proceed if the drag started from the drag handle or category name cell
+    if (!e.target.classList.contains('category-name-cell') && 
+        !e.target.classList.contains('drag-handle')) {
       e.preventDefault();
-      e.stopPropagation();
       return false;
     }
     
-    setDraggedCategory(category);    
-    // Fix for Firefox which may show default ghost image as well
-    e.dataTransfer.effectAllowed = 'move';
-    
-    // Create a custom drag image that shows the entire row
-    const dragGhost = document.createElement('table');
-    dragGhost.className = 'drag-ghost';
-    dragGhost.style.position = 'absolute';
-    dragGhost.style.top = '-1000px';
-    dragGhost.style.opacity = '1.0'; // Full opacity
-    dragGhost.style.backgroundColor = 'var(--color-backgroundSecondary)';
-    dragGhost.style.boxShadow = '0 5px 15px rgba(0,0,0,0.5)';
-    dragGhost.style.width = rowElement.offsetWidth + 'px';
-    dragGhost.style.borderCollapse = 'collapse';
-    dragGhost.style.border = '2px solid #2196F3';
-    dragGhost.style.zIndex = '9999'; // Ensure it's on top
-    
-    // Save to ref for cleanup later
-    dragGhostRef.current = dragGhost;
-    
-    // Clone the row content with complete styling
-    const clonedRow = rowElement.cloneNode(true);
-    clonedRow.style.opacity = '1.0'; // Ensure full opacity
-    clonedRow.style.backgroundColor = 'var(--color-backgroundSecondary)';
-    
-    // Make sure all cells in the cloned row are visible
-    Array.from(clonedRow.children).forEach(cell => {
-      cell.style.opacity = '1';
-      cell.style.backgroundColor = 'var(--color-backgroundSecondary)';
-      cell.style.color = 'var(--color-text)';
-      cell.style.border = '1px solid #2196F3';
-    });
-    
-    // Make sure the drag ghost has the same structure as a table
-    const tbody = document.createElement('tbody');
-    tbody.appendChild(clonedRow);
-    dragGhost.appendChild(tbody);
-    
-    // Add to document for drag image
-    document.body.appendChild(dragGhost);
-    
-    // Set the drag image to our custom element
-    e.dataTransfer.setDragImage(dragGhost, 20, 20);
-    
-    // Add custom attribute for CSS targeting
-    rowElement.setAttribute('dragging', 'true');
-    
-    // Set styles while dragging
-    setDraggedRowStyle({
-      opacity: 0.85, // Higher opacity
-      backgroundColor: 'rgba(173, 216, 230, 0.8)',
-      border: '2px solid #2196F3'
-    });
+    createDragImage(e, setDraggedCategory, setIsDragging, category);
+  };
+  
+  const handleDragOver = (e, category) => {
+    handleDragOverWithReorder(e, category, draggedCategory, categoryOrder, setCategoryOrder);
   };
 
-  const handleDragOver = (e, category) => {
-    e.preventDefault();
-    // Add indication that item can be dropped here
-    e.currentTarget.style.borderTop = category !== draggedCategory 
-      ? '2px solid #4CAF50' 
-      : '';
+  const handleDragEnd = () => {
+    handleDragEndCleanup(setDraggedCategory, setIsDragging);
     
-    if (draggedCategory && draggedCategory !== category) {
-      // Create a new order by swapping positions
-      const newOrder = [...categoryOrder];
-      const dragIndex = newOrder.indexOf(draggedCategory);
-      const dropIndex = newOrder.indexOf(category);
-      
-      if (dragIndex !== -1 && dropIndex !== -1) {
-        // Remove from old position and add at new position
-        newOrder.splice(dragIndex, 1);
-        newOrder.splice(dropIndex, 0, draggedCategory);
-        
-        // Save the new order
-        setCategoryOrder(newOrder);
-        localStorage.setItem('categoryOrder', JSON.stringify(newOrder));
-      }
-    }
+    // Persist the new order to localStorage
+    localStorage.setItem('categoryOrder', JSON.stringify(categoryOrder));
   };
 
   const handleDragEnter = (e) => {
     e.preventDefault();
-    e.currentTarget.style.backgroundColor = 'rgba(173, 216, 230, 0.2)';
+    // Visual feedback handled by getDraggableContainerStyles
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    e.currentTarget.style.backgroundColor = '';
-    e.currentTarget.style.borderTop = '';
-  };
-
-  const handleDragEnd = (e) => {
-    setDraggedCategory(null);
-    setDraggedRowStyle(null);
-    
-    // Remove all temporary styles from table rows
-    document.querySelectorAll('tr').forEach(row => {
-      row.style.borderTop = '';
-      row.style.backgroundColor = '';
-      row.removeAttribute('dragging');
-    });
-    
-    // Clean up the drag ghost element
-    if (dragGhostRef.current) {
-      try {
-        document.body.removeChild(dragGhostRef.current);
-      } catch(err) {
-        // Drag ghost already removed
-      }
-      dragGhostRef.current = null;
-    }
-    
-    // Force redraw on some browsers
-    setTimeout(() => {
-      document.querySelectorAll('.drag-row').forEach(row => {
-        row.style.opacity = '1';
-      });
-    }, 50);
+    // Visual feedback handled by getDraggableContainerStyles
   };
 
   const handleDrop = (e, category) => {
     e.preventDefault();
-    // Reset styles
-    e.currentTarget.style.backgroundColor = '';
-    e.currentTarget.style.borderTop = '';
+    e.stopPropagation();
+    // The actual reordering is handled in handleDragOver
   };
 
   // Add a formatter function for currency display
@@ -832,23 +742,28 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         }
         
         .category-name-cell {
-          cursor: move; /* Only show move cursor on category name cell */
+          cursor: move;
+          user-select: none;
+          -webkit-user-select: none;
           position: relative;
+          padding-left: 24px !important;
         }
         
-        .category-name-cell::after {
+        .category-name-cell::before {
           content: '⋮⋮';
           position: absolute;
-          right: 10px;
+          left: 8px;
           top: 50%;
           transform: translateY(-50%);
-          color: #777;
-          font-size: 14px;
-          opacity: 0.7;
+          color: var(--color-textSecondary);
+          font-size: 12px;
+          letter-spacing: -2px;
+          opacity: 0;
+          transition: opacity 0.2s ease;
         }
         
-        .category-name-cell:hover::after {
-          opacity: 1;
+        .drag-row:hover .category-name-cell::before {
+          opacity: 0.6;
         }
         
         .drag-row:hover {
@@ -858,7 +773,25 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
         .drag-row.dragging {
           opacity: 0.85;
           background-color: rgba(173, 216, 230, 0.8);
-          border: 2px solid #2196F3;
+          border: 3px solid var(--color-primary);
+          box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        
+        tr[dragging="true"] {
+          opacity: 0.85;
+          background-color: rgba(173, 216, 230, 0.8) !important;
+          border: 3px solid var(--color-primary) !important;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        
+        /* Disable the default ghost image */
+        .drag-row[dragging="true"] * {
+          pointer-events: none;
+        }
+        
+        /* Ensure form controls remain interactive */
+        .budget-input {
+          pointer-events: auto !important;
         }
         
         .drag-ghost {
@@ -866,13 +799,25 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
           border-collapse: collapse;
           opacity: 1 !important;
           z-index: 9999;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.5) !important;
+          border: 3px solid var(--color-primary) !important;
         }
         
         .drag-ghost td, .drag-ghost th {
-          border: 1px solid #2196F3;
-          padding: 8px;
+          border: none;
+          padding: 8px 12px;
           opacity: 1 !important;
           background-color: var(--color-backgroundSecondary) !important;
+          color: var(--color-text) !important;
+          font-weight: inherit !important;
+        }
+        
+        /* Ensure drag image row is fully visible */
+        .drag-image-row {
+          opacity: 1 !important;
+          background-color: var(--color-backgroundSecondary) !important;
+          border: 3px solid var(--color-primary) !important;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.5) !important;
         }
         
         /* Override any default browser drag opacity */
@@ -1187,19 +1132,19 @@ const Budgets = ({ helpTextVisible = true, onChartClick }) => {
                 <tr 
                   key={index}
                   className={`drag-row ${draggedCategory === category ? 'dragging' : ''}`}
-                  style={draggedCategory === category ? draggedRowStyle : {}}
+                  style={getDraggableContainerStyles(category, draggedCategory, isDragging, { bg: categoryColor })}
+                  onDragOver={(e) => handleDragOver(e, category)}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, category)}
                 >
                   <td 
                     draggable
-                    onDragStart={(e) => handleDragStart(e, category, e.target.parentElement)}
-                    onDragOver={(e) => handleDragOver(e, category)}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
+                    onDragStart={(e) => handleDragStart(e, category)}
                     onDragEnd={handleDragEnd}
-                    onDrop={(e) => handleDrop(e, category)}
                     className="category-name-cell col-budget-category"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', cursor: 'move' }}>
                       <div className="category-indicator" style={{ backgroundColor: categoryColor }} />
                       {category}
                     </div>
