@@ -1613,7 +1613,6 @@ const AppContent = () => {
     
     // If no label value is provided, don't create a split configuration
     if (!labelValue || labelValue === '') {
-      console.log(`ℹ️ No split configuration created for transaction ${transactionId} - no label selected`);
       return;
     }
     
@@ -2870,25 +2869,7 @@ const AppContent = () => {
     );
     
     if (hasEmptyFields) {
-      // Show error notification
-      const notification = document.createElement('div');
-      notification.textContent = 'Please fill out all required fields for each split transaction';
-      notification.style.position = 'fixed';
-      notification.style.top = '20px';
-      notification.style.right = '20px';
-      notification.style.backgroundColor = '#f8d7da';
-      notification.style.color = '#721c24';
-      notification.style.padding = '10px 20px';
-      notification.style.borderRadius = '4px';
-      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-      notification.style.zIndex = '1000';
-      notification.style.border = '1px solid #f5c6cb';
-      
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        document.body.removeChild(notification);
-      }, 5000);
+      showErrorNotification('Please fill out all required fields for each split transaction');
       return;
     }
     
@@ -2902,25 +2883,7 @@ const AppContent = () => {
     if (originalAmount < 0) {
       const hasPositiveSplit = splitTransactions.some(split => parseFloat(split.amount) > 0);
       if (hasPositiveSplit) {
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.textContent = 'For expense transactions, all split amounts must be negative';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.color = '#721c24';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #f5c6cb';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 5000);
+        showErrorNotification('For expense transactions, all split amounts must be negative');
         return;
       }
     }
@@ -2929,25 +2892,7 @@ const AppContent = () => {
     if (originalAmount > 0) {
       const hasNegativeSplit = splitTransactions.some(split => parseFloat(split.amount) < 0);
       if (hasNegativeSplit) {
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.textContent = 'For income transactions, all split amounts must be positive';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.color = '#721c24';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #f5c6cb';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 5000);
+        showErrorNotification('For income transactions, all split amounts must be positive');
         return;
       }
     }
@@ -2956,49 +2901,13 @@ const AppContent = () => {
     if (originalAmount < 0) {
       // For expenses: total splits should not be less than original (more negative)
       if (totalSplitAmount < originalAmount) {
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.textContent = 'Split amounts exceed the original transaction amount';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.color = '#721c24';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #f5c6cb';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 5000);
+        showErrorNotification('Split amounts exceed the original transaction amount');
         return;
       }
     } else {
       // For income: total splits should not exceed original
       if (totalSplitAmount > originalAmount) {
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.textContent = 'Split amounts exceed the original transaction amount';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.color = '#721c24';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #f5c6cb';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 5000);
+        showErrorNotification('Split amounts exceed the original transaction amount');
         return;
       }
     }
@@ -3006,7 +2915,7 @@ const AppContent = () => {
     try {
       setIsSavingSplit(true);
       
-      // Prepare the data for the API
+      // Prepare the data for the API (remove label field for new system)
       const splitData = {
         originalTransactionId: transactionToSplit.id,
         remainingAmount: calculateRemainingAmount(),
@@ -3014,37 +2923,48 @@ const AppContent = () => {
           date: transactionToSplit.date, // Use the same date as original
           description: split.description,
           amount: parseFloat(split.amount),
-          bank_category: split.bank_category,
-          label: split.label
+          bank_category: split.bank_category
+          // Note: label field removed - will be handled via split configs
         }))
       };
       
       const response = await axios.post(getApiUrl('/transactions/split'), splitData);
       
       if (response.data.success) {
-        // Refresh the transactions
+        // Refresh the transactions to get the newly created split transactions
         const transactionsResponse = await axios.get(getApiUrl('/transactions'));
         setTransactions(transactionsResponse.data);
         
-        // Show success notification
-        const notification = document.createElement('div');
-        notification.textContent = 'Transaction split successfully!';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#d4edda';
-        notification.style.color = '#155724';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #c3e6cb';
+        // Find the newly created split transactions (they have split_from_id = originalTransactionId)
+        // Sort by ID descending to get the most recent ones first, then take only the number we just created
+        const allSplitTransactions = transactionsResponse.data
+          .filter(t => t.split_from_id === transactionToSplit.id)
+          .sort((a, b) => b.id - a.id); // Sort by ID descending (highest/newest first)
         
-        document.body.appendChild(notification);
+        // Take only the number of transactions we just created (they should be the newest ones)
+        const newSplitTransactions = allSplitTransactions.slice(0, splitTransactions.length);
         
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 3000);
+        // Create split configurations for each split transaction that had a label
+        const splitConfigPromises = splitTransactions.map(async (split, index) => {
+          if (split.label && split.label !== '') {
+            const correspondingSplitTransaction = newSplitTransactions[index];
+            if (correspondingSplitTransaction && correspondingSplitTransaction.id) {
+              try {
+                await createSplitConfigForNewTransaction(correspondingSplitTransaction.id, split.label);
+              } catch (splitErr) {
+                console.error(`Error creating split configuration for split transaction ${correspondingSplitTransaction.id}:`, splitErr);
+                // Don't fail the entire operation, just log the error
+              }
+            } else {
+              console.error(`No corresponding split transaction found for index ${index}, label: ${split.label}`);
+            }
+          }
+        });
+        
+        // Wait for all split configurations to be created
+        await Promise.all(splitConfigPromises);
+        
+        showSuccessNotification('Transaction split successfully!');
         
         // Close the modal
         setIsSplitting(false);
@@ -3095,48 +3015,11 @@ const AppContent = () => {
         const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
         setTotals(newTotals);
       } else {
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.textContent = response.data.error || 'Failed to split transaction';
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.color = '#721c24';
-        notification.style.padding = '10px 20px';
-        notification.style.borderRadius = '4px';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        notification.style.zIndex = '1000';
-        notification.style.border = '1px solid #f5c6cb';
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 5000);
+        showErrorNotification(response.data.error || 'Failed to split transaction');
       }
     } catch (error) {
       console.error('Error splitting transaction:', error);
-      
-      // Show error notification
-      const notification = document.createElement('div');
-      notification.textContent = 'Failed to split transaction. Please try again.';
-      notification.style.position = 'fixed';
-      notification.style.top = '20px';
-      notification.style.right = '20px';
-      notification.style.backgroundColor = '#f8d7da';
-      notification.style.color = '#721c24';
-      notification.style.padding = '10px 20px';
-      notification.style.borderRadius = '4px';
-      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-      notification.style.zIndex = '1000';
-      notification.style.border = '1px solid #f5c6cb';
-      
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        document.body.removeChild(notification);
-      }, 5000);
+      showErrorNotification('Failed to split transaction. Please try again.');
     } finally {
       setIsSavingSplit(false);
     }
@@ -5128,97 +5011,113 @@ const AppContent = () => {
                         </button>
                       )}
                       
-                      {/* Compact form layout */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <input
-                          type="text"
-                          value={split.description}
-                          onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
-                          style={{
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--color-inputBorder)',
-                            fontSize: '14px',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            transition: 'border-color 0.2s',
-                            backgroundColor: 'var(--color-inputBackground)',
-                            color: 'var(--color-inputText)'
-                          }}
-                          placeholder="Description"
-                          onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
-                          onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
-                        />
+                      {/* Modern form layout with labels */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '-8px' }}>
+                          Split #{index + 1}
+                        </div>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                            Description *
+                          </label>
                           <input
-                            type="number"
-                            step="0.01"
-                            value={split.amount}
-                            onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                            type="text"
+                            value={split.description}
+                            onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
                             style={{
-                              padding: '8px 10px',
-                              borderRadius: '6px',
+                              padding: '10px',
+                              borderRadius: '4px',
                               border: '1px solid var(--color-inputBorder)',
                               fontSize: '14px',
+                              width: '100%',
                               boxSizing: 'border-box',
-                              transition: 'border-color 0.2s',
                               backgroundColor: 'var(--color-inputBackground)',
                               color: 'var(--color-inputText)'
                             }}
-                            placeholder="Amount"
-                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
-                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
+                            placeholder="Enter transaction description"
+                            required
                           />
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Amount *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={split.amount}
+                              onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)'
+                              }}
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
                           
-                          <select
-                            value={split.bank_category}
-                            onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
-                            style={{
-                              padding: '8px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-inputBorder)',
-                              fontSize: '14px',
-                              backgroundColor: 'var(--color-inputBackground)',
-                              color: 'var(--color-inputText)',
-                              boxSizing: 'border-box',
-                              cursor: 'pointer',
-                              transition: 'border-color 0.2s'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
-                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
-                          >
-                            <option value="">Category</option>
-                            {availableBankCategories
-                              .filter(category => category !== null && category !== undefined && category !== '')
-                              .map(category => (
-                                <option key={category} value={category}>{category}</option>
-                              ))
-                            }
-                          </select>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Bank Category
+                            </label>
+                            <select
+                              value={split.bank_category}
+                              onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <option value="">Select a category</option>
+                              {availableBankCategories
+                                .filter(category => category !== null && category !== undefined && category !== '')
+                                .map(category => (
+                                  <option key={category} value={category}>{category}</option>
+                                ))
+                              }
+                            </select>
+                          </div>
                           
-                          <select
-                            value={split.label}
-                            onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
-                            style={{
-                              padding: '8px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-inputBorder)',
-                              fontSize: '14px',
-                              backgroundColor: 'var(--color-inputBackground)',
-                              color: 'var(--color-inputText)',
-                              boxSizing: 'border-box',
-                              cursor: 'pointer',
-                              transition: 'border-color 0.2s'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
-                            onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
-                          >
-                            <option value="">Label</option>
-                            {getLabelDropdownOptions(users).map(option => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Label
+                            </label>
+                            <select
+                              value={split.label}
+                              onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {getLabelDropdownOptions().map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>

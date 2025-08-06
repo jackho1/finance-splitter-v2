@@ -489,11 +489,36 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   
-  // Add user ID constant for database operations | TODO: Add login functionality to remove this hardcoded value
-  const userId = 'Jack';
+  // Get user ID from the new user management system
+  const [userId, setUserId] = useState(null);
+  
+  // Fetch the current user ID from the user management system
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await axios.get(getApiUrl('/users'));
+        if (response.data.success && response.data.data.length > 0) {
+          // Use the first active user from the list
+          setUserId(response.data.data[0].id);
+        } else {
+          console.error('Could not get user ID from users endpoint');
+          // Fallback to default user ID if needed
+          setUserId(1);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        // Fallback to default user ID if needed
+        setUserId(1);
+      }
+    };
+    
+    fetchCurrentUser();
+  }, []);
   
   // Database API functions for auto distribution rules
   const loadAutoDistributionRules = async () => {
+    if (!userId) return;
+    
     try {
       const response = await axios.get(getApiUrlWithParams('/auto-distribution-rules/:userId', { userId }));
       if (response.data.success) {
@@ -512,6 +537,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   };
 
   const savePersonalSettings = async (settingsUpdate) => {
+    if (!userId) return;
+    
     try {
       await axios.put(getApiUrlWithParams('/personal-settings/:userId', { userId }), settingsUpdate);
     } catch (error) {
@@ -521,6 +548,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   // Personal Split Configuration API Functions
   const loadPersonalSplitConfig = async () => {
+    if (!userId) return;
+    
     try {
       setIsLoadingPersonalSplitConfig(true);
       
@@ -556,6 +585,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   };
 
   const createPersonalSplitGroup = async (groupData) => {
+    if (!userId) return;
+    
     try {
       const response = await axios.post(getApiUrl('/personal-split-groups'), {
         user_id: userId,
@@ -600,6 +631,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   };
 
   const updatePersonalSplitMapping = async (groupId, budgetCategories) => {
+    if (!userId) return;
+    
     try {
       // First, delete existing mappings for this group
       const existingMappings = personalSplitGroups.find(g => g.id === groupId)?.mapped_categories || [];
@@ -629,6 +662,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   };
 
   const loadPersonalSettings = async () => {
+    if (!userId) return;
+    
     try {
       const response = await axios.get(getApiUrlWithParams('/personal-settings/:userId', { userId }));
       if (response.data.success) {
@@ -799,7 +834,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   
   // Function to perform auto distribution using backend endpoint
   const performAutoDistribution = async () => {
-    if (!autoDistributionRules || autoDistributionRules.length === 0) {
+    if (!userId || !autoDistributionRules || autoDistributionRules.length === 0) {
       return;
     }
     
@@ -811,7 +846,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       
       // Use the backend endpoint for atomic distribution
       const response = await axios.post(getApiUrl('/auto-distribution/apply'), {
-        user_id: userId,
+        user_id: userId, // This should now be a numeric ID from the user management system
         month_year: monthYearStr
       });
       
@@ -954,12 +989,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
+    // Only fetch initial data when userId is available
+    if (!userId) return;
+    
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
       
       try {
-        // Single API call to get all personal initial data
-        const response = await axios.get(getApiUrl('/personal-initial-data'));
+        // Single API call to get all personal initial data with userId
+        const response = await axios.get(getApiUrlWithParams('/personal-initial-data/:userId', { userId }));
         
         if (response.data.success) {
           const { personalTransactions, personalCategories, autoDistributionRules, personalSettings } = response.data.data;
@@ -1055,7 +1093,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     };
     
     fetchInitialData();
-  }, []);
+  }, [userId]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
