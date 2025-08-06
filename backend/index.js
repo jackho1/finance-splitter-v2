@@ -588,20 +588,21 @@ app.get('/initial-data', async (req, res) => {
 });
 
 // Combined personal data endpoint
-app.get('/personal-initial-data', async (req, res) => {
+app.get('/personal-initial-data/:userId', async (req, res) => {
   const client = await pool.connect();
   try {
     console.log('Fetching all personal initial data in single transaction...');
 
-    // Get the default user ID (assuming username 'Jack' or create one if doesn't exist)
-    let defaultUserId = 1; // fallback default
-    try {
-      const defaultUserResult = await client.query('SELECT id FROM users WHERE username = $1', ['Jack']);
-      if (defaultUserResult.rows.length > 0) {
-        defaultUserId = defaultUserResult.rows[0].id;
+    // Get the user ID from the request parameters
+    const { userId: userIdParam } = req.params;
+    
+    // Convert userId to integer (handle string values)
+    let userId = 1; // fallback default
+    if (userIdParam) {
+      const parsedId = parseInt(userIdParam, 10);
+      if (!isNaN(parsedId)) {
+        userId = parsedId;
       }
-    } catch (userErr) {
-      console.log('Note: Could not fetch default user, using fallback ID 1:', userErr.message);
     }
 
     const [
@@ -612,8 +613,8 @@ app.get('/personal-initial-data', async (req, res) => {
     ] = await Promise.all([
       client.query('SELECT * FROM personal_transactions_generalized ORDER BY date DESC'),
       client.query('SELECT * FROM personal_category ORDER BY category'),
-      client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', [defaultUserId]),
-      client.query('SELECT * FROM personal_settings WHERE user_id = $1', [defaultUserId])
+      client.query('SELECT * FROM auto_distribution_rules WHERE user_id = $1 ORDER BY id', [userId]),
+      client.query('SELECT * FROM personal_settings WHERE user_id = $1', [userId])
     ]);
 
     // Resolve category IDs back to category names for auto distribution rules
@@ -2748,9 +2749,9 @@ app.get('/auto-distribution-rules/:userId', async (req, res) => {
   try {
     const { userId: userIdParam } = req.params;
 
-    // Convert userId to integer (handle 'default' or string values)
+    // Convert userId to integer (handle string values)
     let userId = 1; // fallback default
-    if (userIdParam && userIdParam !== 'default') {
+    if (userIdParam) {
       const parsedId = parseInt(userIdParam, 10);
       if (!isNaN(parsedId)) {
         userId = parsedId;
@@ -3019,11 +3020,14 @@ app.post('/auto-distribution/apply', async (req, res) => {
 
     const { user_id, month_year } = req.body;
 
-    if (!user_id) {
+    // Ensure user_id is a number
+    const userId = parseInt(user_id, 10);
+    
+    if (!userId || isNaN(userId)) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        error: 'User ID is required'
+        error: 'Valid numeric User ID is required'
       });
     }
 
@@ -3041,7 +3045,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
       ORDER BY adr.id
     `;
 
-    const rulesResult = await client.query(rulesQuery, [user_id]);
+    const rulesResult = await client.query(rulesQuery, [userId]);
     const rawRules = rulesResult.rows;
 
     // Resolve category names for each rule separately to avoid JOIN type issues
@@ -3208,21 +3212,21 @@ app.post('/auto-distribution/apply', async (req, res) => {
     const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
     
     // Check if settings exist for this user
-    const settingsCheck = await client.query('SELECT * FROM personal_settings WHERE user_id = $1', [user_id]);
+    const settingsCheck = await client.query('SELECT * FROM personal_settings WHERE user_id = $1', [userId]);
     
     if (settingsCheck.rows.length === 0) {
       // Create new settings record with last distribution month
       await client.query(`
         INSERT INTO personal_settings (user_id, last_auto_distribution_month) 
         VALUES ($1, $2)
-      `, [user_id, currentMonthKey]);
+      `, [userId, currentMonthKey]);
     } else {
       // Update existing settings record
       await client.query(`
         UPDATE personal_settings 
         SET last_auto_distribution_month = $1 
         WHERE user_id = $2
-      `, [currentMonthKey, user_id]);
+      `, [currentMonthKey, userId]);
     }
 
     await client.query('COMMIT');
@@ -5191,6 +5195,8 @@ app.put('/user-preferences/:userId', async (req, res) => {
 });
 
 // ===== END USER PREFERENCES ENDPOINTS =====
+
+
 
 // Default route for root URL
 app.get('/', (req, res) => {
