@@ -5,9 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React</title>
+    <script>
+      // Apply theme immediately before any rendering occurs
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.className = `theme-${theme}`;
+        // Add a flag to prevent transitions on initial load
+        document.documentElement.style.setProperty('--theme-transition', 'none');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Enable transitions after initial paint
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          document.documentElement.style.setProperty('--theme-transition', 'background-color 0.3s ease, color 0.3s ease');
+        }, 100);
+      });
+    </script>
   </body>
 </html>

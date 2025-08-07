@@ -1,6 +1,10 @@
 /* Theme CSS Variables and Dark Mode Styles */
 
+/* Default light theme colors - applied to :root for immediate availability */
 :root {
+  /* Transition variable controlled by JavaScript */
+  --theme-transition: none;
+  
   /* Default light theme colors */
   --color-background: #f0f2f5;
   --color-backgroundSecondary: #ffffff;
@@ -48,8 +52,8 @@
   --color-info: #3b82f6;
   --color-infoLight: #dbeafe;
   
-  --color-purple: #8b5cf6;
-  --color-purpleLight: #f3f0ff;
+  --color-purple: #7c3aed;
+  --color-purpleLight: #ede9fe;
   
   --color-shadow: rgba(0, 0, 0, 0.1);
   --color-shadowLight: rgba(0, 0, 0, 0.05);
@@ -59,8 +63,9 @@
   --color-chartText: #6b7280;
 }
 
-/* Dark theme class */
-body.theme-dark {
+/* Dark theme class - now applied to html element for earlier application */
+html.theme-dark {
+  color-scheme: dark;
   --color-background: #0f172a;
   --color-backgroundSecondary: #1e293b;
   --color-backgroundTertiary: #334155;
@@ -118,11 +123,23 @@ body.theme-dark {
   --color-chartText: #94a3b8;
 }
 
-/* Global theme styles */
-body {
+/* Explicit light theme class for consistency */
+html.theme-light {
+  /* Uses the default :root values, but can be explicitly set if needed */
+  /* This selector ensures theme-light class works if needed in the future */
+  color-scheme: light;
+}
+
+/* Body background color to ensure immediate application */
+html {
   background-color: var(--color-background);
-  color: var(--color-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: var(--theme-transition);
+}
+
+body {
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
 }
 
 /* Table theme styles */
@@ -355,7 +372,7 @@ a:hover {
 }
 
 /* Chart theme styles for dark mode */
-body.theme-dark .chartjs-render-monitor {
+html.theme-dark .chartjs-render-monitor {
   filter: brightness(0.9);
 }
 
@@ -375,25 +392,32 @@ body.theme-dark .chartjs-render-monitor {
 }
 
 /* Scrollbar styling for dark mode */
-body.theme-dark {
+html.theme-dark {
   scrollbar-color: #475569 #1e293b;
 }
 
-body.theme-dark::-webkit-scrollbar {
+html.theme-dark::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
 
-body.theme-dark::-webkit-scrollbar-track {
+html.theme-dark::-webkit-scrollbar-track {
   background: #1e293b;
 }
 
-body.theme-dark::-webkit-scrollbar-thumb {
+html.theme-dark::-webkit-scrollbar-thumb {
   background-color: #475569;
   border-radius: 6px;
   border: 3px solid #1e293b;
 }
 
-body.theme-dark::-webkit-scrollbar-thumb:hover {
+html.theme-dark::-webkit-scrollbar-thumb:hover {
   background-color: #64748b;
+}
+
+/* Apply transitions only after initial load */
+html.transitions-enabled,
+html.transitions-enabled body,
+html.transitions-enabled * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
