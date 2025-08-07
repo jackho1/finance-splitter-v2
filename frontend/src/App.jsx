@@ -713,10 +713,15 @@ const AppContent = () => {
   
   // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
-    // Initialize theme from localStorage
+    // Theme is already applied in index.html, just sync with React state if needed
     const storedTheme = localStorage.getItem('theme') || 'light';
-    document.body.classList.remove('theme-light', 'theme-dark');
-    document.body.classList.add(`theme-${storedTheme}`);
+    
+    // Enable transitions after initial load
+    if (!document.documentElement.classList.contains('transitions-enabled')) {
+      setTimeout(() => {
+        document.documentElement.classList.add('transitions-enabled');
+      }, 100);
+    }
     
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);

@@ -186,8 +186,8 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
     }
     // If we're editing the current user, revert theme changes
     if (selectedUserId === currentUserId && preferences.theme) {
-      document.body.classList.remove('theme-light', 'theme-dark');
-      document.body.classList.add(`theme-${preferences.theme}`);
+      document.documentElement.classList.remove('theme-light', 'theme-dark');
+      document.documentElement.classList.add(`theme-${preferences.theme}`);
     }
     onClose();
   };
@@ -558,8 +558,8 @@ const UserPreferencesModal = ({ isOpen, onClose }) => {
                       const newTheme = e.target.value;
                       setGlobalTheme(newTheme);
                       // Apply theme immediately for preview
-                      document.body.classList.remove('theme-light', 'theme-dark');
-                      document.body.classList.add(`theme-${newTheme}`);
+                      document.documentElement.classList.remove('theme-light', 'theme-dark');
+                      document.documentElement.classList.add(`theme-${newTheme}`);
                       localStorage.setItem('theme', newTheme);
                     }}
                     style={{

@@ -1,6 +1,8 @@
 html {
   background-color: var(--color-background);
-  transition: background-color 0.3s ease;
+  color: var(--color-text);
+  /* Transition controlled by JavaScript to prevent flash */
+  transition: var(--theme-transition);
 }
 
 body {
@@ -10,9 +12,11 @@ body {
       sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Body inherits background from html */
+  background-color: transparent;
+  color: inherit;
+  /* Transition controlled by JavaScript to prevent flash */
+  transition: var(--theme-transition);
 }
 
 table {
