@@ -433,7 +433,7 @@
 
   - Update it to use the actual bank category list from psql instead of searching all existing transactions for valid bank category values.
 
-- [x] **Fix trg_delete_shared_transactions trigger**:
+- [ ] **Fix trg_delete_shared_transactions trigger**:
 
   - When deleting records manually, this trigger causes errors which does not allow users to delete the record.
 
@@ -444,3 +444,8 @@
 - [ ] **Abstract split transaction modal **:
 
   - Abstract this so only one code needs to update all three views for this component.
+
+- [x] **Fix Dropdown Menu Dark Mode **:
+
+  - Some dropdown menus such as App.jsx's label or PersonalTransactions.jsx's Category column or OffsetTransactions.jsx's category column & label uses a white background and white font to display the dropdown menu option which makes it unreadable. Consider aligning this to be similar backgorund as App.jsx's Bank Category dropdown menu options in dark mode.
+  - Implemented: Aligned select backgrounds and text colors to theme variables and matched bank category styling across `frontend/src/App.jsx`, `frontend/src/PersonalTransactions.jsx`, `frontend/src/OffsetTransactions.jsx`; standardized `.modern-select` in `ModernTables.css`/`ModernTableStyles.css`.

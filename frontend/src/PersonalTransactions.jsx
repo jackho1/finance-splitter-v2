@@ -1448,7 +1448,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ textAlign: 'center' }}
+              style={{ 
+                textAlign: 'center',
+                width: '100%',
+                position: 'relative',
+                zIndex: 1001,
+                pointerEvents: 'auto',
+                backgroundColor: 'var(--color-inputBackground)',
+                color: 'var(--color-inputText)'
+              }}
               autoFocus
             >
               <option value="">Select a category</option>
@@ -2695,15 +2703,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 onClick={clearFilters}
                 style={{ 
                   padding: '8px 14px',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
+                  backgroundColor: 'var(--color-buttonSecondary)',
+                  color: 'var(--color-buttonSecondaryText)',
+                  border: '1px solid var(--color-buttonSecondaryBorder)',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontWeight: '500',
                   fontSize: '13px',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  boxShadow: '0 1px 3px var(--color-shadow)'
                 }}
               >
                 Clear All Filters
@@ -5150,10 +5158,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     width: '100%',
                     padding: '10px',
                     borderRadius: '4px',
-                    border: '1px solid var(--color-border)',
+                    border: '1px solid var(--color-inputBorder)',
                     fontSize: '14px',
-                    backgroundColor: 'var(--color-backgroundSecondary)',
-                    color: 'var(--color-text)',
+                    backgroundColor: 'var(--color-inputBackground)',
+                    color: 'var(--color-inputText)',
                     boxSizing: 'border-box'
                   }}
                 >
@@ -5831,12 +5839,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--color-modalBackground)',
             borderRadius: '12px',
             padding: '24px',
             maxWidth: '400px',
             width: '90%',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 20px 25px -5px var(--color-shadow), 0 10px 10px -5px var(--color-shadowLight)',
             animation: 'modalSlideIn 0.2s ease-out'
           }}>
             <div style={{
@@ -5888,9 +5896,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 onClick={handleCancelDiscardChanges}
                 style={{
                   padding: '10px 16px',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
+                  backgroundColor: 'var(--color-buttonSecondary)',
+                  color: 'var(--color-buttonSecondaryText)',
+                  border: '1px solid var(--color-buttonSecondaryBorder)',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -5898,12 +5906,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f9fafb';
-                  e.target.style.borderColor = '#9ca3af';
+                  e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'white';
-                  e.target.style.borderColor = '#d1d5db';
+                  e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
+                  e.target.style.borderColor = 'var(--color-buttonSecondaryBorder)';
                 }}
               >
                 Keep Editing
