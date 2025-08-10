@@ -93,6 +93,8 @@ const TableDropdownMenu = ({
   width = '220px',
   maxHeight = '280px',
   skipSearch = false,
+  alignRight = false,
+  dropdownRef,
 }) => {
   // Stop clicks from propagating and closing the dropdown
   const handleClick = (e) => e.stopPropagation();
@@ -102,10 +104,12 @@ const TableDropdownMenu = ({
   return (
     <div 
       className="filter-dropdown"
+      ref={dropdownRef}
       onClick={handleClick}
       style={{
         position: 'absolute',
         top: '100%',
+        right: alignRight ? 0 : undefined,
         zIndex: 1000,
         background: 'var(--color-backgroundElevated)',
         border: '1px solid var(--color-border)',
@@ -4151,150 +4155,57 @@ const AppContent = () => {
                         </option>
                       ))}
                     </select>
-                    <button 
-                      data-filter="category"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter');
-                      }}
-                      className="modern-button"
-                      style={{ 
-                        padding: '6px 12px',
-                        backgroundColor: categoryFilter.length > 0 ? 'var(--color-infoLight)' : 'var(--color-buttonSecondary)',
-                        color: categoryFilter.length > 0 ? 'var(--color-info)' : 'var(--color-buttonSecondaryText)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        position: 'relative'
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-                      </svg>
-                      <span>Categories</span>
-                      {categoryFilter.length > 0 && (
-                        <span style={{ 
-                          backgroundColor: 'var(--color-buttonPrimary)', 
-                          color: 'var(--color-buttonPrimaryText)', 
-                          borderRadius: '50%', 
-                          width: '16px', 
-                          height: '16px', 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          fontSize: '11px'
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        data-filter="category"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter');
+                        }}
+                        className="modern-button"
+                        style={{ 
+                          padding: '6px 12px',
+                          backgroundColor: categoryFilter.length > 0 ? 'var(--color-infoLight)' : 'var(--color-buttonSecondary)',
+                          color: categoryFilter.length > 0 ? 'var(--color-info)' : 'var(--color-buttonSecondaryText)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}>
-                          {categoryFilter.length}
-                        </span>
-                      )}
-
-                      {/* Category filter popup */}
-                      {activeFilterColumn === 'categoryFilter' && (
-                        <div 
-                          ref={filterPopupRef}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: '0',
-                            zIndex: 1000,
-                            background: 'var(--color-backgroundElevated)',
-                            border: '1px solid var(--color-border)',
-                            padding: '10px',
-                            borderRadius: '4px',
-                            boxShadow: '0 4px 12px var(--color-shadow)',
-                            width: '250px',
-                            maxHeight: '350px',
-                            overflowY: 'auto',
-                            marginTop: '5px'
-                          }}
-                        >
-                          {/* Display non-null categories first */}
-                          {availableCategories
-                            .filter(category => category !== null && category !== undefined && category !== '')
-                            .map(category => (
-                              <div key={category} style={{ marginBottom: '6px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text)' }} onClick={(e) => e.stopPropagation()}>
-                                  <input 
-                                    type="checkbox" 
-                                    checked={categoryFilter.includes(category)}
-                                    onChange={(e) => handleCategoryFilterChange(category, e)}
-                                    style={{ marginRight: '8px' }}
-                                  />
-                                  {category}
-                                </label>
-      </div>
-                            ))
-                          }
-                          
-                          {/* Display null/empty category at the bottom if it exists */}
-                          {availableCategories.some(category => category === null || category === undefined || category === '') && (
-                            <div style={{ marginBottom: '6px', marginTop: '10px', borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', color: 'var(--color-textSecondary)' }} onClick={(e) => e.stopPropagation()}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={categoryFilter.includes(null)}
-                                  onChange={(e) => handleCategoryFilterChange(null, e)}
-                                  style={{ marginRight: '8px' }}
-                                />
-                                null
-                              </label>
-                            </div>
-                          )}
-                          
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCategoryFilter([]);
-                              }}
-                              style={{ 
-                                padding: '6px 12px',
-                                backgroundColor: 'var(--color-buttonSecondary)',
-                                color: 'var(--color-buttonSecondaryText)',
-                                border: '1px solid var(--color-buttonSecondaryBorder)',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 1px 3px var(--color-shadowLight)'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
-                              }}
-                            >
-                              Clear
-                            </button>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveFilterColumn(null);
-                              }}
-                              style={{ 
-                                padding: '6px 12px',
-                                backgroundColor: 'var(--color-buttonPrimary)',
-                                color: 'var(--color-buttonPrimaryText)',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 1px 3px var(--color-shadowLight)'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = 'var(--color-buttonPrimaryHover)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'var(--color-buttonPrimary)';
-                              }}
-                            >
-                              Apply
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </button>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                        </svg>
+                        <span>Categories</span>
+                        {categoryFilter.length > 0 && (
+                          <span style={{ 
+                            backgroundColor: 'var(--color-buttonPrimary)', 
+                            color: 'var(--color-buttonPrimaryText)', 
+                            borderRadius: '50%', 
+                            width: '16px', 
+                            height: '16px', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '11px'
+                          }}>
+                            {categoryFilter.length}
+                          </span>
+                        )}
+                      </button>
+                      <TableDropdownMenu
+                        isActive={activeFilterColumn === 'categoryFilter'}
+                        onClose={() => setActiveFilterColumn(null)}
+                        availableOptions={availableCategories}
+                        selectedOptions={categoryFilter}
+                        onChange={(option, e) => handleCategoryFilterChange(option, e)}
+                        onClear={() => setCategoryFilter([])}
+                        width="250px"
+                        maxHeight="350px"
+                        skipSearch={true}
+                        alignRight={true}
+                        dropdownRef={filterPopupRef}
+                        emptyLabel="null"
+                      />
+                    </div>
                   </div>
                 </div>
                 
