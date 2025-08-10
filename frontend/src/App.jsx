@@ -1760,7 +1760,8 @@ const AppContent = () => {
                   zIndex: 1001,
                   pointerEvents: 'auto',
                   backgroundColor: 'var(--color-inputBackground)',
-                  border: '2px solid #4a90e2',
+                  color: 'var(--color-inputText)',
+                  border: '1px solid var(--color-inputBorder)',
                   outline: 'none'
                 }}
                 autoFocus
@@ -1789,7 +1790,17 @@ const AppContent = () => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ textAlign: 'center' }}
+              style={{ 
+                textAlign: 'center',
+                width: '100%',
+                position: 'relative',
+                zIndex: 1001,
+                pointerEvents: 'auto',
+                backgroundColor: 'var(--color-inputBackground)',
+                color: 'var(--color-inputText)',
+                border: '1px solid var(--color-inputBorder)',
+                outline: 'none'
+              }}
               autoFocus
             >
               {getLabelDropdownOptions().map(option => (

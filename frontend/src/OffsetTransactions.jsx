@@ -1492,7 +1492,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ textAlign: 'center' }}
+              style={{ 
+                textAlign: 'center',
+                width: '100%',
+                position: 'relative',
+                zIndex: 1001,
+                pointerEvents: 'auto',
+                backgroundColor: 'var(--color-inputBackground)',
+                color: 'var(--color-inputText)'
+              }}
               autoFocus
             >
               <option value="">Select a category</option>
@@ -1514,7 +1522,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ textAlign: 'center' }}
+              style={{ 
+                textAlign: 'center',
+                width: '100%',
+                position: 'relative',
+                zIndex: 1001,
+                pointerEvents: 'auto',
+                backgroundColor: 'var(--color-inputBackground)',
+                color: 'var(--color-inputText)',
+                outline: 'none'
+              }}
               autoFocus
             >
               {getLabelDropdownOptions(users).map(option => (
@@ -2527,15 +2544,15 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                 onClick={clearFilters}
                 style={{ 
                   padding: '8px 14px',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
+                  backgroundColor: 'var(--color-buttonSecondary)',
+                  color: 'var(--color-buttonSecondaryText)',
+                  border: '1px solid var(--color-buttonSecondaryBorder)',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontWeight: '500',
                   fontSize: '13px',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  boxShadow: '0 1px 3px var(--color-shadow)'
                 }}
               >
                 Clear All Filters
@@ -3604,9 +3621,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     width: '100%',
                     padding: '10px',
                     borderRadius: '4px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--color-inputBorder)',
                     fontSize: '14px',
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--color-inputBackground)',
+                    color: 'var(--color-inputText)',
                     boxSizing: 'border-box'
                   }}
                 >
@@ -3629,9 +3647,10 @@ const OffsetTransactions = ({ helpTextVisible }) => {
                     width: '100%',
                     padding: '10px',
                     borderRadius: '4px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--color-inputBorder)',
                     fontSize: '14px',
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--color-inputBackground)',
+                    color: 'var(--color-inputText)',
                     boxSizing: 'border-box'
                   }}
                 >
