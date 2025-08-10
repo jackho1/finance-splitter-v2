@@ -882,43 +882,43 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           // Note: We no longer set labels - they are generated dynamically from users
           setUsers(users);
           setSplitAllocations(splitAllocations);
+
+          // Reapply filters to new data where offsetTransactions is in scope
+          let filtered = applyFilters(offsetTransactions, {
+            dateFilter,
+            sortBy: filters.sortBy
+          }, getTransactionLabel);
+
+          if (categoryFilter.length > 0) {
+            filtered = filtered.filter(transaction => {
+              if (categoryFilter.includes(null) && transaction.category === null) {
+                return true;
+              }
+              return categoryFilter.includes(transaction.category);
+            });
+          }
+
+          if (labelFilter.length > 0) {
+            filtered = filtered.filter(transaction => {
+              return labelFilter.includes(transaction.label);
+            });
+          }
+
+          setAllFilteredTransactions(filtered);
+
+          // Apply month filtering for table view
+          let tableFiltered = filtered;
+          if (!dateFilter.startDate && !dateFilter.endDate) {
+            tableFiltered = filtered.filter(transaction => {
+              const date = new Date(transaction.date);
+              return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+            });
+          }
+
+          setFilteredTransactions(tableFiltered);
         } else {
           throw new Error(transactionsResponse.data.error || 'Failed to refresh data');
         }
-        
-        // Reapply filters to new data
-        let filtered = applyFilters(transactionsResponse.data, {
-          dateFilter,
-          sortBy: filters.sortBy
-        }, getTransactionLabel);
-        
-        if (categoryFilter.length > 0) {
-          filtered = filtered.filter(transaction => {
-            if (categoryFilter.includes(null) && transaction.category === null) {
-              return true;
-            }
-            return categoryFilter.includes(transaction.category);
-          });
-        }
-
-        if (labelFilter.length > 0) {
-          filtered = filtered.filter(transaction => {
-            return labelFilter.includes(transaction.label);
-          });
-        }
-        
-        setAllFilteredTransactions(filtered);
-        
-        // Apply month filtering for table view
-        let tableFiltered = filtered;
-        if (!dateFilter.startDate && !dateFilter.endDate) {
-          tableFiltered = filtered.filter(transaction => {
-            const date = new Date(transaction.date);
-            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-          });
-        }
-        
-        setFilteredTransactions(tableFiltered);
         
       } else {
         // Show error notification
