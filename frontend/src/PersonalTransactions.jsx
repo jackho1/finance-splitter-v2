@@ -904,7 +904,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   useEffect(() => {
     if (initialLoadComplete && autoDistributionEnabled && autoDistributionRules.length > 0) {
       const currentDate = new Date();
-      const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+      const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
       
       console.log('Auto distribution check:', {
         initialLoadComplete,

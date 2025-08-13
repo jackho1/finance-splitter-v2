@@ -3209,7 +3209,7 @@ app.post('/auto-distribution/apply', async (req, res) => {
     }
 
     // Update the last auto distribution month in personal settings
-    const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+    const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
     
     // Check if settings exist for this user
     const settingsCheck = await client.query('SELECT * FROM personal_settings WHERE user_id = $1', [userId]);
