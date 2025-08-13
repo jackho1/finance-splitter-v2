@@ -450,6 +450,6 @@
   - Some dropdown menus such as App.jsx's label or PersonalTransactions.jsx's Category column or OffsetTransactions.jsx's category column & label uses a white background and white font to display the dropdown menu option which makes it unreadable. Consider aligning this to be similar backgorund as App.jsx's Bank Category dropdown menu options in dark mode.
   - Implemented: Aligned select backgrounds and text colors to theme variables and matched bank category styling across `frontend/src/App.jsx`, `frontend/src/PersonalTransactions.jsx`, `frontend/src/OffsetTransactions.jsx`; standardized `.modern-select` in `ModernTables.css`/`ModernTableStyles.css`.
 
-- [x] **Fix Total Spend **:
+- [ ] **Fix Total Spend **:
 
   - Fix this so it is updated live if filtering is done, labels are amounts are updated, etc. Currently it is not live anymore.

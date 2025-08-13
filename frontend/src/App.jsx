@@ -617,13 +617,19 @@ const AppContent = () => {
       return 0;
     }
     
+    // Ensure we have a valid allocations map to read from
+    const allocationsMap = (splitAllocations && typeof splitAllocations === 'object') ? splitAllocations : {};
+    
     filteredTransactions.forEach(transaction => {
-      const allocations = splitAllocations[transaction.id];
+      const allocations = allocationsMap[transaction.id];
       if (allocations && Array.isArray(allocations)) {
         // NEW SYSTEM: Use split allocations data
         const userAllocation = allocations.find(allocation => allocation.user_id === userId);
-        if (userAllocation && typeof userAllocation.amount === 'number') {
-          total += userAllocation.amount;
+        if (userAllocation && userAllocation.amount !== undefined && userAllocation.amount !== null) {
+          const allocationAmount = parseFloat(userAllocation.amount);
+          if (!Number.isNaN(allocationAmount)) {
+            total += allocationAmount;
+          }
         }
       } else {
         // LEGACY SYSTEM: Fallback to label-based system for backward compatibility
@@ -930,10 +936,6 @@ const AppContent = () => {
         
         setFilteredTransactions(tableFiltered);
         
-        // Recalculate totals
-        const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
-        setTotals(newTotals);
-        
       } else {
         // Show error notification
         const notification = document.createElement('div');
@@ -1028,10 +1030,6 @@ const AppContent = () => {
     }
 
     setFilteredTransactions(tableFiltered);
-
-    // Calculate totals using the new allocation-based system
-    const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
-    setTotals(newTotals);
   }, [
     transactions, 
     filters.sortBy, 
@@ -1045,6 +1043,12 @@ const AppContent = () => {
     splitAllocations,
     isTransactionsLoading
   ]);
+
+  // Recalculate totals whenever the filtered list, users, or allocations change
+  useEffect(() => {
+    const nextTotals = calculateTotalsFromAllocations(filteredTransactions, users, splitAllocations);
+    setTotals(nextTotals);
+  }, [filteredTransactions, users, splitAllocations]);
 
   // Update user color styles when users change
   useEffect(() => {
@@ -2059,10 +2063,6 @@ const AppContent = () => {
           // Add to filtered transactions if it passes all filters
           if (shouldAdd) {
             setFilteredTransactions(prev => [addedTransaction, ...prev]);
-            
-            // Update totals
-            const newTotals = calculateTotalsFromAllocations([...filteredTransactions, addedTransaction], users, splitAllocations);
-            setTotals(newTotals);
           }
         }
         
@@ -3030,10 +3030,6 @@ const AppContent = () => {
         }
 
         setFilteredTransactions(tableFiltered);
-
-        // Calculate totals using the new allocation-based system
-        const newTotals = calculateTotalsFromAllocations(tableFiltered, users, splitAllocations);
-        setTotals(newTotals);
       } else {
         showErrorNotification(response.data.error || 'Failed to split transaction');
       }
