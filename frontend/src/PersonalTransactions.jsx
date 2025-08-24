@@ -407,9 +407,6 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
 };
 
 const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
-  // TEMPORARY: Balance subtraction from .env (easily removable)
-  const [BALANCE_SUBTRACTION, setBALANCE_SUBTRACTION] = useState(0);
-  
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
@@ -458,13 +455,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [enableNegativeOffsetBucket, setEnableNegativeOffsetBucket] = useState(false);
   const [selectedNegativeOffsetBucket, setSelectedNegativeOffsetBucket] = useState('');
   
-
-  
   // Updated states for multiple auto distributions
   const [autoDistributionEnabled, setAutoDistributionEnabled] = useState(false);
   const [autoDistributionRules, setAutoDistributionRules] = useState([]);
   const [lastAutoDistributionMonth, setLastAutoDistributionMonth] = useState('');
-  const [hasRunAutoDistributionThisSession, setHasRunAutoDistributionThisSession] = useState(false);
   const [isDistributing, setIsDistributing] = useState(false);
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
   const autoRulesButtonRef = useRef(null);
@@ -861,7 +855,6 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         
         // Update the last distribution month from backend response
         setLastAutoDistributionMonth(lastDistributionMonth);
-        setHasRunAutoDistributionThisSession(true); // Mark as run this session
         console.log('✅ Auto distribution completed, updated lastDistributionMonth to:', lastDistributionMonth);
         // Backend now properly updates personal settings
         
@@ -907,35 +900,29 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     }
   };
   
-    // Check if we need to perform auto distribution (only after initial load is complete)
-  // Note: Auto-distribution is now prevented from running automatically on page refresh
+  // Check if we need to perform auto distribution (only after initial load is complete)
   useEffect(() => {
-    if (initialLoadComplete && autoDistributionEnabled && autoDistributionRules.length > 0 && !hasRunAutoDistributionThisSession) {
+    if (initialLoadComplete && autoDistributionEnabled && autoDistributionRules.length > 0) {
       const currentDate = new Date();
       const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
       
-      console.log('Auto distribution check (session-based):', {
+      console.log('Auto distribution check:', {
         initialLoadComplete,
         autoDistributionEnabled,
         autoDistributionRulesCount: autoDistributionRules.length,
         currentMonthKey,
         lastAutoDistributionMonth,
-        hasRunAutoDistributionThisSession,
-        shouldRun: lastAutoDistributionMonth !== currentMonthKey && !hasRunAutoDistributionThisSession
+        shouldRun: lastAutoDistributionMonth !== currentMonthKey
       });
-
-      // Only run if it's a new month AND we haven't run it this session
+      
       if (lastAutoDistributionMonth !== currentMonthKey) {
-        console.log('🚀 New month detected, but auto-distribution is now manual to prevent unwanted executions on page refresh');
-        console.log('💡 Use the "Run Distribution" button to manually trigger auto-distribution when needed');
-        // Set the session flag to prevent multiple checks
-        setHasRunAutoDistributionThisSession(true);
+        console.log('🚀 New month detected, performing auto distribution...');
+        performAutoDistribution();
       } else {
         console.log('✅ Auto distribution already completed for this month');
-        setHasRunAutoDistributionThisSession(true);
       }
     }
-  }, [initialLoadComplete, autoDistributionEnabled, lastAutoDistributionMonth, autoDistributionRules, hasRunAutoDistributionThisSession]);
+  }, [initialLoadComplete, autoDistributionEnabled, lastAutoDistributionMonth, autoDistributionRules]);
   
   // Initialize or update category order when transactions change
   // Modified to respect database as source of truth and only update when there are actual changes
@@ -1089,9 +1076,6 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           
           // Also call loadPersonalSettings as a backup to ensure proper boolean handling
           await loadPersonalSettings();
-          
-          // TEMPORARY: Fetch balance subtraction (easily removable)
-          try { const sub = await axios.get(getApiUrl('/balance-subtraction')); setBALANCE_SUBTRACTION(sub.data.amount); } catch (e) {}
           
           setIsTransactionsLoading(false);
           
@@ -3091,7 +3075,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   const latestClosingBalance = latestTransaction 
                     ? (typeof latestTransaction.closing_balance === 'number' ?
                       latestTransaction.closing_balance : 
-                      parseFloat(latestTransaction.closing_balance) || 0) - BALANCE_SUBTRACTION
+                      parseFloat(latestTransaction.closing_balance) || 0) 
                     : 0;
 
                   // Format number with commas
@@ -3375,7 +3359,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   const latestClosingBalance = latestTransaction 
                     ? (typeof latestTransaction.closing_balance === 'number' ?
                       latestTransaction.closing_balance : 
-                      parseFloat(latestTransaction.closing_balance) || 0) - BALANCE_SUBTRACTION
+                      parseFloat(latestTransaction.closing_balance) || 0) 
                     : 0;
                 
                   // Format number with commas
