@@ -5196,7 +5196,10 @@ app.put('/user-preferences/:userId', async (req, res) => {
 
 // ===== END USER PREFERENCES ENDPOINTS =====
 
-
+// TEMPORARY: Balance subtraction endpoint (easily removable)
+app.get('/balance-subtraction', (req, res) => {
+  res.json({ amount: parseFloat(process.env.SUBTRACTION || 0) });
+});
 
 // Default route for root URL
 app.get('/', (req, res) => {

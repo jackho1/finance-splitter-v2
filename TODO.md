@@ -450,6 +450,22 @@
   - Some dropdown menus such as App.jsx's label or PersonalTransactions.jsx's Category column or OffsetTransactions.jsx's category column & label uses a white background and white font to display the dropdown menu option which makes it unreadable. Consider aligning this to be similar backgorund as App.jsx's Bank Category dropdown menu options in dark mode.
   - Implemented: Aligned select backgrounds and text colors to theme variables and matched bank category styling across `frontend/src/App.jsx`, `frontend/src/PersonalTransactions.jsx`, `frontend/src/OffsetTransactions.jsx`; standardized `.modern-select` in `ModernTables.css`/`ModernTableStyles.css`.
 
-- [ ] **Fix Total Spend **:
+- [x] **Fix Total Spend **:
 
   - Fix this so it is updated live if filtering is done, labels are amounts are updated, etc. Currently it is not live anymore.
+
+- [ ] **Ability to export data as excel **:
+
+  - Add ability to export table data as excel
+
+- [ ] **Total Summary Calc Bug **:
+
+  - Fix a bug here whereby if a split amount is updated, it currently does not update the actual amounts saved in split_transaction_allocations which is where the total calculation values are truly determined.
+
+- [ ] **Containerize project into docker **:
+
+  - As above
+
+- [ ] **Fix category filtering for offset **:
+
+  - Offset webpage category filtering only partially works.
