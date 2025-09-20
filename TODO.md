@@ -457,3 +457,15 @@
 - [ ] **Ability to export data as excel **:
 
   - Add ability to export table data as excel
+
+- [ ] **Total Summary Calc Bug **:
+
+  - Fix a bug here whereby if a split amount is updated, it currently does not update the actual amounts saved in split_transaction_allocations which is where the total calculation values are truly determined.
+
+- [ ] **Containerize project into docker **:
+
+  - As above
+
+- [ ] **Fix category filtering for offset **:
+
+  - Offset webpage category filtering only partially works.

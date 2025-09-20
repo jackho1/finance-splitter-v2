@@ -15,9 +15,10 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 // Lucide React Native icons
@@ -40,7 +41,8 @@ import {
   Trash2,
   Split,
   Bookmark,
-  User
+  User,
+  Check
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -548,6 +550,22 @@ const TransactionItem = memo<{
                 </Text>
               </View>
             )}
+            {/* Subtle paid indicator */}
+            {transaction.mark && (
+              <View style={[
+                styles.subtlePaidIndicator,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                  borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+                }
+              ]}>
+                <Check 
+                  size={10} 
+                  color={isDark ? 'rgba(16, 185, 129, 0.8)' : 'rgba(16, 185, 129, 0.7)'} 
+                  strokeWidth={2.5}
+                />
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -561,6 +579,7 @@ export default function FinanceDashboard() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
   
   // State
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -585,6 +604,68 @@ export default function FinanceDashboard() {
   // New state for split allocations and users
   const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
   const [users, setUsers] = useState<User[]>([]);
+  
+  // Notification banner state
+  const [notification, setNotification] = useState<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    visible: boolean;
+    duration?: number;
+  } | null>(null);
+
+  // Notification helper functions
+  const getNotificationColors = useCallback((type: 'success' | 'error' | 'info' | 'warning') => {
+    const colors = {
+      success: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+        border: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)',
+        text: isDark ? 'rgba(16, 185, 129, 0.95)' : 'rgba(16, 185, 129, 0.9)',
+        icon: '#10b981',
+      },
+      error: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.15)',
+        border: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.25)',
+        text: isDark ? 'rgba(239, 68, 68, 0.95)' : 'rgba(239, 68, 68, 0.9)',
+        icon: '#ef4444',
+      },
+      info: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.15)',
+        border: isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.25)',
+        text: isDark ? 'rgba(99, 102, 241, 0.95)' : 'rgba(99, 102, 241, 0.9)',
+        icon: '#6366f1',
+      },
+      warning: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)',
+        border: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)',
+        text: isDark ? 'rgba(245, 158, 11, 0.95)' : 'rgba(245, 158, 11, 0.9)',
+        icon: '#f59e0b',
+      },
+    };
+    return colors[type];
+  }, [isDark]);
+
+  const showNotification = useCallback((
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning' = 'info',
+    duration: number = 3000
+  ) => {
+    const id = Date.now().toString();
+    setNotification({ id, message, type, visible: true, duration });
+    
+    // Auto-dismiss after specified duration
+    setTimeout(() => {
+      setNotification(prev => prev && prev.id === id ? { ...prev, visible: false } : prev);
+      // Clear notification after fade animation
+      setTimeout(() => {
+        setNotification(prev => prev && prev.id === id ? null : prev);
+      }, 400);
+    }, duration);
+  }, []);
 
   // Helper function to get transaction label from split allocations
   const getTransactionLabel = useCallback((transaction: Transaction): string | null => {
@@ -903,6 +984,59 @@ export default function FinanceDashboard() {
     }
   }, [fetchTransactions]);
   
+  /**
+   * Mark or unmark a transaction as paid
+   * @param transactionId - The ID of the transaction to mark/unmark
+   * @param isPaid - True to mark as paid, false to mark as unpaid
+   */
+  const markTransaction = useCallback(async (transactionId: string, isPaid: boolean) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mark: isPaid }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update transaction mark status');
+      }
+      
+      // Provide haptic feedback for successful action
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Refresh transactions to get updated data
+      await fetchTransactions();
+      
+      // Show success notification
+      showNotification(
+        `Transaction ${isPaid ? 'marked as paid' : 'unmarked'} successfully`,
+        'success'
+      );
+      
+    } catch (error) {
+      console.error('Error marking transaction:', error);
+      
+      // Provide error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Show error notification
+      showNotification(
+        `Failed to ${isPaid ? 'mark' : 'unmark'} transaction. Please try again.`,
+        'error'
+      );
+    }
+  }, [fetchTransactions, showNotification]);
+  
+  /**
+   * Toggle the mark status of a transaction
+   * @param transaction - The transaction to toggle mark status for
+   */
+  const toggleTransactionMark = useCallback(async (transaction: Transaction) => {
+    const newMarkStatus = !transaction.mark;
+    await markTransaction(transaction.id, newMarkStatus);
+  }, [markTransaction]);
+  
   // Event handlers
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -1029,29 +1163,6 @@ export default function FinanceDashboard() {
     Alert.alert('Split Transaction', 'Split transaction functionality coming soon!');
   }, [hideBottomSheet]);
   
-  const toggleTransactionMark = useCallback(async (transaction: Transaction) => {
-    try {
-      const updatedTransaction = {
-        ...transaction,
-        mark: !transaction.mark
-      };
-      
-      const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTransaction),
-      });
-      
-      if (!response.ok) throw new Error('Failed to update transaction');
-      
-      await fetchTransactions();
-      hideBottomSheet();
-      Alert.alert('Success', `Transaction marked as ${updatedTransaction.mark ? 'paid' : 'unpaid'}`);
-    } catch (error) {
-      console.error('Error updating transaction mark:', error);
-      Alert.alert('Error', 'Failed to update transaction. Please try again.');
-    }
-  }, [fetchTransactions, hideBottomSheet]);
   
   const updateTransactionWithDropdown = useCallback(async (transaction: Transaction) => {
     try {
@@ -1673,10 +1784,13 @@ export default function FinanceDashboard() {
                       <Text style={styles.actionButtonText}>Split</Text>
                     </Pressable>
                     
-                    <Pressable style={[
-                      styles.actionButton, 
-                      selectedTransaction.mark ? styles.unmarkButton : styles.markButton
-                    ]}>
+                    <Pressable 
+                      style={[
+                        styles.actionButton, 
+                        selectedTransaction.mark ? styles.unmarkButton : styles.markButton
+                      ]}
+                      onPress={() => toggleTransactionMark(selectedTransaction)}
+                    >
                       <Bookmark size={14} color="#ffffff" />
                       <Text style={styles.actionButtonText}>
                         {selectedTransaction.mark ? 'Unmark' : 'Mark'}
@@ -1689,6 +1803,62 @@ export default function FinanceDashboard() {
           )}
         </BottomSheetScrollView>
       </BottomSheetModal>
+      
+      {/* Notification Banner Overlay */}
+      {notification && (
+        <Animated.View
+          style={[
+            styles.notificationOverlay,
+            {
+              top: insets.top + 8, // Position below safe area + margin
+              opacity: notification.visible ? 1 : 0,
+              transform: [{
+                translateY: notification.visible ? 0 : -80
+              }],
+            }
+          ]}
+          pointerEvents={notification.visible ? 'auto' : 'none'}
+        >
+          {/* Backdrop Layer with Blur */}
+          <BlurView
+            intensity={15}
+            tint={isDark ? 'dark' : 'light'}
+            style={styles.notificationBackdrop}
+          >
+            <View style={[
+              styles.notificationBackdropOverlay,
+              { backgroundColor: getNotificationColors(notification.type).backdrop }
+            ]} />
+          </BlurView>
+          
+          {/* Colored Content Layer */}
+          <View style={[
+            styles.notificationColorLayer,
+            {
+              backgroundColor: getNotificationColors(notification.type).background,
+              borderColor: getNotificationColors(notification.type).border,
+            }
+          ]}>
+            <View style={styles.notificationContent}>
+              <View style={[
+                styles.notificationIcon,
+                { backgroundColor: getNotificationColors(notification.type).icon }
+              ]}>
+                {notification.type === 'success' && <Check size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'error' && <X size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'info' && <HelpCircle size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'warning' && <HelpCircle size={12} color="#ffffff" strokeWidth={2.5} />}
+              </View>
+              <Text style={[
+                styles.notificationText,
+                { color: getNotificationColors(notification.type).text }
+              ]}>
+                {notification.message}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1696,6 +1866,57 @@ export default function FinanceDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  
+  // Notification Overlay Styles
+  notificationOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    marginHorizontal: 12,
+  },
+  notificationBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  notificationBackdropOverlay: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  notificationColorLayer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  notificationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  notificationIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   loadingContainer: {
     flex: 1,
@@ -1975,6 +2196,14 @@ const styles = StyleSheet.create({
   transactionAmount: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  subtlePaidIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
   },
   transactionTags: {
     flexDirection: 'row',
