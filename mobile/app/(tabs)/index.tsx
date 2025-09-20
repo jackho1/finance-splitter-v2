@@ -42,7 +42,8 @@ import {
   Split,
   Bookmark,
   User,
-  Check
+  Check,
+  ChevronDown
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -605,6 +606,12 @@ export default function FinanceDashboard() {
   const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
   const [users, setUsers] = useState<User[]>([]);
   
+  // Dropdown options state
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableBankCategories, setAvailableBankCategories] = useState<string[]>([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  
   // Notification banner state
   const [notification, setNotification] = useState<{
     id: string;
@@ -949,13 +956,15 @@ export default function FinanceDashboard() {
         transactions, 
         categoryMappings, 
         users: userData, 
-        splitAllocations: splitData 
+        splitAllocations: splitData,
+        bankCategories
       } = data.data;
       
       setTransactions(transactions);
       setCategoryMappings(categoryMappings);
       setUsers(userData || []);
       setSplitAllocations(splitData || {});
+      setAvailableBankCategories(bankCategories || []);
     } catch (error) {
       console.error('Error fetching initial data:', error);
       Alert.alert('Error', 'Failed to load data. Please try again.');
@@ -1091,6 +1100,8 @@ export default function FinanceDashboard() {
     setSelectedTransaction(null);
     setIsEditing(false);
     setEditedTransaction(null);
+    setShowCategoryDropdown(false);
+    setShowLabelDropdown(false);
   }, []);
 
   const deleteTransaction = useCallback(async (id: string) => {
@@ -1147,6 +1158,98 @@ export default function FinanceDashboard() {
       </Text>
     </View>
   );
+
+  // Custom Dropdown Component
+  const CustomDropdown = ({ 
+    options, 
+    value, 
+    onSelect, 
+    placeholder = "Select option",
+    isOpen,
+    onToggle 
+  }: {
+    options: Array<{ value: string; label: string }>;
+    value: string;
+    onSelect: (value: string) => void;
+    placeholder?: string;
+    isOpen: boolean;
+    onToggle: () => void;
+  }) => {
+    const selectedOption = options.find(opt => opt.value === value);
+    
+    return (
+      <View style={styles.dropdownContainer}>
+        <Pressable
+          style={[
+            styles.dropdownTrigger,
+            {
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            }
+          ]}
+          onPress={onToggle}
+        >
+          <Text style={[
+            styles.dropdownTriggerText,
+            { color: getBottomSheetTheme(isDark).textColor }
+          ]}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </Text>
+          <ChevronDown 
+            size={16} 
+            color={getBottomSheetTheme(isDark).textColor} 
+            style={[
+              styles.dropdownChevron,
+              isOpen && styles.dropdownChevronRotated
+            ]}
+          />
+        </Pressable>
+
+        {isOpen && (
+          <View style={[
+            styles.dropdownOptions,
+            {
+              backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+            }
+          ]}>
+            <ScrollView 
+              style={[
+                styles.dropdownScrollView,
+                { backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }
+              ]} 
+              nestedScrollEnabled
+            >
+              {options.map((option, index) => (
+                <Pressable
+                  key={option.value || `empty-${index}`}
+                  style={[
+                    styles.dropdownOption,
+                    { backgroundColor: isDark ? '#1c1c1e' : '#ffffff' },
+                    option.value === value && {
+                      backgroundColor: isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.15)'
+                    }
+                  ]}
+                  onPress={() => {
+                    onSelect(option.value);
+                    onToggle();
+                  }}
+                >
+                  <Text style={[
+                    styles.dropdownOptionText,
+                    { color: isDark ? '#ffffff' : '#000000' },
+                    option.value === value && styles.dropdownOptionTextSelected
+                  ]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
   
 
   
@@ -1154,6 +1257,10 @@ export default function FinanceDashboard() {
     setIsEditing(!isEditing);
     if (!isEditing && selectedTransaction) {
       setEditedTransaction({ ...selectedTransaction });
+    } else {
+      // Close dropdowns when exiting edit mode
+      setShowCategoryDropdown(false);
+      setShowLabelDropdown(false);
     }
   }, [isEditing, selectedTransaction]);
   
@@ -1244,10 +1351,66 @@ export default function FinanceDashboard() {
     setLastPressTime(now);
   }, [lastPressTime]);
   
+  // Helper function to generate label dropdown options (similar to web app)
+  const getLabelDropdownOptions = useCallback(() => {
+    // Guard clause: return default options if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return [{ value: '', label: 'None' }];
+    }
+    
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    const options = [
+      { value: '', label: 'None' }
+    ];
+    
+    // Add individual user options
+    activeUsers.forEach(user => {
+      options.push({
+        value: user.display_name,
+        label: user.display_name
+      });
+    });
+    
+    // Add collective option based on number of users
+    if (activeUsers.length === 2) {
+      options.push({
+        value: 'Both',
+        label: 'Both (Equal Split)'
+      });
+    } else if (activeUsers.length >= 3) {
+      options.push({
+        value: 'All users',
+        label: 'All users (Equal Split)'
+      });
+    }
+    
+    return options;
+  }, [users]);
+
   // Effects
   useEffect(() => {
     fetchTransactions();
   }, []);
+
+  // Extract available categories when transactions are loaded (similar to web app)
+  useEffect(() => {
+    if (transactions.length) {
+      // Get unique categories directly from transactions' category field
+      const categories = [...new Set(
+        transactions
+          .map(t => t.category)
+          .filter(category => category !== null && category !== undefined && category !== '')
+      )].sort();
+      
+      // Add null/empty as the last option if they exist in the data
+      if (transactions.some(t => !t.category)) {
+        categories.push('');
+      }
+      
+      setAvailableCategories(categories);
+    }
+  }, [transactions]);
   
   useEffect(() => {
     // Scroll to current month in chart
@@ -1737,55 +1900,61 @@ export default function FinanceDashboard() {
               {/* Edit Fields - Only shown when editing */}
               {isEditing && (
                 <View style={styles.editSection}>
-                  <View style={styles.editField}>
+                  {/* Full section backdrop when any dropdown is open */}
+                  {(showCategoryDropdown || showLabelDropdown) && (
+                    <View style={[
+                      styles.editSectionBackdrop,
+                      { backgroundColor: getBottomSheetTheme(isDark).backgroundColor }
+                    ]} />
+                  )}
+                  
+                  <View style={[
+                    styles.editField,
+                    { zIndex: showCategoryDropdown ? 1100 : 1000 }
+                  ]}>
                     <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
                       CATEGORY
                     </Text>
-                    <TextInput
-                      style={[
-                        styles.fieldInput,
-                        {
-                          color: getBottomSheetTheme(isDark).textColor,
-                          backgroundColor: isDark 
-                            ? 'rgba(255, 255, 255, 0.03)' 
-                            : 'rgba(0, 0, 0, 0.02)',
-                          borderColor: isDark 
-                            ? 'rgba(255, 255, 255, 0.08)' 
-                            : 'rgba(0, 0, 0, 0.06)',
-                        }
+                    <CustomDropdown
+                      options={[
+                        { value: '', label: 'None' },
+                        ...availableCategories.map(cat => ({ value: cat, label: cat || 'None' }))
                       ]}
                       value={editedTransaction?.category || ''}
-                      onChangeText={(text) => 
-                        setEditedTransaction(prev => prev ? { ...prev, category: text } : null)
+                      onSelect={(value) => 
+                        setEditedTransaction(prev => prev ? { ...prev, category: value } : null)
                       }
-                      placeholder="Enter category"
-                      placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
+                      placeholder="Select category"
+                      isOpen={showCategoryDropdown}
+                      onToggle={() => {
+                        setShowCategoryDropdown(!showCategoryDropdown);
+                        setShowLabelDropdown(false); // Close other dropdown
+                      }}
                     />
                   </View>
 
-                  <View style={styles.editField}>
+                  <View style={[
+                    styles.editField,
+                    { 
+                      zIndex: showLabelDropdown ? 1100 : 1000,
+                      opacity: showCategoryDropdown ? 0.3 : 1 // Fade out when category dropdown is open
+                    }
+                  ]}>
                     <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
                       LABEL
                     </Text>
-                    <TextInput
-                      style={[
-                        styles.fieldInput,
-                        {
-                          color: getBottomSheetTheme(isDark).textColor,
-                          backgroundColor: isDark 
-                            ? 'rgba(255, 255, 255, 0.03)' 
-                            : 'rgba(0, 0, 0, 0.02)',
-                          borderColor: isDark 
-                            ? 'rgba(255, 255, 255, 0.08)' 
-                            : 'rgba(0, 0, 0, 0.06)',
-                        }
-                      ]}
+                    <CustomDropdown
+                      options={getLabelDropdownOptions()}
                       value={editedTransaction?.label || ''}
-                      onChangeText={(text) => 
-                        setEditedTransaction(prev => prev ? { ...prev, label: text } : null)
+                      onSelect={(value) => 
+                        setEditedTransaction(prev => prev ? { ...prev, label: value } : null)
                       }
-                      placeholder="Enter label"
-                      placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
+                      placeholder="Select label"
+                      isOpen={showLabelDropdown}
+                      onToggle={() => {
+                        setShowLabelDropdown(!showLabelDropdown);
+                        setShowCategoryDropdown(false); // Close other dropdown
+                      }}
                     />
                   </View>
                 </View>
@@ -2279,79 +2448,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   
-  // Dropdown styles
-  dropdownContainer: {
-    position: 'absolute',
-    zIndex: 1000,
-  },
-  dropdownContent: {
-    maxWidth: 380,
-    maxHeight: SCREEN_HEIGHT * 0.6,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
-  },
-  dropdownTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  dropdownCloseButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownCloseIcon: {
-    fontSize: 20,
-    fontWeight: '400',
-  },
-  dropdownBody: {
-    padding: 18,
-  },
-  dropdownField: {
-    marginBottom: 18,
-  },
-  dropdownLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 6,
-    letterSpacing: 0.2,
-  },
-  dropdownInput: {
-    fontSize: 15,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 44,
-  },
-  dropdownActions: {
-    marginTop: 16,
-    gap: 12,
-  },
-  primaryActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
 
   
   // Category mapping info styles
@@ -2511,9 +2607,21 @@ const styles = StyleSheet.create({
   // Edit Fields
   editSection: {
     marginBottom: 16,
+    position: 'relative',
+  },
+  editSectionBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: -20,
+    right: -20,
+    bottom: -20,
+    zIndex: 999,
+    borderRadius: 16,
+    opacity: 0.95,
   },
   editField: {
     marginBottom: 16,
+    position: 'relative',
   },
   fieldLabel: {
     fontSize: 10,
@@ -2623,6 +2731,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 4,
+  },
+
+  // Dropdown Component Styles
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 1001,
+    marginBottom: 4, // Add space to prevent overlapping with content below
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    minHeight: 40,
+  },
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontWeight: '400',
+    flex: 1,
+  },
+  dropdownChevron: {
+    marginLeft: 8,
+  },
+  dropdownChevronRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  dropdownOptions: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    borderRadius: 10,
+    borderWidth: 2,
+    maxHeight: 200,
+    marginTop: 4,
+    zIndex: 1002,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 12,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  dropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+    minHeight: 44, // Ensure touch target size
+  },
+  dropdownOptionText: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  dropdownOptionTextSelected: {
+    fontWeight: '600',
+    color: '#6366f1',
   },
 
 
