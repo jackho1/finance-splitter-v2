@@ -1641,29 +1641,52 @@ export default function FinanceDashboard() {
                   </View>
                   
                   <View style={styles.transactionInfo}>
-                    {isEditing ? (
-                      <TextInput
-                        style={[
-                          styles.editableDescription,
-                          {
-                            color: getBottomSheetTheme(isDark).textColor,
-                            backgroundColor: getBottomSheetTheme(isDark).buttonBg,
-                            borderColor: getBottomSheetTheme(isDark).borderColor,
+                    <View style={[
+                      styles.descriptionContainer,
+                      isEditing && {
+                        backgroundColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.03)' 
+                          : 'rgba(0, 0, 0, 0.02)',
+                        borderColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.08)' 
+                          : 'rgba(0, 0, 0, 0.06)',
+                        borderWidth: 1,
+                        borderRadius: 8,
+                      }
+                    ]}>
+                      {isEditing ? (
+                        <TextInput
+                          style={[
+                            styles.editableDescription,
+                            {
+                              color: getBottomSheetTheme(isDark).textColor,
+                              backgroundColor: 'transparent',
+                              borderWidth: 0,
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                            }
+                          ]}
+                          value={editedTransaction?.description || ''}
+                          onChangeText={(text) => 
+                            setEditedTransaction(prev => prev ? { ...prev, description: text } : null)
                           }
-                        ]}
-                        value={editedTransaction?.description || ''}
-                        onChangeText={(text) => 
-                          setEditedTransaction(prev => prev ? { ...prev, description: text } : null)
-                        }
-                        placeholder="Transaction description"
-                        placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
-                        multiline
-                      />
-                    ) : (
-                      <Text style={[styles.merchantName, { color: getBottomSheetTheme(isDark).textColor }]}>
-                        {selectedTransaction.description}
-                      </Text>
-                    )}
+                          placeholder="Transaction description"
+                          placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
+                          multiline
+                        />
+                      ) : (
+                        <Text style={[
+                          styles.merchantName, 
+                          { 
+                            color: getBottomSheetTheme(isDark).textColor,
+                            paddingHorizontal: isEditing ? 12 : 0,
+                            paddingVertical: isEditing ? 8 : 0,
+                          }
+                        ]}>
+                          {selectedTransaction.description}
+                        </Text>
+                      )}
+                    </View>
                     
                     <View style={styles.transactionMeta}>
                       <Text style={[
@@ -1723,8 +1746,12 @@ export default function FinanceDashboard() {
                         styles.fieldInput,
                         {
                           color: getBottomSheetTheme(isDark).textColor,
-                          backgroundColor: getBottomSheetTheme(isDark).buttonBg,
-                          borderColor: getBottomSheetTheme(isDark).borderColor,
+                          backgroundColor: isDark 
+                            ? 'rgba(255, 255, 255, 0.03)' 
+                            : 'rgba(0, 0, 0, 0.02)',
+                          borderColor: isDark 
+                            ? 'rgba(255, 255, 255, 0.08)' 
+                            : 'rgba(0, 0, 0, 0.06)',
                         }
                       ]}
                       value={editedTransaction?.category || ''}
@@ -1745,8 +1772,12 @@ export default function FinanceDashboard() {
                         styles.fieldInput,
                         {
                           color: getBottomSheetTheme(isDark).textColor,
-                          backgroundColor: getBottomSheetTheme(isDark).buttonBg,
-                          borderColor: getBottomSheetTheme(isDark).borderColor,
+                          backgroundColor: isDark 
+                            ? 'rgba(255, 255, 255, 0.03)' 
+                            : 'rgba(0, 0, 0, 0.02)',
+                          borderColor: isDark 
+                            ? 'rgba(255, 255, 255, 0.08)' 
+                            : 'rgba(0, 0, 0, 0.06)',
                         }
                       ]}
                       value={editedTransaction?.label || ''}
@@ -2417,6 +2448,9 @@ const styles = StyleSheet.create({
   },
   transactionInfo: {
     flex: 1,
+  },
+  descriptionContainer: {
+    // Container for the description field that maintains consistent layout
   },
   merchantName: {
     fontSize: 15,
