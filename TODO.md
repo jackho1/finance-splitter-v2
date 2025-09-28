@@ -466,6 +466,6 @@
 
   - As above
 
-- [ ] **Fix category filtering for offset **:
+- [x] **Fix category filtering for offset **:
 
   - Offset webpage category filtering only partially works.

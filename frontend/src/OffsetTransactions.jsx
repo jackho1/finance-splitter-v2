@@ -2,11 +2,19 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { useUserPreferencesContext } from './contexts/UserPreferencesContext';
-import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
+import { 
+  updateUserColorStyles, 
+  updateUserTotalColors, 
+  setUserPreferencesCache 
+} from './utils/userColorStyles';
 
 // Import utility functions
 import { applyFilters } from './utils/filterTransactions';
-import { groupSplitTransactions } from './utils/transactionGrouping';
+import { 
+  filterTransactionsByCategoryAndLabel, 
+  groupSplitTransactions, 
+  filterByMonth 
+} from './utils/transactionGrouping';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
 import { getLabelFilterOptions, getLabelDropdownOptions } from './utils/getLabelFilterOptions';
 import { 
@@ -15,6 +23,8 @@ import {
   handleDragEndCleanup,
   getDraggableContainerStyles 
 } from './utils/dragAndDropUtils';
+
+// Import styles
 import './ModernTables.css';
 import './SortableTableHeaders.css';
 import './CompactDropdown.css';
@@ -965,51 +975,37 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     }
   };
 
-  // Update the filter logic in useEffect
-  useEffect(() => {
-    let filtered = applyFilters(transactions, {
-      dateFilter,
-      sortBy: filters.sortBy
-    }, getTransactionLabel);
+// Update the filter logic in useEffect
+useEffect(() => {
+  // Apply date filter and sorting first
+  let filtered = applyFilters(transactions, {
+    dateFilter,
+    sortBy: filters.sortBy
+  }, getTransactionLabel);
 
-    if (categoryFilter.length > 0) {
-      filtered = filtered.filter(transaction => {
-        if (categoryFilter.includes(null) && !transaction.category) {
-          return true;
-        }
-        return categoryFilter.includes(transaction.category);
-      });
-    }
-
-    if (labelFilter.length > 0) {
-      filtered = filtered.filter(transaction => {
-        const transactionLabel = getTransactionLabel(transaction);
-        if (labelFilter.includes(null) && !transactionLabel) {
-          return true;
-        }
-        return labelFilter.includes(transactionLabel);
-      });
-    }
-    
-    // Group split transactions together after filtering and sorting
-    filtered = groupSplitTransactions(filtered);
-    
-    setAllFilteredTransactions(filtered);
-    
-    let tableFiltered = filtered;
-    // Only apply month filter if there's no date range filter AND showAllTransactions is false
-    if (!dateFilter.startDate && !dateFilter.endDate && !showAllTransactions) {
-      tableFiltered = filtered.filter(transaction => {
-        const date = new Date(transaction.date);
-        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-      });
-      
-      // Re-group after month filtering to maintain split transaction grouping
-      tableFiltered = groupSplitTransactions(tableFiltered);
-    }
-    
-    setFilteredTransactions(tableFiltered);
-  }, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
+  // Apply category and label filters (using the utility function)
+  filtered = filterTransactionsByCategoryAndLabel(
+    filtered, 
+    categoryFilter, 
+    labelFilter, 
+    getTransactionLabel
+  );
+  
+  // Group split transactions together after filtering and sorting
+  // Pass original transactions array to handle missing parents gracefully
+  filtered = groupSplitTransactions(filtered, transactions);
+  
+  setAllFilteredTransactions(filtered);
+  
+  let tableFiltered = filtered;
+  
+  // Only apply month filter if there's no date range filter AND showAllTransactions is false
+  if (!dateFilter.startDate && !dateFilter.endDate && !showAllTransactions) {
+    tableFiltered = filterByMonth(filtered, currentMonth, currentYear, transactions);
+  }
+  
+  setFilteredTransactions(tableFiltered);
+}, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
 
   // Update user color styles when users change
   useEffect(() => {
