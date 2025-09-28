@@ -4,7 +4,7 @@ import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 
 // Import utility functions
 import { applyFilters } from './utils/filterTransactions';
-import { groupSplitTransactions } from './utils/transactionGrouping';
+import { groupSplitTransactions } from './utils/transactionGrouping'; //Note: If transaction groupings change in this page, this solution will need to be updated to account for split transactions
 import { optimizedHandlePersonalUpdate } from './utils/updateHandlers';
 import { 
   createDragImage, 
