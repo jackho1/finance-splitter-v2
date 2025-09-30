@@ -1258,16 +1258,100 @@ export default function FinanceDashboard() {
   
 
   
+  // Helper function to update split configuration based on label changes
+  const updateSplitConfiguration = useCallback(async (transactionId: string, newLabel: string) => {
+    if (!users || users.length === 0) {
+      throw new Error('No users available for split configuration');
+    }
+
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+
+    if (!newLabel || newLabel === '') {
+      // Delete existing split configuration for empty label
+      console.log('Clearing split configuration for empty label');
+      return fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config?transaction_type=shared`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } 
+    
+    let splitUsers;
+    
+    if ((newLabel === 'Both' && activeUsers.length === 2) || (newLabel === 'All users' && activeUsers.length >= 3)) {
+      // Equal split between all active users for "Both" or "All users"
+      splitUsers = activeUsers.map(user => ({ id: user.id }));
+      console.log(`Creating equal split configuration for "${newLabel}" with users:`, splitUsers);
+    } else {
+      // Single user allocation
+      const targetUser = activeUsers.find(user => user.display_name === newLabel);
+      if (!targetUser) {
+        throw new Error(`User "${newLabel}" not found`);
+      }
+      
+      splitUsers = [{ id: targetUser.id }];
+      console.log('Creating single user split configuration for user:', targetUser.display_name);
+    }
+
+    // Check if split configuration already exists (like frontend does)
+    let existingSplitConfig = null;
+    try {
+      const existingResponse = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config?transaction_type=shared`);
+      if (existingResponse.ok) {
+        const existingData = await existingResponse.json();
+        if (existingData.success && existingData.data) {
+          existingSplitConfig = existingData.data;
+        }
+      }
+    } catch (checkErr) {
+      // Split config doesn't exist yet, will create new one
+      console.log('Split configuration does not exist yet, will create new one');
+    }
+
+    const splitConfigData = {
+      transaction_type: 'shared',
+      split_type_code: 'equal', // Default to equal split like frontend
+      users: splitUsers,
+      created_by: 1 // Default user ID like frontend
+    };
+
+    let response;
+    if (existingSplitConfig) {
+      // Update existing split configuration
+      console.log('Updating existing split configuration:', splitConfigData);
+      response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(splitConfigData),
+      });
+    } else {
+      // Create new split configuration
+      console.log('Creating new split configuration:', splitConfigData);
+      response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(splitConfigData),
+      });
+    }
+
+    return response;
+  }, [users]);
+
+
   const handleEditTransaction = useCallback(() => {
     setIsEditing(!isEditing);
     if (!isEditing && selectedTransaction) {
-      setEditedTransaction({ ...selectedTransaction });
+      // Initialize edited transaction with current values, including computed label
+      const computedLabel = getTransactionLabel(selectedTransaction);
+      setEditedTransaction({ 
+        ...selectedTransaction, 
+        label: computedLabel || '' // Ensure label is properly set from split allocations
+      });
     } else {
       // Close dropdowns when exiting edit mode
       setShowCategoryDropdown(false);
       setShowLabelDropdown(false);
     }
-  }, [isEditing, selectedTransaction]);
+  }, [isEditing, selectedTransaction, getTransactionLabel]);
   
   const splitTransaction = useCallback(async (transaction: Transaction) => {
     hideBottomSheet();
@@ -1304,8 +1388,13 @@ export default function FinanceDashboard() {
     if (!editedTransaction || !selectedTransaction) return;
     
     try {
-      // Only send fields that are allowed by the API and have actually changed
-      const allowedFields = ['date', 'description', 'amount', 'bank_category', 'label', 'mark'];
+      // Compare current label with original computed label
+      const originalLabel = getTransactionLabel(selectedTransaction);
+      const newLabel = editedTransaction.label || '';
+      const labelChanged = originalLabel !== newLabel;
+      
+      // Handle standard field updates (excluding label which needs special handling)
+      const allowedFields = ['date', 'description', 'amount', 'bank_category', 'mark'];
       const updatedFields: Partial<Transaction> = {};
       
       // Only include fields that have actually changed and are allowed
@@ -1319,27 +1408,41 @@ export default function FinanceDashboard() {
         }
       });
       
-      // If no fields have changed, show success message and return
-      if (Object.keys(updatedFields).length === 0) {
+      // Handle label changes through split allocations
+      if (labelChanged) {
+        console.log('Label changed from:', originalLabel, 'to:', newLabel);
+        
+        // Update split allocation based on the new label
+        const splitConfigResponse = await updateSplitConfiguration(editedTransaction.id, newLabel);
+        if (!splitConfigResponse.ok) {
+          throw new Error('Failed to update transaction label');
+        }
+      }
+      
+      // If no standard fields have changed and label didn't change, show message and return
+      if (Object.keys(updatedFields).length === 0 && !labelChanged) {
         setIsEditing(false);
         setEditedTransaction(null);
         showNotification('No changes to save', 'info', 2000);
         return;
       }
       
-      console.log('Sending update with fields:', updatedFields);
-      
-      const response = await fetch(`${getApiBaseUrl()}/transactions/${editedTransaction.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedFields),
-      });
-      
-      if (!response.ok) {
-        // Try to get more detailed error information
-        const errorData = await response.json().catch(() => null);
-        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
-        throw new Error(errorMessage);
+      // Update standard fields if any have changed
+      if (Object.keys(updatedFields).length > 0) {
+        console.log('Sending update with fields:', updatedFields);
+        
+        const response = await fetch(`${getApiBaseUrl()}/transactions/${editedTransaction.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedFields),
+        });
+        
+        if (!response.ok) {
+          // Try to get more detailed error information
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+          throw new Error(errorMessage);
+        }
       }
       
       // Provide haptic feedback for successful update
@@ -1364,7 +1467,7 @@ export default function FinanceDashboard() {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
       showNotification(errorMessage, 'error', 5000);
     }
-  }, [editedTransaction, selectedTransaction, fetchTransactions, showNotification, hideBottomSheet]);
+  }, [editedTransaction, selectedTransaction, getTransactionLabel, updateSplitConfiguration, fetchTransactions, showNotification, hideBottomSheet]);
 
   
   // Handler functions for bottom sheet actions
