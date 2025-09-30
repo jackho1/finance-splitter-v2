@@ -974,24 +974,29 @@ export default function FinanceDashboard() {
     }
   }, []);
   
-  const updateTransaction = useCallback(async (transaction: Transaction) => {
+  const updateTransaction = useCallback(async (transaction: Transaction, updatedFields: Partial<Transaction>) => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify(updatedFields),
       });
       
-      if (!response.ok) throw new Error('Failed to update transaction');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+        throw new Error(errorMessage);
+      }
       
       await fetchTransactions();
       setSelectedTransaction(null);
-      Alert.alert('Success', 'Transaction updated successfully');
+      showNotification('Transaction updated successfully', 'success');
     } catch (error) {
       console.error('Error updating transaction:', error);
-      Alert.alert('Error', 'Failed to update transaction. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
     }
-  }, [fetchTransactions]);
+  }, [fetchTransactions, showNotification]);
   
   /**
    * Mark or unmark a transaction as paid
@@ -1271,46 +1276,96 @@ export default function FinanceDashboard() {
   }, [hideBottomSheet]);
   
   
-  const updateTransactionWithDropdown = useCallback(async (transaction: Transaction) => {
+  const updateTransactionWithDropdown = useCallback(async (transaction: Transaction, updatedFields: Partial<Transaction>) => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify(updatedFields),
       });
       
-      if (!response.ok) throw new Error('Failed to update transaction');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+        throw new Error(errorMessage);
+      }
       
       await fetchTransactions();
       hideBottomSheet();
-      Alert.alert('Success', 'Transaction updated successfully');
+      showNotification('Transaction updated successfully', 'success');
     } catch (error) {
       console.error('Error updating transaction:', error);
-      Alert.alert('Error', 'Failed to update transaction. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
     }
-  }, [fetchTransactions, hideBottomSheet]);
+  }, [fetchTransactions, hideBottomSheet, showNotification]);
 
   const saveTransactionChanges = useCallback(async () => {
-    if (!editedTransaction) return;
+    if (!editedTransaction || !selectedTransaction) return;
     
     try {
+      // Only send fields that are allowed by the API and have actually changed
+      const allowedFields = ['date', 'description', 'amount', 'bank_category', 'label', 'mark'];
+      const updatedFields: Partial<Transaction> = {};
+      
+      // Only include fields that have actually changed and are allowed
+      allowedFields.forEach(field => {
+        const editedValue = editedTransaction[field as keyof Transaction];
+        const originalValue = selectedTransaction[field as keyof Transaction];
+        
+        // Check if the value has actually changed
+        if (editedValue !== originalValue) {
+          (updatedFields as any)[field] = editedValue;
+        }
+      });
+      
+      // If no fields have changed, show success message and return
+      if (Object.keys(updatedFields).length === 0) {
+        setIsEditing(false);
+        setEditedTransaction(null);
+        showNotification('No changes to save', 'info', 2000);
+        return;
+      }
+      
+      console.log('Sending update with fields:', updatedFields);
+      
       const response = await fetch(`${getApiBaseUrl()}/transactions/${editedTransaction.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedTransaction),
+        body: JSON.stringify(updatedFields),
       });
       
-      if (!response.ok) throw new Error('Failed to update transaction');
+      if (!response.ok) {
+        // Try to get more detailed error information
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+        throw new Error(errorMessage);
+      }
       
+      // Provide haptic feedback for successful update
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Refresh transactions and close edit mode
       await fetchTransactions();
       setIsEditing(false);
       setEditedTransaction(null);
-      Alert.alert('Success', 'Transaction updated successfully');
+      hideBottomSheet();
+      
+      // Show success notification instead of alert
+      showNotification('Transaction updated successfully', 'success');
+      
     } catch (error) {
       console.error('Error updating transaction:', error);
-      Alert.alert('Error', 'Failed to update transaction. Please try again.');
+      
+      // Provide error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Show detailed error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
     }
-  }, [editedTransaction, fetchTransactions]);
+  }, [editedTransaction, selectedTransaction, fetchTransactions, showNotification, hideBottomSheet]);
+
   
   // Handler functions for bottom sheet actions
   const handleSplitTransaction = useCallback(() => {
@@ -1393,25 +1448,8 @@ export default function FinanceDashboard() {
     fetchTransactions();
   }, []);
 
-  // Extract available categories when transactions are loaded (similar to web app)
-  useEffect(() => {
-    if (transactions.length) {
-      // Get unique categories directly from transactions' category field
-      const categories = [...new Set(
-        transactions
-          .map(t => t.category)
-          .filter(category => category !== null && category !== undefined && category !== '')
-      )].sort();
-      
-      // Add null/empty as the last option if they exist in the data
-      if (transactions.some(t => !t.category)) {
-        categories.push('');
-      }
-      
-      setAvailableCategories(categories);
-    }
-  }, [transactions]);
-  
+  // Note: We use availableBankCategories for editing (like frontend), no need to extract categories
+
   useEffect(() => {
     // Scroll to current month in chart
     if (scrollViewRef.current) {
@@ -1913,16 +1951,16 @@ export default function FinanceDashboard() {
                     { zIndex: showCategoryDropdown ? 1100 : 1000 }
                   ]}>
                     <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
-                      CATEGORY
+                      BANK CATEGORY
                     </Text>
                     <CustomDropdown
                       options={[
                         { value: '', label: 'None' },
-                        ...availableCategories.map(cat => ({ value: cat, label: cat || 'None' }))
+                        ...availableBankCategories.map(cat => ({ value: cat, label: cat || 'None' }))
                       ]}
-                      value={editedTransaction?.category || ''}
+                      value={editedTransaction?.bank_category || ''}
                       onSelect={(value) => 
-                        setEditedTransaction(prev => prev ? { ...prev, category: value } : null)
+                        setEditedTransaction(prev => prev ? { ...prev, bank_category: value } : null)
                       }
                       placeholder="Select category"
                       isOpen={showCategoryDropdown}
