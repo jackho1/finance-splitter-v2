@@ -1052,10 +1052,60 @@ export default function FinanceDashboard() {
   }, [markTransaction]);
   
   // Event handlers
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    fetchTransactions();
-  }, [fetchTransactions]);
+  const handleRefresh = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // Call the backend endpoint to run shared_bank_feed.py
+      const refreshUrl = `${getApiBaseUrl()}/refresh-shared-bank-feeds`;
+      console.log('Triggering shared bank feed refresh at:', refreshUrl);
+      
+      const response = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Show success notification
+        showNotification(
+          data.message || 'Bank feeds refreshed successfully!',
+          'success',
+          4000
+        );
+        
+        // Refresh the transactions data after successful bank feed refresh
+        await fetchTransactions();
+      } else {
+        // Show error notification for failed refresh
+        showNotification(
+          `Failed to refresh bank feeds: ${data.message || 'Unknown error'}`,
+          'error',
+          5000
+        );
+      }
+    } catch (error) {
+      console.error('Error refreshing bank feeds:', error);
+      
+      // Show error notification
+      showNotification(
+        'Error refreshing bank feeds. Please check your connection and try again.',
+        'error',
+        5000
+      );
+    } finally {
+      // Note: isRefreshing is set to false in fetchTransactions, so no need to set it here
+      // unless fetchTransactions wasn't called due to an error
+      if (isRefreshing) {
+        setIsRefreshing(false);
+      }
+    }
+  }, [showNotification, fetchTransactions]);
   
   const toggleCategoryFilter = useCallback((category: string) => {
     // Add haptic feedback for better user interaction
@@ -1508,6 +1558,7 @@ export default function FinanceDashboard() {
     
     setLastPressTime(now);
   }, [lastPressTime]);
+
   
   // Helper function to generate label dropdown options (similar to web app)
   const getLabelDropdownOptions = useCallback(() => {
