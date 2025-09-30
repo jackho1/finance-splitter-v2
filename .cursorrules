@@ -1,46 +1,46 @@
-- When a prompt relates mobile web development under mobile/ and in particular for UI changes, ensure those UI are consistent and aligned with the eequivalent UI found in the frontend/ webpage
-- When a prompt relates to adding api endpoints in the mobile web app, ensure the api endpoints are consistent with the apiConfig.js file in frontend/ and the endpoint urls are consistent with index.js within the backend/ file.
-- When using a component, ensure the component follows best practice and ensure it is optimal in terms of performance.
-- When refactoring components, ensure any previously modified or unused components are deleted instead of commenting that it is unused.
+For prompts relating to mobile app development under the mobile/ folder, you are an expert in TypeScript, React Native, Expo, and Mobile App Development.
 
-  For prompts relating to mobile app development under the mobile/ folder, you are an expert in TypeScript, React Native, Expo, and Mobile App Development.
+Code Style and Structure:
 
-  Code Style and Structure:
+- Write concise, type-safe TypeScript code.
+- Use functional components and hooks over class components.
+- Ensure components are modular, reusable, and maintainable.
+- Organize files by feature, grouping related components, hooks, and styles.
+- Delete unused components when refactoring, don’t just comment them out.
+- Avoid vague irrelevant comments such as "updated this" when making code changes.
 
-  - Write concise, type-safe TypeScript code.
-  - Use functional components and hooks over class components.
-  - Ensure components are modular, reusable, and maintainable.
-  - Organize files by feature, grouping related components, hooks, and styles.
+Naming Conventions:
 
-  Naming Conventions:
+- Use camelCase for variable and function names (e.g., `isFetchingData`, `handleUserInput`).
+- Use PascalCase for component names (e.g., `UserProfile`, `ChatScreen`).
+- Directory names should be lowercase and hyphenated (e.g., `user-profile`, `chat-screen`).
 
-  - Use camelCase for variable and function names (e.g., `isFetchingData`, `handleUserInput`).
-  - Use PascalCase for component names (e.g., `UserProfile`, `ChatScreen`).
-  - Directory names should be lowercase and hyphenated (e.g., `user-profile`, `chat-screen`).
+TypeScript Usage:
 
-  TypeScript Usage:
+- Use TypeScript for all components, favoring interfaces for props and state.
+- Enable strict typing in `tsconfig.json`.
+- Avoid using `any`; strive for precise types.
+- Utilize `React.FC` for defining functional components with props.
 
-  - Use TypeScript for all components, favoring interfaces for props and state.
-  - Enable strict typing in `tsconfig.json`.
-  - Avoid using `any`; strive for precise types.
-  - Utilize `React.FC` for defining functional components with props.
+Performance Optimization:
 
-  Performance Optimization:
+- Minimize `useEffect`, `useState`, and heavy computations inside render methods.
+- Use `React.memo()` for components with static props to prevent unnecessary re-renders.
+- Optimize FlatLists with props like `removeClippedSubviews`, `maxToRenderPerBatch`, and `windowSize`.
+- Use `getItemLayout` for FlatLists when items have a consistent size to improve performance.
+- Avoid anonymous functions in `renderItem` or event handlers to prevent re-renders.
+- Ensure components follow best practices and are performance-optimized.
 
-  - Minimize `useEffect`, `useState`, and heavy computations inside render methods.
-  - Use `React.memo()` for components with static props to prevent unnecessary re-renders.
-  - Optimize FlatLists with props like `removeClippedSubviews`, `maxToRenderPerBatch`, and `windowSize`.
-  - Use `getItemLayout` for FlatLists when items have a consistent size to improve performance.
-  - Avoid anonymous functions in `renderItem` or event handlers to prevent re-renders.
+UI and Styling:
 
-  UI and Styling:
+- For mobile web development under mobile/, ensure UI changes match the equivalent UI in frontend/, which contains the web app version.
+- Use consistent styling, either through `StyleSheet.create()` or Styled Components.
+- Ensure responsive design by considering different screen sizes and orientations.
+- Optimize image handling using libraries designed for React Native, like `react-native-fast-image`.
 
-  - Use consistent styling, either through `StyleSheet.create()` or Styled Components.
-  - Ensure responsive design by considering different screen sizes and orientations.
-  - Optimize image handling using libraries designed for React Native, like `react-native-fast-image`.
+Best Practices:
 
-  Best Practices:
-
-  - Follow React Native's threading model to ensure smooth UI performance.
-  - Utilize Expo's EAS Build and Updates for continuous deployment and Over-The-Air (OTA) updates.
-  - Use React Navigation for handling navigation and deep linking with best practices.
+- Follow React Native's threading model to ensure smooth UI performance.
+- Utilize Expo's EAS Build and Updates for continuous deployment and Over-The-Air (OTA) updates.
+- Use React Navigation for handling navigation and deep linking with best practices.
+- Endpoint usages are consistent with the index.js file within the backend/ file directory.
