@@ -14,6 +14,7 @@ import {
   FlatList,
   Animated,
   Easing,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -51,6 +52,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { KeyboardAwareBottomSheet } from '@/components/KeyboardAwareBottomSheet';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
 // Constants
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -736,6 +739,29 @@ export default function FinanceDashboard() {
   
   // Bottom sheet ref
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+  
+  // Keyboard-aware snap points for bottom sheet
+  const { keyboardHeight: bottomSheetKeyboardHeight, isKeyboardVisible: bottomSheetKeyboardVisible } = useKeyboardHeight();
+  
+  // Calculate snap points that adjust for keyboard
+  const snapPoints = useMemo(() => {
+    if (bottomSheetKeyboardVisible && bottomSheetKeyboardHeight > 0) {
+      // When keyboard is visible, expand to a height that keeps content visible
+      const keyboardAdjustedHeight = (bottomSheetKeyboardHeight + 300) / SCREEN_HEIGHT * 100;
+      return ['40%', `${Math.min(keyboardAdjustedHeight, 90)}%`];
+    }
+    return ['40%', '85%'];
+  }, [bottomSheetKeyboardVisible, bottomSheetKeyboardHeight]);
+  
+  // Auto-expand bottom sheet when keyboard appears
+  useEffect(() => {
+    if (bottomSheetKeyboardVisible && bottomSheetModalRef.current) {
+      // Expand to the larger snap point when keyboard shows
+      setTimeout(() => {
+        bottomSheetModalRef.current?.snapToIndex(1);
+      }, 100);
+    }
+  }, [bottomSheetKeyboardVisible]);
 
   // Computed values
   const categoryData = useMemo(() => {
@@ -1151,6 +1177,8 @@ export default function FinanceDashboard() {
   }, []);
   
   const hideBottomSheet = useCallback(() => {
+    // Immediately dismiss keyboard for faster response
+    Keyboard.dismiss();
     bottomSheetModalRef.current?.dismiss();
     setSelectedTransaction(null);
     setIsEditing(false);
@@ -1915,7 +1943,10 @@ export default function FinanceDashboard() {
       <BottomSheetModal
         ref={bottomSheetModalRef}
         index={0}
-        snapPoints={['40%', '85%']} // Reduced from 60% to 40% for thumb-reachable default size
+        snapPoints={snapPoints}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
         backdropComponent={(props) => (
           <BottomSheetBackdrop
             {...props}
@@ -1934,10 +1965,22 @@ export default function FinanceDashboard() {
           height: 5,
         }}
         enablePanDownToClose
+        onAnimate={(fromIndex, toIndex) => {
+          // Dismiss keyboard as soon as closing animation starts
+          if (toIndex === -1) {
+            Keyboard.dismiss();
+          }
+        }}
         enableDynamicSizing={false}
+        onChange={(index) => {
+          // Dismiss keyboard immediately when sheet starts closing
+          if (index === -1) {
+            Keyboard.dismiss();
+          }
+        }}
         onDismiss={hideBottomSheet}
       >
-        <BottomSheetScrollView 
+        <KeyboardAwareBottomSheet 
           style={styles.bottomSheetContent}
           contentContainerStyle={styles.bottomSheetScrollContent}
           showsVerticalScrollIndicator={false}
@@ -2193,7 +2236,7 @@ export default function FinanceDashboard() {
               </View>
             </View>
           )}
-        </BottomSheetScrollView>
+        </KeyboardAwareBottomSheet>
       </BottomSheetModal>
       
       {/* Notification Banner Overlay */}
