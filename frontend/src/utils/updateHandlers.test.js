@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+import { getApiUrl, getApiUrlWithParams } from './apiUtils';
 
 import { 
   normalizeValue, 

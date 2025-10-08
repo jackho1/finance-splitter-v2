@@ -66,16 +66,31 @@ export const filterByBankCategory = (transactions, bankCategoryFilter) => {
  * Filter transactions based on labels
  * @param {Array} transactions - Original transactions array
  * @param {Array} labelFilter - Array of selected labels
+ * @param {Function} getTransactionLabel - Optional function to get dynamic labels
  * @returns {Array} - Filtered transactions
  */
-export const filterByLabel = (transactions, labelFilter) => {
+export const filterByLabel = (transactions, labelFilter, getTransactionLabel) => {
   if (!labelFilter.length) {
     return transactions;
   }
   
-  return transactions.filter(transaction => 
-    labelFilter.includes(transaction.label)
-  );
+  return transactions.filter(transaction => {
+    // Get both static and dynamic labels
+    const staticLabel = transaction.label;
+    const dynamicLabel = getTransactionLabel ? getTransactionLabel(transaction) : null;
+    
+    // Use dynamic label if available, otherwise use static label
+    const transactionLabel = (dynamicLabel !== null && dynamicLabel !== undefined) 
+      ? dynamicLabel 
+      : staticLabel;
+    
+    // Handle null values properly
+    if (labelFilter.includes(null) && (transactionLabel === null || transactionLabel === undefined)) {
+      return true;
+    }
+    
+    return labelFilter.includes(transactionLabel);
+  });
 };
 
 /**
@@ -215,9 +230,10 @@ export const sortByCategory = (transactions, sortDirection) => {
  * Apply all filters and sorting to transactions
  * @param {Array} transactions - Original transactions array
  * @param {Object} filters - Object containing all filter and sort options
+ * @param {Function} getTransactionLabel - Optional function to get dynamic labels
  * @returns {Array} - Filtered and sorted transactions
  */
-export const applyFilters = (transactions, filters) => {
+export const applyFilters = (transactions, filters, getTransactionLabel) => {
   const { dateFilter = {}, bankCategoryFilter = [], labelFilter = [], sortBy } = filters;
   
   let filtered = [...transactions];
@@ -228,8 +244,8 @@ export const applyFilters = (transactions, filters) => {
   // Apply bank category filter
   filtered = filterByBankCategory(filtered, bankCategoryFilter);
   
-  // Apply label filter
-  filtered = filterByLabel(filtered, labelFilter);
+  // Apply label filter with dynamic label support
+  filtered = filterByLabel(filtered, labelFilter, getTransactionLabel);
   
   // Apply sorting
   if (sortBy) {
