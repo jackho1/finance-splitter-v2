@@ -473,3 +473,7 @@
 - [ ] **When web app is initialized, check if dark mode is selected= **:
 
   - Bug exists where dark mode is selected but upon web page load, it uses light mode.
+
+- [ ] **Filter by label stil failing **:
+
+  - As above
