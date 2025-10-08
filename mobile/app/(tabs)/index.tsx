@@ -57,6 +57,9 @@ import { Colors } from '@/constants/Colors';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { KeyboardAwareBottomSheet } from '@/components/KeyboardAwareBottomSheet';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { UserFilterDropdown } from '@/components/UserFilterDropdown';
+import { SortDropdown, SortOption } from '@/components/SortDropdown';
+import { RunningTotalDisplay } from '@/components/RunningTotalDisplay';
 
 // Constants
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -273,11 +276,11 @@ const getCategoryIconColor = (isDark: boolean): string => {
   // Use a neutral icon color that works well with all transaction background colors
   // and maintains good contrast in both light and dark modes
   if (isDark) {
-  return '#94A3B8'; // Light slate-gray for dark mode - softer and more modern
+    return '#94A3B8'; // Light slate-gray for dark mode - softer and more modern
   } else {
-  return '#475569'; // Dark slate-gray for light mode - professional and readable
+    return '#475569'; // Dark slate-gray for light mode - professional and readable
   }
-  };
+};
 // Helper function to get bottom sheet theme
 const getBottomSheetTheme = (isDark: boolean) => ({
   backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
@@ -616,6 +619,10 @@ export default function FinanceDashboard() {
   const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
   const [users, setUsers] = useState<User[]>([]);
   
+  // User filtering and sorting state
+  const [selectedUserFilters, setSelectedUserFilters] = useState<string[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  
   // Dropdown options state
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [availableBankCategories, setAvailableBankCategories] = useState<string[]>([]);
@@ -786,6 +793,14 @@ export default function FinanceDashboard() {
         return false;
       }
       
+      // Apply user filtering if any users are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(transaction);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
+      }
+      
       return true;
     });
     
@@ -838,7 +853,7 @@ export default function FinanceDashboard() {
       });
     
     return result;
-  }, [transactions, categoryMappings]);
+  }, [transactions, categoryMappings, selectedUserFilters, sortOption, getTransactionLabel]);
   
   const filteredCategoryData = useMemo(() => {
     if (selectedCategories.length === 0 && selectedCategoryFilters.length === 0) return categoryData;
@@ -871,57 +886,75 @@ export default function FinanceDashboard() {
       
       // Filter by selected categories if any are selected
       if (selectedCategoryFilters.length > 0) {
-        // Use the same category determination logic
         const transactionCategory = getTransactionCategory(t, categoryMappings);
-        return selectedCategoryFilters.includes(transactionCategory);
+        if (!selectedCategoryFilters.includes(transactionCategory)) {
+          return false;
+        }
+      }
+      
+      // Filter by selected users if any are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(t);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
       }
       
       return true;
     });
     
+    // Apply sorting if specified
+    if (sortOption) {
+      if (sortOption === 'amount-desc') {
+        filtered.sort((a, b) => {
+          const amountA = Math.abs(parseFloat(a.amount) || 0);
+          const amountB = Math.abs(parseFloat(b.amount) || 0);
+          return amountB - amountA; // Descending order (highest first)
+        });
+      } else if (sortOption === 'date-desc') {
+        filtered.sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        });
+      }
+    }
     return filtered;
-  }, [transactions, displayMonth, currentYear, selectedCategoryFilters, categoryMappings]);
+  }, [transactions, displayMonth, currentYear, selectedCategoryFilters, categoryMappings, selectedUserFilters, sortOption, getTransactionLabel]);
   
   // Group transactions by date and create flat array with date headers
   const groupedTransactions = useMemo((): ListItem[] => {
-    const groupedByDate = new Map<string, Transaction[]>();
-    
-    // Group transactions by date
-    monthlyTransactions.forEach(transaction => {
-      const dateStr = transaction.date;
-      if (!groupedByDate.has(dateStr)) {
-        groupedByDate.set(dateStr, []);
-      }
-      groupedByDate.get(dateStr)!.push(transaction);
-    });
-    
-    // Sort dates in descending order (newest first)
-    const sortedDates = Array.from(groupedByDate.keys()).sort((a, b) => 
-      new Date(b).getTime() - new Date(a).getTime()
-    );
-    
-    // Create flat array with date headers and transactions
     const result: ListItem[] = [];
-    sortedDates.forEach(dateStr => {
-      // Add date header
-      result.push({
-        type: 'date',
-        date: dateStr,
-        id: `date-${dateStr}`
-      });
+    const addedDateHeaders = new Set<string>();
+    let lastDate: string | null = null;
+    
+    // monthlyTransactions is already sorted based on sortOption
+    monthlyTransactions.forEach(transaction => {
+      const currentDate = transaction.date;
       
-      // Add transactions for this date
-      const transactionsForDate = groupedByDate.get(dateStr)!;
-      transactionsForDate.forEach(transaction => {
-        result.push({
-          ...transaction,
-          type: 'transaction'
-        });
+      // Add date header only if we haven't added one for this date yet
+      // and it's different from the last date (to maintain grouping)
+      if (currentDate !== lastDate) {
+        if (!addedDateHeaders.has(currentDate)) {
+          result.push({
+            type: 'date',
+            date: currentDate,
+            id: `date-${currentDate}`
+          });
+          addedDateHeaders.add(currentDate);
+        }
+        lastDate = currentDate;
+      }
+      
+      // Add the transaction
+      result.push({
+        ...transaction,
+        type: 'transaction'
       });
     });
     
     return result;
-  }, [monthlyTransactions]);
+  }, [monthlyTransactions, sortOption]);
   
   // Calculate unfiltered monthly transactions for category totals
   const unfileredMonthlyTransactions = useMemo(() => {
@@ -929,11 +962,23 @@ export default function FinanceDashboard() {
       if (!t.date) return false;
       const transactionDate = new Date(t.date);
       
-      // Only filter by month and year (no category filtering)
-      return transactionDate.getMonth() === displayMonth && 
-             transactionDate.getFullYear() === currentYear;
+      // Filter by month and year
+      if (transactionDate.getMonth() !== displayMonth || 
+          transactionDate.getFullYear() !== currentYear) {
+        return false;
+      }
+      
+      // Apply user filtering if any users are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(t);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
+      }
+      
+      return true;
     });
-  }, [transactions, displayMonth, currentYear]);
+  }, [transactions, displayMonth, currentYear, selectedUserFilters, getTransactionLabel]);
 
   const categoryTotals = useMemo((): CategoryTotal[] => {
     const totals = new Map<string, { total: number; color: string }>();
@@ -968,7 +1013,7 @@ export default function FinanceDashboard() {
       .sort((a, b) => b.total - a.total);
     
     return result;
-  }, [unfileredMonthlyTransactions, categoryMappings]);
+  }, [unfileredMonthlyTransactions, categoryMappings, getTransactionLabel]);
   
   // API calls
   const fetchTransactions = useCallback(async () => {
@@ -1159,6 +1204,8 @@ export default function FinanceDashboard() {
     setSelectedCategories([]);
     setSelectedSegment(null);
     setSelectedCategoryFilters([]);
+    setSelectedUserFilters([]);
+    setSortOption('date-desc');
   }, []);
   
   const handleCategorySummaryClick = useCallback((category: string) => {
@@ -1840,7 +1887,7 @@ export default function FinanceDashboard() {
         <View style={styles.chartHeader}>
           <ThemedText type="subtitle">Shared Transactions</ThemedText>
           
-          {(selectedCategories.length > 0 || selectedCategoryFilters.length > 0) && (
+          {(selectedCategories.length > 0 || selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0 || sortOption === 'amount-desc') && (
             <Pressable 
               style={({ pressed }) => [
                 styles.resetButton,
@@ -1849,7 +1896,7 @@ export default function FinanceDashboard() {
               onPress={resetFilters}
             >
               <Text style={[styles.resetButtonText, { color: isDark ? '#fff' : '#000' }]}>
-                Reset ({selectedCategories.length + selectedCategoryFilters.length})
+                Reset ({selectedCategories.length + selectedCategoryFilters.length + selectedUserFilters.length + (sortOption === 'amount-desc' ? 1 : 0)})
               </Text>
             </Pressable>
           )}
@@ -1982,9 +2029,14 @@ export default function FinanceDashboard() {
                   }
                 ]}>
                   {monthlyTransactions.length} transactions
-                  {selectedCategoryFilters.length > 0 && (
+                  {(selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0 || sortOption === 'amount-desc') && (
                     <Text style={[styles.filterIndicator, { color: isDark ? '#0A84FF' : '#007AFF' }]}>
-                      {' '}• {selectedCategoryFilters.join(', ')}
+                      {' '}•{' '}
+                      {selectedCategoryFilters.length > 0 && `Cat: ${selectedCategoryFilters.join(', ')}`}
+                      {selectedCategoryFilters.length > 0 && selectedUserFilters.length > 0 && ' | '}
+                      {selectedUserFilters.length > 0 && `User: ${selectedUserFilters.join(', ')}`}
+                      {(selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0) && sortOption === 'amount-desc' && ' | '}
+                      {sortOption === 'amount-desc' && 'Sort: Highest'}
                     </Text>
                   )}
                 </Text>
@@ -2053,6 +2105,41 @@ export default function FinanceDashboard() {
             })}
             </ScrollView>
         )}
+        
+        {/* Filter and Sort Controls */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        }}>
+          <UserFilterDropdown
+            users={users}
+            splitAllocations={splitAllocations}
+            transactions={monthlyTransactions}
+            selectedUsers={selectedUserFilters}
+            onSelectionChange={setSelectedUserFilters}
+            isDark={isDark}
+          />
+          <SortDropdown
+            selectedSort={sortOption}
+            onSortChange={setSortOption}
+            isDark={isDark}
+          />
+        </View>
+        
+        {/* Running Total Display */}
+        <RunningTotalDisplay
+          transactions={monthlyTransactions}
+          users={users}
+          splitAllocations={splitAllocations}
+          isDark={isDark}
+          selectedUsers={selectedUserFilters}
+        />
+        
       </View>
     );
   };
@@ -2096,48 +2183,55 @@ export default function FinanceDashboard() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
-        {/* Static Chart Section - Not affected by swipe gestures */}
-        {renderChart()}
-        
-        {/* Swipeable Transaction List Section */}
-        <PanGestureHandler
-          onHandlerStateChange={handleSwipeGesture}
-          onGestureEvent={handleSwipeGesture}
-          activeOffsetX={[-10, 10]}
-          failOffsetY={[-5, 5]}
-        >
-          <Animated.View 
-            style={{
-              flex: 1,
-              transform: [{ translateX }],
-              opacity: swipeOpacity,
-            }}
-          >
-            <FlatList
-              data={groupedTransactions}
-              keyExtractor={item => item.id}
-              renderItem={renderListItem}
-              ListHeaderComponent={renderTransactionListHeader()}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <ThemedText style={styles.emptyText}>No transactions found</ThemedText>
-                  <ThemedText style={styles.emptySubtext}>
-                    Transactions for {MONTH_LABELS[displayMonth]} will appear here
-                  </ThemedText>
-                </View>
-              }
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={isDark ? '#fff' : '#000'}
-                />
-              }
+        <ScrollView 
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={isDark ? '#fff' : '#000'}
             />
-          </Animated.View>
-        </PanGestureHandler>
+          }
+        >
+          {/* Chart Section - No swipe animation, scrolls with content */}
+          {renderChart()}
+          
+          {/* Transaction List Header - No swipe animation */}
+          {renderTransactionListHeader()}
+          
+          {/* Swipeable Transaction List Section */}
+          <PanGestureHandler
+            onHandlerStateChange={handleSwipeGesture}
+            onGestureEvent={handleSwipeGesture}
+            activeOffsetX={[-10, 10]}
+            failOffsetY={[-5, 5]}
+          >
+            <Animated.View 
+              style={{
+                transform: [{ translateX }],
+                opacity: swipeOpacity,
+              }}
+            >
+              <FlatList
+                data={groupedTransactions}
+                keyExtractor={item => item.id}
+                renderItem={renderListItem}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <ThemedText style={styles.emptyText}>No transactions found</ThemedText>
+                    <ThemedText style={styles.emptySubtext}>
+                      Transactions for {MONTH_LABELS[displayMonth]} will appear here
+                    </ThemedText>
+                  </View>
+                }
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false} // Disable FlatList scrolling since we're using ScrollView
+              />
+            </Animated.View>
+          </PanGestureHandler>
+        </ScrollView>
         
         <BottomSheetModal
         ref={bottomSheetModalRef}
@@ -2496,7 +2590,7 @@ export default function FinanceDashboard() {
     </SafeAreaView>
     </GestureHandlerRootView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -3233,6 +3327,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6366f1',
   },
-
-
 });

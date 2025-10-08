@@ -2,7 +2,7 @@
 
   - Add ability to swipe & change months for mobile app instead of needing to press on arrow icons.
 
-- [ ] ** Add ability to sort filtered transactions for mobile app **:
+- [x] ** Add ability to sort filtered transactions for mobile app **:
 
   - Add ability to sort filtered transactions to show highest amount spent for that month, etc.
 
