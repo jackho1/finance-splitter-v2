@@ -21,6 +21,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 
 // Lucide React Native icons
 import { 
@@ -44,7 +45,9 @@ import {
   Bookmark,
   User,
   Check,
-  ChevronDown
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -596,6 +599,10 @@ export default function FinanceDashboard() {
   const [displayMonth, setDisplayMonth] = useState(new Date().getMonth());
   const [lastPressTime, setLastPressTime] = useState<number>(0);
   
+  // Swipe gesture state
+  const translateX = useRef(new Animated.Value(0)).current;
+  const swipeOpacity = useRef(new Animated.Value(1)).current;
+
   // Enhanced bottom sheet state
   const [isEditing, setIsEditing] = useState(false);
   const [editedTransaction, setEditedTransaction] = useState<Transaction | null>(null);
@@ -1570,6 +1577,76 @@ export default function FinanceDashboard() {
       }
     });
   }, []);
+
+  // Animated navigation function that mimics swipe animations
+  const navigateMonthWithAnimation = useCallback((direction: 'prev' | 'next') => {
+    // Add haptic feedback for button press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (direction === 'prev') {
+      // Animate out to the right (previous month)
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigateMonth('prev');
+        // Reset position and animate in from left
+        translateX.setValue(-SCREEN_WIDTH);
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    } else {
+      // Animate out to the left (next month)
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: -SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigateMonth('next');
+        // Reset position and animate in from right
+        translateX.setValue(SCREEN_WIDTH);
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, [navigateMonth, translateX, swipeOpacity]);
   
   const handleMonthPress = useCallback(() => {
     const now = Date.now();
@@ -1586,6 +1663,108 @@ export default function FinanceDashboard() {
     
     setLastPressTime(now);
   }, [lastPressTime]);
+
+  const handleSwipeGesture = useCallback((event: any) => {
+    const { nativeEvent } = event;
+    
+    if (nativeEvent.state === State.ACTIVE) {
+      // Update translation during swipe
+      translateX.setValue(nativeEvent.translationX);
+      
+      // Update opacity based on swipe distance
+      const opacity = 1 - Math.abs(nativeEvent.translationX) / SCREEN_WIDTH;
+      swipeOpacity.setValue(Math.max(0.3, opacity));
+    } else if (nativeEvent.state === State.END) {
+      const swipeThreshold = 50; // Minimum distance to trigger navigation
+      
+      if (nativeEvent.translationX > swipeThreshold) {
+        // Swipe right - go to previous month
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Animate out
+        Animated.parallel([
+          Animated.timing(translateX, {
+            toValue: SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          navigateMonth('prev');
+          // Reset position
+          translateX.setValue(-SCREEN_WIDTH);
+          // Animate in from left
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      } else if (nativeEvent.translationX < -swipeThreshold) {
+        // Swipe left - go to next month
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Animate out
+        Animated.parallel([
+          Animated.timing(translateX, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          navigateMonth('next');
+          // Reset position
+          translateX.setValue(SCREEN_WIDTH);
+          // Animate in from right
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      } else {
+        // Snap back to center if swipe wasn't far enough
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  }, [navigateMonth, translateX, swipeOpacity]);
 
   
   // Helper function to generate label dropdown options (similar to web app)
@@ -1761,13 +1940,15 @@ export default function FinanceDashboard() {
           <Pressable 
             style={({ pressed }) => [
               styles.navButton,
-              { opacity: pressed ? 0.7 : 1 }
+              { opacity: pressed ? 0.5 : 1 }
             ]}
-            onPress={() => navigateMonth('prev')}
+            onPress={() => navigateMonthWithAnimation('prev')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={[styles.navButtonText, { color: isDark ? '#fff' : '#000' }]}>
-              ‹
-            </Text>
+            <ChevronLeft 
+              size={24} 
+              color={isDark ? '#fff' : '#000'} 
+            />
           </Pressable>
           
           <View style={styles.monthDisplay}>
@@ -1814,13 +1995,15 @@ export default function FinanceDashboard() {
           <Pressable 
             style={({ pressed }) => [
               styles.navButton,
-              { opacity: pressed ? 0.7 : 1 }
+              { opacity: pressed ? 0.5 : 1 }
             ]}
-            onPress={() => navigateMonth('next')}
+            onPress={() => navigateMonthWithAnimation('next')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={[styles.navButtonText, { color: isDark ? '#fff' : '#000' }]}>
-              ›
-            </Text>
+            <ChevronRight 
+              size={24} 
+              color={isDark ? '#fff' : '#000'} 
+            />
           </Pressable>
         </View>
         
@@ -1911,36 +2094,52 @@ export default function FinanceDashboard() {
   };
   
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}> 
-      <FlatList
-        data={groupedTransactions}
-        keyExtractor={item => item.id}
-        renderItem={renderListItem}
-        ListHeaderComponent={
-          <View>
-            {renderChart()}
-            {renderTransactionListHeader()}
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <ThemedText style={styles.emptyText}>No transactions found</ThemedText>
-            <ThemedText style={styles.emptySubtext}>
-              Transactions for {MONTH_LABELS[displayMonth]} will appear here
-            </ThemedText>
-          </View>
-        }
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={isDark ? '#fff' : '#000'}
-          />
-        }
-      />
-      <BottomSheetModal
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
+        {/* Static Chart Section - Not affected by swipe gestures */}
+        {renderChart()}
+        
+        {/* Swipeable Transaction List Section */}
+        <PanGestureHandler
+          onHandlerStateChange={handleSwipeGesture}
+          onGestureEvent={handleSwipeGesture}
+          activeOffsetX={[-10, 10]}
+          failOffsetY={[-5, 5]}
+        >
+          <Animated.View 
+            style={{
+              flex: 1,
+              transform: [{ translateX }],
+              opacity: swipeOpacity,
+            }}
+          >
+            <FlatList
+              data={groupedTransactions}
+              keyExtractor={item => item.id}
+              renderItem={renderListItem}
+              ListHeaderComponent={renderTransactionListHeader()}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>No transactions found</ThemedText>
+                  <ThemedText style={styles.emptySubtext}>
+                    Transactions for {MONTH_LABELS[displayMonth]} will appear here
+                  </ThemedText>
+                </View>
+              }
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={isDark ? '#fff' : '#000'}
+                />
+              }
+            />
+          </Animated.View>
+        </PanGestureHandler>
+        
+        <BottomSheetModal
         ref={bottomSheetModalRef}
         index={0}
         snapPoints={snapPoints}
@@ -2295,6 +2494,7 @@ export default function FinanceDashboard() {
         </Animated.View>
       )}
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -2500,7 +2700,11 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   navButton: {
-    padding: 8,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
   },
   navButtonText: {
     fontSize: 24,

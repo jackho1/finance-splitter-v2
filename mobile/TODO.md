@@ -1,4 +1,4 @@
-- [ ] ** Add ability to swipe and change months for mobile app **:
+- [x] ** Add ability to swipe and change months for mobile app **:
 
   - Add ability to swipe & change months for mobile app instead of needing to press on arrow icons.
 
