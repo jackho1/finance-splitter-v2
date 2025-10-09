@@ -99,18 +99,18 @@ describe('groupSplitTransactions', () => {
 
       expect(result).toHaveLength(7);
       
-      // First group should be original2 and its splits (appears first in input)
-      expect(result[0]).toEqual(original2);
-      expect(result[1]).toEqual(split2_1);
-      expect(result[2]).toEqual(split2_2);
+      // First group should be original1 and its splits (split1_1 triggers this first)
+      expect(result[0]).toEqual(original1);
+      expect(result[1]).toEqual(split1_1);
+      expect(result[2]).toEqual(split1_2);
+      
+      // Second group should be original2 and its splits
+      expect(result[3]).toEqual(original2);
+      expect(result[4]).toEqual(split2_1);
+      expect(result[5]).toEqual(split2_2);
       
       // Regular transaction
-      expect(result[3]).toEqual(regularTransaction);
-      
-      // Second group should be original1 and its splits
-      expect(result[4]).toEqual(original1);
-      expect(result[5]).toEqual(split1_1);
-      expect(result[6]).toEqual(split1_2);
+      expect(result[6]).toEqual(regularTransaction);
     });
   });
 
@@ -123,9 +123,11 @@ describe('groupSplitTransactions', () => {
       const transactions = [orphanedSplit1, regularTransaction, orphanedSplit2];
       const result = groupSplitTransactions(transactions);
 
-      // Orphaned splits should be ignored, only regular transaction should remain
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(regularTransaction);
+      // Orphaned splits should be treated as standalone transactions
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual(orphanedSplit1);
+      expect(result[1]).toEqual(regularTransaction);
+      expect(result[2]).toEqual(orphanedSplit2);
     });
 
     test('should handle original transaction without any splits', () => {

@@ -338,6 +338,84 @@ describe('App Utility Functions', () => {
       expect(result2).toEqual(['Entertainment', 'Food']);
     });
   });
+
+  describe('handleLabelFilterChange', () => {
+    // Test filter logic pattern similar to category filter
+    const updateLabelFilter = (currentFilter, label) => {
+      // Check if the label is already in the filter
+      const isAlreadyIncluded = currentFilter.some(item => 
+        // Handle null equality properly
+        (item === null && label === null) || item === label
+      );
+
+      if (isAlreadyIncluded) {
+        // Remove the label if it's already included
+        return currentFilter.filter(item => 
+          !((item === null && label === null) || item === label)
+        );
+      } else {
+        // Add the label if it's not already included
+        return [...currentFilter, label];
+      }
+    };
+
+    test('should add label to empty filter', () => {
+      const currentFilter = [];
+      const result = updateLabelFilter(currentFilter, 'Alice');
+      expect(result).toEqual(['Alice']);
+    });
+
+    test('should add label to existing filter', () => {
+      const currentFilter = ['Alice'];
+      const result = updateLabelFilter(currentFilter, 'Bob');
+      expect(result).toEqual(['Alice', 'Bob']);
+    });
+
+    test('should remove existing label from filter', () => {
+      const currentFilter = ['Alice', 'Bob'];
+      const result = updateLabelFilter(currentFilter, 'Alice');
+      expect(result).toEqual(['Bob']);
+    });
+
+    test('should handle null label addition', () => {
+      const currentFilter = ['Alice'];
+      const result = updateLabelFilter(currentFilter, null);
+      expect(result).toEqual(['Alice', null]);
+    });
+
+    test('should handle null label removal', () => {
+      const currentFilter = ['Alice', null];
+      const result = updateLabelFilter(currentFilter, null);
+      expect(result).toEqual(['Alice']);
+    });
+
+    test('should handle adding null to empty filter', () => {
+      const currentFilter = [];
+      const result = updateLabelFilter(currentFilter, null);
+      expect(result).toEqual([null]);
+    });
+
+    test('should handle multiple toggle operations', () => {
+      const currentFilter = ['Alice', 'Bob'];
+      const result1 = updateLabelFilter(currentFilter, 'Alice');
+      expect(result1).toEqual(['Bob']);
+      
+      const result2 = updateLabelFilter(result1, 'Alice');
+      expect(result2).toEqual(['Bob', 'Alice']);
+    });
+
+    test('should handle collective labels like Both and All users', () => {
+      const currentFilter = [];
+      const result1 = updateLabelFilter(currentFilter, 'Both');
+      expect(result1).toEqual(['Both']);
+      
+      const result2 = updateLabelFilter(result1, 'All users');
+      expect(result2).toEqual(['Both', 'All users']);
+      
+      const result3 = updateLabelFilter(result2, 'Both');
+      expect(result3).toEqual(['All users']);
+    });
+  });
 });
 
 // Component rendering tests removed to avoid CSS import issues

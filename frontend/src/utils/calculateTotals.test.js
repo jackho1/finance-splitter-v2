@@ -1,114 +1,170 @@
-import { calculateTotals } from './calculateTotals';
-import { USER_CONFIG } from '../config/userConfig';
+import { describe, expect, test } from 'vitest';
+import { getTransactionLabel, getUserTotalFromAllocations, calculateTotalsFromAllocations } from './calculateTotals';
 
-describe('calculateTotals', () => {
-  // Use the configuration for test setup
-  const { PRIMARY_USER_1, PRIMARY_USER_2, BOTH_LABEL } = USER_CONFIG;
+// Mock data for testing
+const mockUsers = [
+  { id: 1, display_name: 'Alice', username: 'alice', is_active: true },
+  { id: 2, display_name: 'Bob', username: 'bob', is_active: true },
+  { id: 3, display_name: 'Charlie', username: 'charlie', is_active: true },
+  { id: 4, display_name: 'System', username: 'default', is_active: true } // System user should be excluded
+];
+
+const mockSplitAllocations = {
+  // Single user allocation
+  1: [{ user_id: 1, display_name: 'Alice', amount: -100, split_type_code: 'fixed' }],
   
-  test('calculates totals correctly with configuration', () => {
-    const transactions = [
-      { id: 1, label: PRIMARY_USER_1, amount: 100 },
-      { id: 2, label: PRIMARY_USER_2, amount: 200 },
-      { id: 3, label: BOTH_LABEL, amount: 300 }
-    ];
-    
-    // Use default labels from config
-    const result = calculateTotals(transactions);
-    
-    // Test assertions using the config values
-    expect(result[PRIMARY_USER_1]).toBe(100 + 300 / 2);  // Ruby gets full amount + half of Both
-    expect(result[PRIMARY_USER_2]).toBe(200 + 300 / 2);  // Jack gets full amount + half of Both
-    expect(result[BOTH_LABEL]).toBe(300);  // Both gets full amount
-  });
+  // Equal split between two users (Both)
+  2: [
+    { user_id: 1, display_name: 'Alice', amount: -50, split_type_code: 'equal', percentage: 50 },
+    { user_id: 2, display_name: 'Bob', amount: -50, split_type_code: 'equal', percentage: 50 }
+  ],
   
-  test('handles invalid transactions', () => {
-    const transactions = [
-      { id: 1, label: PRIMARY_USER_1, amount: '100abc' },  // Invalid amount
-      { id: 2, label: null, amount: 200 },  // No label
-    ];
-    
-    const result = calculateTotals(transactions);
-    
-    // Should handle invalid amount by parsing relevant portion
-    expect(result[PRIMARY_USER_1]).toBe(100);
-    // No label should be ignored
-    expect(result).toEqual({ [PRIMARY_USER_1]: 100, [PRIMARY_USER_2]: 0, [BOTH_LABEL]: 0 });
-  });
+  // Equal split between all users (All users)
+  3: [
+    { user_id: 1, display_name: 'Alice', amount: -33.33, split_type_code: 'equal', percentage: 33.33 },
+    { user_id: 2, display_name: 'Bob', amount: -33.33, split_type_code: 'equal', percentage: 33.33 },
+    { user_id: 3, display_name: 'Charlie', amount: -33.34, split_type_code: 'equal', percentage: 33.34 }
+  ],
+  
+  // Mixed split
+  4: [
+    { user_id: 1, display_name: 'Alice', amount: -70, split_type_code: 'fixed' },
+    { user_id: 2, display_name: 'Bob', amount: -30, split_type_code: 'fixed' }
+  ]
+};
 
-  test('should handle negative amounts', () => {
-    const mockTransactions = [
-      { id: 1, label: PRIMARY_USER_1, amount: -50 },
-      { id: 2, label: PRIMARY_USER_2, amount: -100 },
-      { id: 3, label: BOTH_LABEL, amount: -200 }
-    ];
+const mockTransactions = [
+  { id: 1, amount: -100, date: '2024-08-01', label: null }, // New system - Alice only
+  { id: 2, amount: -100, date: '2024-08-02', label: null }, // New system - Both
+  { id: 3, amount: -100, date: '2024-08-03', label: null }, // New system - All users
+  { id: 4, amount: -100, date: '2024-08-04', label: null }, // New system - Mixed
+  { id: 5, amount: -150, date: '2024-07-01', label: 'Alice' }, // Legacy system
+  { id: 6, amount: -200, date: '2024-07-02', label: 'Both' }, // Legacy system
+  { id: 7, amount: -300, date: '2024-07-03', label: 'All users' }, // Legacy system
+  { id: 8, amount: -50, date: '2024-07-04', label: null }, // No allocation
+];
 
-    const result = calculateTotals(mockTransactions);
+describe('calculateTotals utilities', () => {
+  describe('getTransactionLabel', () => {
+    test('should return null when loading', () => {
+      const result = getTransactionLabel(mockTransactions[0], mockSplitAllocations, mockUsers, true);
+      expect(result).toBeNull();
+    });
 
-    expect(result).toEqual({
-      [PRIMARY_USER_1]: -150,  // -50 + (-200/2)
-      [PRIMARY_USER_2]: -200,  // -100 + (-200/2)
-      [BOTH_LABEL]: -200   // -200
+    test('should return null when users not loaded', () => {
+      const result = getTransactionLabel(mockTransactions[0], mockSplitAllocations, null, false);
+      expect(result).toBeNull();
+    });
+
+    test('should return null when splitAllocations not loaded', () => {
+      const result = getTransactionLabel(mockTransactions[0], null, mockUsers, false);
+      expect(result).toBeNull();
+    });
+
+    test('should return single user display name for single allocation', () => {
+      const result = getTransactionLabel(mockTransactions[0], mockSplitAllocations, mockUsers, false);
+      expect(result).toBe('Alice');
+    });
+
+    test('should return "Both" for equal split between 2 users', () => {
+      const result = getTransactionLabel(mockTransactions[1], mockSplitAllocations, mockUsers, false);
+      expect(result).toBe('Both');
+    });
+
+    test('should return "All users" for equal split between 3+ users', () => {
+      const result = getTransactionLabel(mockTransactions[2], mockSplitAllocations, mockUsers, false);
+      expect(result).toBe('All users');
+    });
+
+    test('should return mixed allocation format for non-equal splits', () => {
+      const result = getTransactionLabel(mockTransactions[3], mockSplitAllocations, mockUsers, false);
+      expect(result).toBe('Alice +1');
+    });
+
+    test('should return null for transaction without allocations', () => {
+      const result = getTransactionLabel(mockTransactions[7], mockSplitAllocations, mockUsers, false);
+      expect(result).toBeNull();
     });
   });
 
-  test('should skip transactions with null or undefined labels', () => {
-    const mockTransactions = [
-      { id: 1, label: PRIMARY_USER_1, amount: 100 },
-      { id: 2, label: null, amount: 200 },
-      { id: 3, label: undefined, amount: 300 },
-      { id: 4, label: '', amount: 400 },
-      { id: 5, label: PRIMARY_USER_2, amount: 500 }
-    ];
+  describe('getUserTotalFromAllocations', () => {
+    test('should return 0 for invalid inputs', () => {
+      const result = getUserTotalFromAllocations(1, null, mockSplitAllocations, mockUsers);
+      expect(result).toBe(0);
+    });
 
-    const result = calculateTotals(mockTransactions);
+    test('should calculate total from new allocation system', () => {
+      const newTransactions = mockTransactions.slice(0, 4); // Only new system transactions
+      const result = getUserTotalFromAllocations(1, newTransactions, mockSplitAllocations, mockUsers);
+      // Alice gets: -100 (tx1) + -50 (tx2) + -33.33 (tx3) + -70 (tx4) = -253.33
+      expect(result).toBeCloseTo(-253.33, 2);
+    });
 
-    expect(result).toEqual({
-      [PRIMARY_USER_1]: 100,
-      [PRIMARY_USER_2]: 500,
-      [BOTH_LABEL]: 0
+    test('should calculate total from legacy label system', () => {
+      const legacyTransactions = mockTransactions.slice(4, 7); // Only legacy transactions
+      const result = getUserTotalFromAllocations(1, legacyTransactions, {}, mockUsers);
+      // Alice gets: -150 (direct) + -66.67 (Both split) + -100 (All users split) = -316.67
+      expect(result).toBeCloseTo(-316.67, 2);
+    });
+
+    test('should handle mixed new and legacy systems', () => {
+      const allTransactions = mockTransactions.slice(0, 7); // Exclude unallocated
+      const result = getUserTotalFromAllocations(1, allTransactions, mockSplitAllocations, mockUsers);
+      // New system: -253.33 + Legacy system: -316.67 = -570
+      expect(result).toBeCloseTo(-570, 2);
+    });
+
+    test('should ignore unallocated transactions', () => {
+      const result = getUserTotalFromAllocations(1, [mockTransactions[7]], mockSplitAllocations, mockUsers);
+      expect(result).toBe(0);
+    });
+
+    test('should handle Bob\'s allocations correctly', () => {
+      const newTransactions = mockTransactions.slice(0, 4);
+      const result = getUserTotalFromAllocations(2, newTransactions, mockSplitAllocations, mockUsers);
+      // Bob gets: 0 (tx1) + -50 (tx2) + -33.33 (tx3) + -30 (tx4) = -113.33
+      expect(result).toBeCloseTo(-113.33, 2);
+    });
+
+    test('should handle Charlie\'s allocations correctly', () => {
+      const newTransactions = mockTransactions.slice(0, 4);
+      const result = getUserTotalFromAllocations(3, newTransactions, mockSplitAllocations, mockUsers);
+      // Charlie gets: 0 (tx1) + 0 (tx2) + -33.34 (tx3) + 0 (tx4) = -33.34
+      expect(result).toBeCloseTo(-33.34, 2);
     });
   });
 
-  test('should handle empty transactions array', () => {
-    const result = calculateTotals([]);
+  describe('calculateTotalsFromAllocations', () => {
+    test('should return empty object for invalid users', () => {
+      const result = calculateTotalsFromAllocations(mockTransactions, null, mockSplitAllocations);
+      expect(result).toEqual({});
+    });
 
-    expect(result).toEqual({
-      [PRIMARY_USER_1]: 0,
-      [PRIMARY_USER_2]: 0,
-      [BOTH_LABEL]: 0
+    test('should calculate totals for all active users', () => {
+      const allTransactions = mockTransactions.slice(0, 7); // Exclude unallocated
+      const result = calculateTotalsFromAllocations(allTransactions, mockUsers, mockSplitAllocations);
+      
+      expect(result).toHaveProperty('Alice');
+      expect(result).toHaveProperty('Bob');
+      expect(result).toHaveProperty('Charlie');
+      expect(result).not.toHaveProperty('System'); // Default user should be excluded
+      
+      expect(result.Alice).toBeCloseTo(-570, 2);
+      expect(result.Bob).toBeCloseTo(-280, 2); // -113.33 (new) + -166.67 (legacy)
+      expect(result.Charlie).toBeCloseTo(-200.01, 2); // -33.34 (new) + -166.67 (legacy)
+    });
+
+    test('should handle empty transactions gracefully', () => {
+      const result = calculateTotalsFromAllocations([], mockUsers, mockSplitAllocations);
+      expect(result.Alice).toBe(0);
+      expect(result.Bob).toBe(0);
+      expect(result.Charlie).toBe(0);
+    });
+
+    test('should filter out default system user', () => {
+      const result = calculateTotalsFromAllocations(mockTransactions, mockUsers, mockSplitAllocations);
+      expect(Object.keys(result)).not.toContain('System');
+      expect(Object.keys(result).length).toBe(3); // Only Alice, Bob, Charlie
     });
   });
-
-  test('should handle custom labels', () => {
-    const customLabels = ['Alice', 'Bob', 'Shared'];
-    const mockTransactions = [
-      { id: 1, label: 'Alice', amount: 100 },
-      { id: 2, label: 'Bob', amount: 200 },
-      { id: 3, label: 'Shared', amount: 300 }
-    ];
-
-    const result = calculateTotals(mockTransactions, customLabels);
-
-    expect(result).toEqual({
-      'Alice': 250,  // 100 + (300/2)
-      'Bob': 350,    // 200 + (300/2)
-      'Shared': 300  // 300
-    });
-  });
-
-  test('should handle non-numeric amounts', () => {
-    const mockTransactions = [
-      { id: 1, label: PRIMARY_USER_1, amount: '100' },     // String should be parsed
-      { id: 2, label: PRIMARY_USER_2, amount: '200abc' },  // Invalid number - JavaScript's parseFloat will return 200 for this
-      { id: 3, label: BOTH_LABEL, amount: null }           // Null amount
-    ];
-
-    const result = calculateTotals(mockTransactions);
-
-    expect(result).toEqual({
-      [PRIMARY_USER_1]: 100,  // Parsed from string
-      [PRIMARY_USER_2]: 200,  // parseFloat returns 200 from '200abc'
-      [BOTH_LABEL]: 0         // Null parsed to 0
-    });
-  });
-}); 
+});

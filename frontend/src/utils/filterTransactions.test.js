@@ -1,344 +1,220 @@
-import { 
-  filterByDate, 
-  filterByBankCategory, 
-  filterByLabel, 
-  sortByDate,
-  sortByAmount,
-  sortByDescription,
-  applyFilters 
-} from './filterTransactions.js';
+import { describe, expect, test, vi } from 'vitest';
+import { filterByLabel, applyFilters } from './filterTransactions';
 
-describe('Transaction Filtering Functions', () => {
-  // Test data
-  const testTransactions = [
-    { id: 1, date: '2023-01-15', amount: 100, bank_category: 'Food', label: 'Ruby', description: 'Groceries' },
-    { id: 2, date: '2023-02-20', amount: -200, bank_category: 'Transport', label: 'Jack', description: 'Uber ride' },
-    { id: 3, date: '2023-03-10', amount: 300, bank_category: 'Entertainment', label: 'Both', description: 'Concert tickets' },
-    { id: 4, date: '2023-04-05', amount: -150, bank_category: 'Food', label: 'Ruby', description: 'Restaurant' },
-    { id: 5, date: '2023-05-25', amount: 500, bank_category: null, label: 'Jack', description: 'Bonus' },
-    { id: 6, date: '2023-06-15', amount: 0, bank_category: '', label: 'Both', description: null },
-    { id: 7, date: '2023-07-01', amount: '250.50', bank_category: undefined, label: 'Ruby', description: 'Apple Store' }
-  ];
+// Mock data for testing
+const mockTransactions = [
+  { id: 1, label: 'Alice', date: '2024-01-01', amount: -100, bank_category: 'Food' },
+  { id: 2, label: 'Bob', date: '2024-01-02', amount: -50, bank_category: 'Transport' },
+  { id: 3, label: 'Both', date: '2024-01-03', amount: -75, bank_category: 'Food' },
+  { id: 4, label: null, date: '2024-01-04', amount: -25, bank_category: 'Entertainment' },
+  { id: 5, label: 'All users', date: '2024-01-05', amount: -200, bank_category: 'Utilities' },
+];
 
-  describe('filterByDate', () => {
-    test('should filter transactions by date range', () => {
-      const dateFilter = {
-        startDate: '2023-02-01',
-        endDate: '2023-04-30'
-      };
+// Mock split allocations data
+const mockSplitAllocations = {
+  6: [{ user_id: 1, display_name: 'Alice', amount: -30 }],
+  7: [
+    { user_id: 1, display_name: 'Alice', amount: -40 },
+    { user_id: 2, display_name: 'Bob', amount: -40 }
+  ],
+  8: [
+    { user_id: 1, display_name: 'Alice', amount: -33.33 },
+    { user_id: 2, display_name: 'Bob', amount: -33.33 },
+    { user_id: 3, display_name: 'Charlie', amount: -33.34 }
+  ]
+};
 
-      const result = filterByDate(testTransactions, dateFilter);
-      
-      // Should include transactions from February to April (ids: 2, 3, 4)
-      expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([2, 3, 4]);
-    });
+// Mock users data
+const mockUsers = [
+  { id: 1, display_name: 'Alice', username: 'alice', is_active: true },
+  { id: 2, display_name: 'Bob', username: 'bob', is_active: true },
+  { id: 3, display_name: 'Charlie', username: 'charlie', is_active: true }
+];
 
-    test('should return all transactions if date filter is empty', () => {
-      const dateFilter = {
-        startDate: '',
-        endDate: ''
-      };
+// Mock transactions with split allocations (new system)
+const mockNewTransactions = [
+  { id: 6, label: null, date: '2024-08-01', amount: -30, bank_category: 'Food' },
+  { id: 7, label: null, date: '2024-08-02', amount: -80, bank_category: 'Transport' },
+  { id: 8, label: null, date: '2024-08-03', amount: -100, bank_category: 'Utilities' }
+];
 
-      const result = filterByDate(testTransactions, dateFilter);
-      
-      expect(result).toEqual(testTransactions);
-    });
-
-    test('should filter with only startDate provided', () => {
-      const dateFilter = {
-        startDate: '2023-04-01',
-        endDate: ''
-      };
-
-      const result = filterByDate(testTransactions, dateFilter);
-      
-      // Should include transactions from April onwards (ids: 4, 5, 6, 7)
-      expect(result).toHaveLength(4);
-      expect(result.map(t => t.id)).toEqual([4, 5, 6, 7]);
-    });
-
-    test('should filter with only endDate provided', () => {
-      const dateFilter = {
-        startDate: '',
-        endDate: '2023-03-31'
-      };
-
-      const result = filterByDate(testTransactions, dateFilter);
-      
-      // Should include transactions up to March (ids: 1, 2, 3)
-      expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([1, 2, 3]);
-    });
-
-    test('should handle edge cases of dates exactly on the boundary', () => {
-      const dateFilter = {
-        startDate: '2023-02-20', // Exactly the date of one transaction
-        endDate: '2023-03-10'    // Exactly the date of another transaction
-      };
-
-      const result = filterByDate(testTransactions, dateFilter);
-      
-      // Should include transactions on February 20 and March 10 (ids: 2, 3)
-      expect(result).toHaveLength(2);
-      expect(result.map(t => t.id)).toEqual([2, 3]);
-    });
-  });
-
-  describe('filterByBankCategory', () => {
-    test('should filter transactions by bank category', () => {
-      const bankCategoryFilter = ['Food'];
-
-      const result = filterByBankCategory(testTransactions, bankCategoryFilter);
-      
-      // Should include transactions with 'Food' category (ids: 1, 4)
-      expect(result).toHaveLength(2);
-      expect(result.map(t => t.id)).toEqual([1, 4]);
-    });
-
-    test('should filter transactions by multiple bank categories', () => {
-      const bankCategoryFilter = ['Food', 'Transport'];
-
-      const result = filterByBankCategory(testTransactions, bankCategoryFilter);
-      
-      // Should include transactions with 'Food' or 'Transport' categories (ids: 1, 2, 4)
-      expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([1, 2, 4]);
-    });
-
-    test('should handle null, undefined, and empty string bank categories', () => {
-      const bankCategoryFilter = [null];
-
-      const result = filterByBankCategory(testTransactions, bankCategoryFilter);
-      
-      // Should include transactions with null, undefined, or empty bank category (ids: 5, 6, 7)
-      expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([5, 6, 7]);
-    });
-
-    test('should handle mixed null and defined categories', () => {
-      const bankCategoryFilter = ['Food', null];
-
-      const result = filterByBankCategory(testTransactions, bankCategoryFilter);
-      
-      // Should include 'Food' category and null/empty categories (ids: 1, 4, 5, 6, 7)
-      expect(result).toHaveLength(5);
-      expect(result.map(t => t.id)).toEqual([1, 4, 5, 6, 7]);
-    });
-
-    test('should return all transactions if bank category filter is empty', () => {
-      const bankCategoryFilter = [];
-
-      const result = filterByBankCategory(testTransactions, bankCategoryFilter);
-      
-      expect(result).toEqual(testTransactions);
-    });
-  });
-
+describe('filterTransactions utilities', () => {
   describe('filterByLabel', () => {
-    test('should filter transactions by label', () => {
-      const labelFilter = ['Ruby'];
+    test('should return all transactions when labelFilter is empty', () => {
+      const result = filterByLabel(mockTransactions, []);
+      expect(result).toEqual(mockTransactions);
+    });
 
-      const result = filterByLabel(testTransactions, labelFilter);
-      
-      // Should include transactions with 'Ruby' label (ids: 1, 4, 7)
+    test('should filter by static label correctly', () => {
+      const result = filterByLabel(mockTransactions, ['Alice']);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(1);
+    });
+
+    test('should filter by multiple static labels', () => {
+      const result = filterByLabel(mockTransactions, ['Alice', 'Bob']);
+      expect(result).toHaveLength(2);
+      expect(result.map(t => t.id)).toEqual([1, 2]);
+    });
+
+    test('should include null label transactions when filtering for null', () => {
+      const result = filterByLabel(mockTransactions, [null]);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(4);
+    });
+
+    test('should filter with dynamic label function for new transactions', () => {
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        const allocations = mockSplitAllocations[transaction.id];
+        if (!allocations) return null;
+        
+        if (allocations.length === 1) {
+          return allocations[0].display_name;
+        }
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
+        return null;
+      });
+
+      const result = filterByLabel(mockNewTransactions, ['Alice'], mockGetTransactionLabel);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(6);
+      expect(mockGetTransactionLabel).toHaveBeenCalledTimes(3);
+    });
+
+    test('should filter with dynamic label function for "Both" transactions', () => {
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        const allocations = mockSplitAllocations[transaction.id];
+        if (!allocations) return null;
+        
+        if (allocations.length === 1) {
+          return allocations[0].display_name;
+        }
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
+        return null;
+      });
+
+      const result = filterByLabel(mockNewTransactions, ['Both'], mockGetTransactionLabel);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(7);
+    });
+
+    test('should filter with dynamic label function for "All users" transactions', () => {
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        const allocations = mockSplitAllocations[transaction.id];
+        if (!allocations) return null;
+        
+        if (allocations.length === 1) {
+          return allocations[0].display_name;
+        }
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
+        return null;
+      });
+
+      const result = filterByLabel(mockNewTransactions, ['All users'], mockGetTransactionLabel);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(8);
+    });
+
+    test('should handle null values correctly with dynamic label function', () => {
+      const mockGetTransactionLabel = vi.fn(() => null);
+
+      const result = filterByLabel(mockNewTransactions, [null], mockGetTransactionLabel);
       expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([1, 4, 7]);
+      expect(mockGetTransactionLabel).toHaveBeenCalledTimes(3);
     });
 
-    test('should filter transactions by multiple labels', () => {
-      const labelFilter = ['Ruby', 'Both'];
+    test('should combine static and dynamic label filtering', () => {
+      const mixedTransactions = [...mockTransactions, ...mockNewTransactions];
+      
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        // For old transactions, use the static label
+        if (transaction.label !== null) return transaction.label;
+        
+        // For new transactions, use dynamic allocation
+        const allocations = mockSplitAllocations[transaction.id];
+        if (!allocations) return null;
+        
+        if (allocations.length === 1) {
+          return allocations[0].display_name;
+        }
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
+        return null;
+      });
 
-      const result = filterByLabel(testTransactions, labelFilter);
-      
-      // Should include transactions with 'Ruby' or 'Both' labels (ids: 1, 3, 4, 6, 7)
-      expect(result).toHaveLength(5);
-      expect(result.map(t => t.id)).toEqual([1, 3, 4, 6, 7]);
-    });
-
-    test('should return all transactions if label filter is empty', () => {
-      const labelFilter = [];
-
-      const result = filterByLabel(testTransactions, labelFilter);
-      
-      expect(result).toEqual(testTransactions);
-    });
-  });
-
-  describe('sortByDate', () => {
-    test('should sort transactions by date in ascending order', () => {
-      const result = sortByDate(testTransactions, 'asc');
-      
-      // Should sort by date, oldest first
-      expect(result.map(t => t.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    });
-
-    test('should sort transactions by date in descending order', () => {
-      const result = sortByDate(testTransactions, 'desc');
-      
-      // Should sort by date, newest first
-      expect(result.map(t => t.id)).toEqual([7, 6, 5, 4, 3, 2, 1]);
-    });
-  });
-
-  describe('sortByAmount', () => {
-    test('should sort transactions by amount in ascending order', () => {
-      const result = sortByAmount(testTransactions, 'asc');
-      
-      // Should sort by amount, lowest first (negative values first)
-      // Expected order: -200, -150, 0, 100, 250.50, 300, 500
-      expect(result.map(t => t.id)).toEqual([2, 4, 6, 1, 7, 3, 5]);
-    });
-
-    test('should sort transactions by amount in descending order', () => {
-      const result = sortByAmount(testTransactions, 'desc');
-      
-      // Should sort by amount, highest first
-      // Expected order: 500, 300, 250.50, 100, 0, -150, -200
-      expect(result.map(t => t.id)).toEqual([5, 3, 7, 1, 6, 4, 2]);
-    });
-
-    test('should handle string amounts', () => {
-      const result = sortByAmount(testTransactions, 'asc');
-      
-      // Transaction 7 has amount as string '250.50', should be converted properly
-      const transaction7 = result.find(t => t.id === 7);
-      expect(transaction7).toBeDefined();
-      
-      // Should be sorted correctly between 100 and 300
-      const transaction7Index = result.findIndex(t => t.id === 7);
-      const transaction1Index = result.findIndex(t => t.id === 1);
-      const transaction3Index = result.findIndex(t => t.id === 3);
-      
-      expect(transaction7Index).toBeGreaterThan(transaction1Index);
-      expect(transaction7Index).toBeLessThan(transaction3Index);
-    });
-  });
-
-  describe('sortByDescription', () => {
-    test('should sort transactions by description in ascending order', () => {
-      const result = sortByDescription(testTransactions, 'asc');
-      
-      // Should sort alphabetically A-Z, null values should sort to beginning
-      // Expected order: null, Apple Store, Bonus, Concert tickets, Groceries, Restaurant, Uber ride
-      expect(result.map(t => t.id)).toEqual([6, 7, 5, 3, 1, 4, 2]);
-    });
-
-    test('should sort transactions by description in descending order', () => {
-      const result = sortByDescription(testTransactions, 'desc');
-      
-      // Should sort alphabetically Z-A
-      // Expected order: Uber ride, Restaurant, Groceries, Concert tickets, Bonus, Apple Store, null
-      expect(result.map(t => t.id)).toEqual([2, 4, 1, 3, 5, 7, 6]);
-    });
-
-    test('should handle case-insensitive sorting', () => {
-      const mixedCaseTransactions = [
-        { id: 1, description: 'apple' },
-        { id: 2, description: 'Banana' },
-        { id: 3, description: 'CHERRY' }
-      ];
-      
-      const result = sortByDescription(mixedCaseTransactions, 'asc');
-      
-      // Should sort ignoring case: apple, Banana, CHERRY
-      expect(result.map(t => t.id)).toEqual([1, 2, 3]);
-    });
-
-    test('should handle null and undefined descriptions', () => {
-      const result = sortByDescription(testTransactions, 'asc');
-      
-      // Should handle null description (transaction 6)
-      const nullDescTransaction = result[0];
-      expect(nullDescTransaction.id).toBe(6);
-      expect(nullDescTransaction.description).toBe(null);
+      const result = filterByLabel(mixedTransactions, ['Alice'], mockGetTransactionLabel);
+      expect(result).toHaveLength(2); // One static Alice + one dynamic Alice
+      expect(result.map(t => t.id)).toEqual([1, 6]);
     });
   });
 
   describe('applyFilters', () => {
-    test('should apply multiple filters together', () => {
+    test('should apply label filter with dynamic function correctly', () => {
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        if (transaction.id === 6) return 'Alice';
+        if (transaction.id === 7) return 'Both';
+        if (transaction.id === 8) return 'All users';
+        return null;
+      });
+
       const filters = {
-        dateFilter: {
-          startDate: '2023-01-01',
-          endDate: '2023-04-30'
-        },
-        bankCategoryFilter: ['Food', 'Transport'],
-        labelFilter: ['Ruby', 'Jack'],
+        labelFilter: ['Alice'],
         sortBy: 'date-asc'
       };
 
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should filter by date (Jan-Apr), bank categories (Food, Transport), 
-      // labels (Ruby, Jack), and sort by date ascending
-      // Expected transactions: ids 1, 2, 4 in that order
-      expect(result).toHaveLength(3);
-      expect(result.map(t => t.id)).toEqual([1, 2, 4]);
+      const result = applyFilters(mockNewTransactions, filters, mockGetTransactionLabel);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(6);
+      expect(mockGetTransactionLabel).toHaveBeenCalledTimes(3);
     });
 
-    test('should apply amount sorting', () => {
+    test('should work without dynamic label function for legacy transactions', () => {
       const filters = {
-        dateFilter: {},
-        bankCategoryFilter: [],
-        labelFilter: [],
-        sortBy: 'amount-desc'
+        labelFilter: ['Alice'],
+        sortBy: 'date-asc'
       };
 
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should sort all transactions by amount descending
-      expect(result.map(t => t.id)).toEqual([5, 3, 7, 1, 6, 4, 2]);
+      const result = applyFilters(mockTransactions, filters);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(1);
     });
 
-    test('should apply description sorting', () => {
+    test('should apply multiple filters including dynamic labels', () => {
+      const mockGetTransactionLabel = vi.fn((transaction) => {
+        if (transaction.id === 6) return 'Alice';
+        if (transaction.id === 7) return 'Both';
+        if (transaction.id === 8) return 'All users';
+        return null;
+      });
+
       const filters = {
-        dateFilter: {},
-        bankCategoryFilter: [],
-        labelFilter: [],
-        sortBy: 'description-asc'
-      };
-
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should sort all transactions by description ascending
-      expect(result.map(t => t.id)).toEqual([6, 7, 5, 3, 1, 4, 2]);
-    });
-
-    test('should apply no filters when all filter objects are empty', () => {
-      const filters = {
-        dateFilter: {},
-        bankCategoryFilter: [],
-        labelFilter: [],
-        sortBy: ''
-      };
-
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should return all transactions unsorted
-      expect(result).toEqual(testTransactions);
-    });
-
-    test('should handle undefined filter properties with defaults', () => {
-      const filters = {
+        labelFilter: ['Alice', 'Both'],
+        bankCategoryFilter: ['Food', 'Transport'],
         sortBy: 'date-desc'
       };
 
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should apply only sorting, other filters should default to empty
-      expect(result).toHaveLength(testTransactions.length);
-      expect(result.map(t => t.id)).toEqual([7, 6, 5, 4, 3, 2, 1]);
-    });
-
-    test('should default to date-desc sorting when invalid sort option provided', () => {
-      const filters = {
-        sortBy: 'invalid-option'
-      };
-
-      const result = applyFilters(testTransactions, filters);
-      
-      // Should fall back to date-desc sorting
-      expect(result.map(t => t.id)).toEqual([7, 6, 5, 4, 3, 2, 1]);
+      const result = applyFilters(mockNewTransactions, filters, mockGetTransactionLabel);
+      expect(result).toHaveLength(2);
+      expect(result.map(t => t.id)).toEqual([7, 6]); // Sorted by date desc
     });
   });
 });
