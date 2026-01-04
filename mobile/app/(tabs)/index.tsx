@@ -1016,12 +1016,12 @@ export default function FinanceDashboard() {
   }, [unfileredMonthlyTransactions, categoryMappings, getTransactionLabel]);
   
   // API calls
-  const fetchTransactions = useCallback(async () => {
+  const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
     try {
       const apiUrl = `${getApiBaseUrl()}/initial-data`;
       console.log('Fetching initial data from:', apiUrl);
       
-      const response = await fetch(apiUrl);
+      const response = await fetch(apiUrl, { signal });
       
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`);
@@ -1044,6 +1044,11 @@ export default function FinanceDashboard() {
       setSplitAllocations(splitData || {});
       setAvailableBankCategories(bankCategories || []);
     } catch (error) {
+      // Don't show error for aborted requests
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Fetch was aborted');
+        return;
+      }
       console.error('Error fetching initial data:', error);
       Alert.alert('Error', 'Failed to load data. Please try again.');
     } finally {
@@ -1853,7 +1858,70 @@ export default function FinanceDashboard() {
 
   // Effects
   useEffect(() => {
-    fetchTransactions();
+    let isMounted = true;
+    const abortController = new AbortController();
+    
+    const fetchWithTimeout = async () => {
+      try {
+        const apiUrl = `${getApiBaseUrl()}/initial-data`;
+        console.log('Fetching initial data from:', apiUrl);
+        
+        // Add timeout to prevent indefinite hanging (15 seconds)
+        const timeoutId = setTimeout(() => abortController.abort(), 15000);
+        
+        const response = await fetch(apiUrl, {
+          signal: abortController.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          const { 
+            transactions, 
+            categoryMappings, 
+            users: userData, 
+            splitAllocations: splitData,
+            bankCategories
+          } = data.data;
+          
+          setTransactions(transactions);
+          setCategoryMappings(categoryMappings);
+          setUsers(userData || []);
+          setSplitAllocations(splitData || {});
+          setAvailableBankCategories(bankCategories || []);
+        }
+      } catch (error) {
+        if (!isMounted) return; // Don't show error if unmounted
+        
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Fetch aborted (timeout or unmount)');
+          Alert.alert('Connection Timeout', 'Failed to connect to server. Please try again.');
+        } else {
+          console.error('Error fetching initial data:', error);
+          Alert.alert('Error', 'Failed to load data. Please try again.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    };
+    
+    fetchWithTimeout();
+    
+    // Cleanup function - runs when component unmounts
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, []);
 
   // Note: We use availableBankCategories for editing (like frontend), no need to extract categories
