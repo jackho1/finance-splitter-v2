@@ -1098,10 +1098,16 @@ const AppContent = () => {
     }
   });
 
-  // Filter transactions based on chart label filter
+  // Filter transactions based on chart label filter and current year
   const getChartFilteredTransactions = () => {
     return allFilteredTransactions.filter(transaction => {
       const allocations = splitAllocations[transaction.id];
+      
+      // 0. Filter by the currently selected year
+      const transactionYear = new Date(transaction.date).getFullYear();
+      if (transactionYear !== currentYear) {
+        return false;
+      }
       
       // 1. Filter out transactions without allocations (and fallback for legacy unlabelled)
       if (!allocations || allocations.length === 0) {
@@ -4114,8 +4120,8 @@ const AppContent = () => {
                     textAlign: 'center'
                   }}>
                     {chartLabelFilter === 'All' 
-                      ? 'All Users - All-Time Transactions' 
-                      : `${chartLabelFilter}'s All-Time Transactions`}
+                      ? `All Users - ${currentYear} Transactions` 
+                      : `${chartLabelFilter}'s ${currentYear} Transactions`}
                   </h3>
                   
                   <div style={{ 
@@ -4208,7 +4214,7 @@ const AppContent = () => {
                 <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '0 auto' }}>
                   <Bar data={data} options={options} />
                   <HelpText isVisible={helpTextVisible}>
-                    Chart displays data for all months regardless of the month filter above and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
+                    Chart displays data for all months of the selected year and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
                   </HelpText>
                 </div>
               </>

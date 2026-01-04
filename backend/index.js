@@ -27,10 +27,31 @@ const dbConfig = {
   createTimeoutMillis: 15000, // How long to wait when creating a new client
   reapIntervalMillis: 1000, // Check for idle connections every second
   createRetryIntervalMillis: 200, // Retry connection creation quickly
+  // TCP keep-alive settings to prevent idle connection timeouts from firewalls/proxies
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000, // Start sending keep-alive probes after 10 seconds of idle
 };
 
 // Database connection setup
 const pool = new Pool(dbConfig);
+
+// Handle pool errors to prevent unhandled 'error' events from crashing the app
+// This happens when idle connections in the pool get dropped by the database server
+// or network timeouts occur on idle connections
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle PostgreSQL client:', err.message);
+  // Don't exit - the pool will automatically handle reconnection
+  // The affected client is removed from the pool automatically
+});
+
+// Log when connections are acquired and released (optional, for debugging)
+pool.on('connect', (client) => {
+  console.log('New PostgreSQL client connected');
+});
+
+pool.on('remove', (client) => {
+  console.log('PostgreSQL client removed from pool');
+});
 
 // Check and add split transaction columns to tables if they don't exist
 const ensureSplitColumnsExist = async () => {
