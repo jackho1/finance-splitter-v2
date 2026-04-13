@@ -1683,15 +1683,68 @@ const AppContent = () => {
     } else {
       // For all other fields, use the existing optimized update handler
       await optimizedHandleUpdate(
-        transactionId, 
-        field, 
-        editValue, 
-        transactions, 
-        setTransactions, 
-        setFilteredTransactions, 
-        setEditCell, 
+        transactionId,
+        field,
+        editValue,
+        transactions,
+        setTransactions,
+        setFilteredTransactions,
+        setEditCell,
         setIsUpdating
       );
+
+      // BUG FIX: When the amount changes, split allocations become stale because
+      // getUserTotalFromAllocations reads per-user amounts from splitAllocations state
+      // (not transaction.amount). Re-submit the existing split config so the backend
+      // recalculates allocation amounts against the new transaction amount, and sync
+      // the result into local state so the summary totals update immediately.
+      if (field === 'amount' && splitAllocations && splitAllocations[transactionId]) {
+        const existingAllocations = splitAllocations[transactionId];
+        if (Array.isArray(existingAllocations) && existingAllocations.length > 0) {
+          try {
+            const splitTypeCode = existingAllocations[0].split_type_code || 'equal';
+
+            // Rebuild the users payload from cached allocations. For percentage/fixed
+            // splits, pass the stored percentage so the backend preserves the same
+            // ratios against the new amount (fixed amounts would no longer sum correctly).
+            const splitUsers = existingAllocations.map(a => {
+              const u = { id: a.user_id };
+              if (splitTypeCode !== 'equal' && a.percentage != null) {
+                u.percentage = parseFloat(a.percentage);
+              }
+              return u;
+            });
+
+            const recalcResponse = await axios.put(
+              getApiUrl(`/transactions/${transactionId}/split-config`),
+              {
+                transaction_type: 'shared',
+                split_type_code: splitTypeCode === 'fixed' ? 'percentage' : splitTypeCode,
+                users: splitUsers
+              }
+            );
+
+            if (recalcResponse.data.success) {
+              const { allocations, split_type } = recalcResponse.data.data;
+              // Enrich with split_type_code so getTransactionLabel and subsequent
+              // amount edits can read it (matches initial-data shape).
+              const enrichedAllocations = allocations.map(a => ({
+                ...a,
+                amount: parseFloat(a.amount),
+                split_type_code: split_type?.code,
+                split_type_label: split_type?.label
+              }));
+              setSplitAllocations(prev => ({
+                ...prev,
+                [transactionId]: enrichedAllocations
+              }));
+            }
+          } catch (recalcErr) {
+            console.error('Failed to recalculate split allocations after amount update:', recalcErr);
+            showErrorNotification('Amount saved, but split totals may be out of sync. Please re-select the label to refresh.');
+          }
+        }
+      }
     }
   };
 

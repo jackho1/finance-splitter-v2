@@ -3179,7 +3179,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         const color = getCategoryColor(category, index);
                         
                         // Check if this category has been affected by offsetting
-                        const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && rawTotal !== numTotal;
+                        const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && Math.abs(rawTotal - numTotal) > 0.01;
                         const isExcludedNegative = rawTotal < 0 && (!enableNegativeOffsetBucket || category !== selectedNegativeOffsetBucket) && enableNegativeOffsetBucket;
                           
                         return (
