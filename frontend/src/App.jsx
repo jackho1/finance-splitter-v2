@@ -1,0 +1,5280 @@
+import React, { useEffect, useState, useRef } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+import html2canvas from 'html2canvas';
+import { BrowserRouter, useLocation, useNavigate } from 'react-router-dom';
+import Budgets from './Budgets';
+import PersonalTransactions from './PersonalTransactions';
+import OffsetTransactions from './OffsetTransactions';
+import { UserPreferencesProvider, useUserPreferencesContext } from './contexts/UserPreferencesContext';
+import UserPreferencesModal from './components/UserPreferencesModal';
+import { AppLayout, useLayoutHelp } from './routes/AppLayout';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { AutoFitText } from '@/components/AutoFitText';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+// Import utility functions
+
+import { applyFilters } from './utils/filterTransactions';
+import { groupSplitTransactions } from './utils/transactionGrouping';
+import { 
+  optimizedHandleUpdate, 
+  normalizeValue, 
+  valuesAreEqual, 
+  getFieldType 
+} from './utils/updateHandlers';
+import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
+import { updateUserColorStyles, updateUserTotalColors, setUserPreferencesCache } from './utils/userColorStyles';
+import { getTransactionLabel, getUserTotalFromAllocations, calculateTotalsFromAllocations } from './utils/calculateTotals';
+import { getLabelFilterOptions, getLabelDropdownOptions } from './utils/getLabelFilterOptions';
+
+import './theme.css';
+import './ModernTables.css';
+import './SortableTableHeaders.css';
+import './CompactDropdown.css';
+
+
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+// Help Text Component for consistent styling
+const HelpText = ({ children, isVisible }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <div className="help-text">
+      <div className="help-text-icon" style={{ lineHeight: 0, marginBottom: 0 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div className="help-text-content">{children}</div>
+    </div>
+  );
+};
+
+// Refactored FilterButton component for more streamlined appearance
+const FilterButton = ({ isActive, onClick, count = 0 }) => (
+  <button 
+    className={`filter-button compact ${isActive ? 'active' : ''}`}
+    onClick={onClick}
+    title="Filter"
+  >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+    </svg>
+    {count > 0 && (
+      <span className="filter-badge">{count}</span>
+    )}
+  </button>
+);
+
+// Refactored table dropdown menu component
+const TableDropdownMenu = ({ 
+  isActive, 
+  onClose, 
+  availableOptions,
+  selectedOptions,
+  onChange,
+  onClear,
+  emptyLabel = '(Empty/Null)',
+  width = '220px',
+  maxHeight = '280px',
+  skipSearch = false,
+  alignRight = false,
+  dropdownRef,
+}) => {
+  // Stop clicks from propagating and closing the dropdown
+  const handleClick = (e) => e.stopPropagation();
+  
+  if (!isActive) return null;
+  
+  return (
+    <div 
+      className="filter-dropdown"
+      ref={dropdownRef}
+      onClick={handleClick}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        right: alignRight ? 0 : undefined,
+        zIndex: 1000,
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '6px',
+        boxShadow: '0 4px 12px var(--color-shadow)',
+        width: width === '220px' ? '220px' : width, // Increase default width
+        marginTop: '5px',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: maxHeight
+      }}
+    >
+      {/* Search field - optional enhancement */}
+      {availableOptions.length > 10 && !skipSearch && (
+        <div className="filter-search" style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border)' }}>
+          <input
+            type="text"
+            placeholder="Search..."
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              fontSize: '13px',
+              border: '1px solid var(--color-inputBorder)',
+              borderRadius: '4px',
+              backgroundColor: 'var(--color-inputBackground)',
+              color: 'var(--color-inputText)'
+            }}
+          />
+        </div>
+      )}
+      
+      <div className="filter-options" style={{ 
+        overflowY: 'auto', 
+        flex: '1 1 auto',
+        padding: '0px 0' 
+      }}>
+        {/* Display non-null options */}
+        {availableOptions
+          .filter(option => option !== null && option !== undefined && option !== '')
+          .map(option => (
+            <div 
+              key={option} 
+              className="filter-option"
+              style={{ 
+                padding: '3px 1px',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(option, e);
+              }}
+            >
+              <input 
+                type="checkbox" 
+                checked={selectedOptions.includes(option)}
+                onChange={() => {}} // Handled by parent div onClick
+                style={{ marginRight: '6px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '13px', color: 'var(--color-text)' }}>
+                {option}
+              </span>
+            </div>
+          ))
+        }
+        
+        {/* Display null/empty option at the bottom if it exists */}
+        {availableOptions.some(option => option === null || option === undefined || option === '') && (
+          <div 
+            className="filter-option"
+            style={{ 
+              padding: '6px 4px',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              borderTop: '1px solid var(--color-border)',
+              marginTop: '4px',
+              paddingTop: '8px',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-backgroundHover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(null, e);
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={selectedOptions.includes(null)}
+              onChange={() => {}} // Handled by parent div onClick
+              style={{ marginRight: '6px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '13px', fontStyle: 'italic', color: 'var(--color-textSecondary)' }}>
+              {emptyLabel}
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Footer with clear button only */}
+      {selectedOptions.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-start', 
+          padding: '3px 4px',
+          borderTop: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-backgroundElevated)',
+          borderBottomLeftRadius: '6px',
+          borderBottomRightRadius: '6px',
+          position: 'sticky',
+          bottom: 0,
+          flex: '0 0 auto'
+        }}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            style={{ 
+              padding: '3px 6px',
+              backgroundColor: 'transparent',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-borderSecondary)',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.target.style.color = 'var(--color-text)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = 'var(--color-textSecondary)';
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Specialized date filter dropdown component
+const DateFilterDropdown = ({ 
+  isActive, 
+  dateFilter,
+  onChange,
+  onClear,
+  dateRange,
+  width = '220px',
+}) => {
+  // Stop clicks from propagating and closing the dropdown
+  const handleClick = (e) => e.stopPropagation();
+  
+  if (!isActive) return null;
+  
+  return (
+    <div 
+      className="filter-dropdown"
+      onClick={handleClick}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        zIndex: 1000,
+        background: 'var(--color-backgroundElevated)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '6px',
+        boxShadow: '0 4px 12px var(--color-shadow)',
+        width: width,
+        marginTop: '5px',
+        padding: '12px',
+      }}
+    >
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '12px', 
+          fontWeight: '500', 
+          color: 'var(--color-text)', 
+          marginBottom: '4px' 
+        }}>
+          From:
+        </label>
+        <input 
+          type="date" 
+          name="startDate"
+          value={dateFilter.startDate}
+          onChange={onChange}
+          min={dateRange.min}
+          max={dateRange.max}
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '13px',
+            border: '1px solid var(--color-inputBorder)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '12px', 
+          fontWeight: '500', 
+          color: 'var(--color-text)', 
+          marginBottom: '4px' 
+        }}>
+          To:
+        </label>
+        <input 
+          type="date" 
+          name="endDate"
+          value={dateFilter.endDate}
+          onChange={onChange}
+          min={dateRange.min}
+          max={dateRange.max}
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '13px',
+            border: '1px solid var(--color-inputBorder)',
+            borderRadius: '4px',
+            backgroundColor: 'var(--color-inputBackground)',
+            color: 'var(--color-inputText)',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+      {(dateFilter.startDate || dateFilter.endDate) && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          paddingTop: '8px',
+          borderTop: '1px solid var(--color-border)'
+        }}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            style={{ 
+              padding: '4px 8px',
+              backgroundColor: 'transparent',
+              color: 'var(--color-textSecondary)',
+              border: '1px solid var(--color-borderSecondary)',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+              e.target.style.color = 'var(--color-text)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = 'var(--color-textSecondary)';
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Sortable header component
+const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, onFilterToggle, isFilterActive }) => {
+  const isActive = sortBy.startsWith(column);
+  const isDesc = sortBy === `${column}-desc`;
+
+  // Compact single-row layout that keeps the title centered and anchors
+  // the (optional) filter button at the right edge without stealing width
+  // from the label text. Used by every column header in the Transactions
+  // table; sizing is driven by the wrapping <th>'s col-* class.
+  return (
+    <div className="relative flex w-full items-center justify-center">
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          'group inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-semibold uppercase tracking-wide transition-colors',
+          'text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          isActive && 'text-foreground'
+        )}
+      >
+        <span className="whitespace-nowrap">{children}</span>
+        <span
+          className={cn(
+            'flex h-3 w-3 flex-col items-center justify-center transition-opacity',
+            isActive ? 'opacity-100' : 'opacity-30 group-hover:opacity-70'
+          )}
+          aria-hidden
+        >
+          <span
+            className={cn(
+              'h-0 w-0 border-x-[3px] border-b-[4px] border-x-transparent',
+              isActive && !isDesc ? 'border-b-primary' : 'border-b-current'
+            )}
+          />
+          <span
+            className={cn(
+              'mt-[1px] h-0 w-0 border-x-[3px] border-t-[4px] border-x-transparent',
+              isActive && isDesc ? 'border-t-primary' : 'border-t-current'
+            )}
+          />
+        </span>
+      </button>
+      {hasFilter && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFilterToggle();
+          }}
+          title="Filter"
+          className={cn(
+            'absolute right-0 flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            isFilterActive && 'bg-primary/10 text-primary'
+          )}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Create a separate component for the main app logic
+const AppContent = () => {
+  // Route-driven active tab: the sidebar NavLinks change the URL, we read
+  // the URL here to decide which tab body to render. Keeps legacy conditional
+  // `{activeTab === 'budgets' && ...}` blocks working with zero rewriting.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = (() => {
+    const path = location.pathname.replace(/^\//, '').split('/')[0];
+    if (!path) return 'transactions';
+    if (['transactions', 'budgets', 'personal', 'offset', 'settings'].includes(path)) {
+      return path;
+    }
+    return 'transactions';
+  })();
+  const setActiveTab = (tab) => navigate(`/${tab}`);
+
+  const [transactions, setTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
+  const [filters, setFilters] = useState({ sortBy: 'date-desc' });
+  const [totals, setTotals] = useState({});
+  const [editCell, setEditCell] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  // Add loading state variables
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  // Add category mapping state
+  const [categoryMappings, setCategoryMappings] = useState({});
+  const [isCategoryMappingsLoading, setIsCategoryMappingsLoading] = useState(false);
+  // Add state for available categories
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState([]);
+  // Add label filter for chart
+  const [chartLabelFilter, setChartLabelFilter] = useState('All');
+  // Add state for new user management system
+  const [users, setUsers] = useState([]);
+  const [splitAllocations, setSplitAllocations] = useState(null); // Use null to distinguish from empty object
+  // Add state for transaction month filtering
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  
+  // User preferences context
+  const { 
+    setUsers: setContextUsers, 
+    setCurrentUser, 
+    getUserTotalColors, 
+    getTransactionRowColor
+  } = useUserPreferencesContext();
+  
+  // Settings is now a route; the modal opens automatically when the URL is
+  // /settings and closes by navigating back to /transactions.
+  const isPreferencesModalOpen = activeTab === 'settings';
+  const setIsPreferencesModalOpen = (open) => {
+    if (!open) navigate('/transactions');
+  };
+
+  // Column filtering states
+  const [activeFilterColumn, setActiveFilterColumn] = useState(null);
+  const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
+  const [bankCategoryFilter, setBankCategoryFilter] = useState([]);
+  const [labelFilter, setLabelFilter] = useState([]);
+  const [availableBankCategories, setAvailableBankCategories] = useState([]);
+  const filterPopupRef = useRef(null);
+  
+  // Add new transaction state
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    amount: '',
+    bank_category: '',
+    label: ''
+  });
+  
+  // Help text visibility is owned by the layout shell (sidebar button)
+  // so every tab sees the same value. We keep the same variable names
+  // used throughout this file to minimize downstream churn.
+  const { helpVisible: helpTextVisible, setHelpVisible: setHelpTextVisible } = useLayoutHelp();
+
+  // Add refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Add screen grab state
+  const [isScreenGrabOpen, setIsScreenGrabOpen] = useState(false);
+  const screenGrabRef = useRef(null);
+
+  // ===== REFACTORED TOTALS CALCULATION SYSTEM =====
+  // This section handles the calculation of user totals based on the new user management system
+  // Requirements addressed:
+  // 1. Ignore unlabelled transactions (transactions without split allocations or labels)
+  // 2. Handle "Both" transactions by dividing by 2 and adding to both users
+  // 3. Handle "All users" transactions by dividing by total active users and split between all
+  // 4. Respect date range filtering (transactions filtered by date range are used for totals)
+  // 5. Use users data from initial-data endpoint (usersResult from backend/index.js)
+  
+  // Helper functions for new user management system
+  const getTransactionLabel = (transaction, splitAllocations, users, isTransactionsLoading) => {
+    // Early return for loading states
+    if (isTransactionsLoading || !users || users.length === 0) {
+      return null;
+    }
+    
+    // Check if splitAllocations is loaded
+    if (splitAllocations === null || splitAllocations === undefined) {
+      return null;
+    }
+    
+    const allocations = splitAllocations[transaction.id];
+    
+    // If we have split allocations data for this transaction, use it
+    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+      // If single user, show their display name
+      if (allocations.length === 1) {
+        const displayName = allocations[0].display_name;
+        return displayName;
+      }
+      
+      // For multiple users, check if it's an equal split
+      const isEqualSplit = () => {
+        // Check if all allocations have the same split_type_code and it's 'equal'
+        const allEqualType = allocations.every(allocation => allocation.split_type_code === 'equal');
+        
+        if (allEqualType) {
+          return true;
+        }
+        
+        // Alternative check: if percentages are equal (indicating equal split)
+        if (allocations.length > 1 && allocations[0].percentage) {
+          const firstPercentage = parseFloat(allocations[0].percentage);
+          const expectedPercentage = 100 / allocations.length;
+          const tolerance = 0.1; // Small tolerance for floating point comparison
+          
+          return allocations.every(allocation => {
+            const percentage = parseFloat(allocation.percentage);
+            return Math.abs(percentage - expectedPercentage) < tolerance;
+          });
+        }
+        
+        // Alternative check: if amounts are equal (for equal splits)
+        if (allocations.length > 1) {
+          const firstAmount = Math.abs(parseFloat(allocations[0].amount));
+          const tolerance = 0.01; // 1 cent tolerance
+          
+          return allocations.every(allocation => {
+            const amount = Math.abs(parseFloat(allocation.amount));
+            return Math.abs(amount - firstAmount) < tolerance;
+          });
+        }
+        
+        return false;
+      };
+      
+      // If it's an equal split among multiple users
+      if (isEqualSplit()) {
+        // If exactly 2 users with equal split, show "Both"
+        if (allocations.length === 2) {
+          return 'Both';
+        }
+        
+        // If 3+ users with equal split, show "All users"
+        if (allocations.length >= 3) {
+          return 'All users';
+        }
+      }
+      
+      // For other cases (mixed split types), show first user + count
+      return `${allocations[0].display_name} +${allocations.length - 1}`;
+    } else {
+      // No split allocations found
+      return null;
+    }
+  };
+
+  /**
+   * Calculate total amount for a specific user from filtered transactions
+   * @param {number} userId - The user ID to calculate totals for
+   * @param {Array} filteredTransactions - Transactions filtered by date/other criteria
+   * @returns {number} Total amount allocated to the user
+   * 
+   * Logic:
+   * 1. For transactions with split allocations: Use the user's allocated amount
+   * 2. For legacy label-based transactions:
+   *    - Single user: Full amount if labeled with user's name
+   *    - "Both": Split equally between active users (minimum 2)
+   *    - "All users": Split equally between all active users
+   * 3. Unlabelled transactions (no allocations, no label): Ignored
+   */
+  const getUserTotalFromAllocations = (userId, filteredTransactions, splitAllocations, users) => {
+    let total = 0;
+    
+    if (!Array.isArray(filteredTransactions)) {
+      return 0;
+    }
+    
+    // Ensure we have a valid allocations map to read from
+    const allocationsMap = (splitAllocations && typeof splitAllocations === 'object') ? splitAllocations : {};
+    
+    filteredTransactions.forEach(transaction => {
+      const allocations = allocationsMap[transaction.id];
+      if (allocations && Array.isArray(allocations)) {
+        // NEW SYSTEM: Use split allocations data
+        const userAllocation = allocations.find(allocation => allocation.user_id === userId);
+        if (userAllocation && userAllocation.amount !== undefined && userAllocation.amount !== null) {
+          const allocationAmount = parseFloat(userAllocation.amount);
+          if (!Number.isNaN(allocationAmount)) {
+            total += allocationAmount;
+          }
+        }
+      } else {
+        // LEGACY SYSTEM: Fallback to label-based system for backward compatibility
+        // Only process legacy labels if users is loaded and transaction has a label
+        if (users && Array.isArray(users) && transaction.label) {
+          const user = users.find(u => u.id === userId);
+          const activeUsers = users.filter(u => u.username !== 'default' && u.is_active);
+          
+          if (user && transaction.label === user.display_name) {
+            // Single user transaction
+            total += parseFloat(transaction.amount) || 0;
+          } else if (user && transaction.label === 'Both' && activeUsers.length >= 2) {
+            // "Both" transaction - split equally between all active users (legacy assumed 2 users)
+            total += (parseFloat(transaction.amount) || 0) / Math.max(2, activeUsers.length);
+          } else if (user && transaction.label === 'All users' && activeUsers.length >= 2) {
+            // "All users" transaction - split equally between all active users
+            total += (parseFloat(transaction.amount) || 0) / activeUsers.length;
+          }
+        }
+        // NOTE: If transaction has no label or no valid allocations, it's ignored (as required)
+      }
+    });
+    
+    return typeof total === 'number' && !isNaN(total) ? total : 0;
+  };
+
+  /**
+   * Calculate totals for all users based on filtered transactions
+   * @param {Array} filteredTransactions - Transactions filtered by date range, labels, etc.
+   * @returns {Object} Object with user display names as keys and their totals as values
+   * 
+   * This is the main function that orchestrates total calculations for the UI.
+   * It respects:
+   * - Date filtering (only calculates totals for transactions in the filtered date range)
+   * - Month filtering (when no specific date range is selected)
+   * - User management system (fetches users from initial-data endpoint)
+   * - Split allocations for proper transaction splitting
+   */
+  const calculateTotalsFromAllocations = (filteredTransactions, users, splitAllocations) => {
+    const totals = {};
+    
+    // Guard clause: return empty totals if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return totals;
+    }
+    
+    // Calculate totals for each active user (excluding default system user)
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    activeUsers.forEach(user => {
+      const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions, splitAllocations, users);
+      // Ensure all totals are numeric (handle undefined, null, NaN cases)
+      totals[user.display_name] = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
+    });
+    
+    return totals;
+  };
+  
+  // Add split transaction states
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [transactionToSplit, setTransactionToSplit] = useState(null);
+  const [splitTransactions, setSplitTransactions] = useState([{
+    description: '',
+    amount: '',
+    bank_category: '',
+    label: ''
+  }]);
+  const [isSavingSplit, setIsSavingSplit] = useState(false);
+  
+  // Add expanded row state
+  const [expandedRow, setExpandedRow] = useState(null);
+  
+  // Add bulk update state
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  
+  // Add state for dynamic total colors
+  const [userTotalColors, setUserTotalColors] = useState({});
+  
+  // Add a refresh counter to force re-renders when colors update
+  const [colorRefreshCounter, setColorRefreshCounter] = useState(0);
+
+  // Function to generate a random color
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+  
+  // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
+  useEffect(() => {
+    // Theme is already applied in index.html, just sync with React state if needed
+    const storedTheme = localStorage.getItem('theme') || 'light';
+    
+    // Enable transitions after initial load
+    if (!document.documentElement.classList.contains('transitions-enabled')) {
+      setTimeout(() => {
+        document.documentElement.classList.add('transitions-enabled');
+      }, 100);
+    }
+    
+    const fetchInitialData = async () => {
+      setIsTransactionsLoading(true);
+      setIsCategoryMappingsLoading(true);
+      
+      try {
+        // Single API call to get all initial data
+        const response = await axios.get(getApiUrl('/initial-data'));
+        
+        if (response.data.success) {
+          const { transactions, categoryMappings, labels, bankCategories, users, splitAllocations } = response.data.data;
+          
+          // Set all data from the combined response
+          setCategoryMappings(categoryMappings);
+          setTransactions(transactions || []);
+          setFilteredTransactions(transactions);
+          setAllFilteredTransactions(transactions);
+          // Note: We no longer set labels - they are generated dynamically from users
+          setAvailableBankCategories(bankCategories);
+          
+          // Set new user management system data
+          setUsers(users || []);
+          setSplitAllocations(splitAllocations || {});
+          
+          // Initialize user preferences cache (prevents multiple API calls)
+          setUserPreferencesCache(users || []);
+          
+          // Update context with users
+          setContextUsers(users || []);
+          
+          // Update loading states
+          setIsCategoryMappingsLoading(false);
+          setIsTransactionsLoading(false);
+        } else {
+          throw new Error(response.data.error || 'Failed to fetch initial data');
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        setIsTransactionsLoading(false);
+        setIsCategoryMappingsLoading(false);
+      }
+    };
+    
+    fetchInitialData();
+  }, []);
+  
+  // Function to get category from bank_category using mappings
+  const getCategoryFromMapping = (bankCategory) => {
+    if (!bankCategory) return null;
+    // Only return a value if it exists in the mappings
+    return categoryMappings[bankCategory] || null;
+  };
+
+  // Extract available categories when transactions and mappings are loaded
+  useEffect(() => {
+    if (transactions.length) {
+      // Get unique categories directly from transactions' category field
+      const categories = [...new Set(
+        transactions
+          .map(t => t.category)  // Use direct category field instead of mapping from bank_category
+          .filter(category => category !== null && category !== undefined && category !== '')
+      )].sort();
+      
+      // Add null/empty as the last option if they exist in the data
+      if (transactions.some(t => !t.category)) {
+        categories.push(null);
+      }
+      
+      setAvailableCategories(categories);
+    }
+  }, [transactions]); // Remove categoryMappings dependency since we're not using it
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) && 
+          // Make sure we're not clicking on the filter button itself (which has its own handler)
+          !event.target.closest('button[data-filter="category"]')) {
+        setActiveFilterColumn(null);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Handle category filter change
+  const handleCategoryFilterChange = (category, e) => {
+    // Stop event propagation to prevent closing the dropdown
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    setCategoryFilter(prev => {
+      // Check if the category is already in the filter
+      const isAlreadyIncluded = prev.some(item => 
+        // Handle null equality properly
+        (item === null && category === null) || item === category
+      );
+
+      if (isAlreadyIncluded) {
+        // Remove the category if it's already included
+        return prev.filter(item => 
+          !((item === null && category === null) || item === category)
+        );
+      } else {
+        // Add the category if it's not already included
+        return [...prev, category];
+      }
+    });
+  };
+
+  // Add month navigation handlers
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => (prev === 0 ? 11 : prev - 1));
+    setCurrentYear(prev => (currentMonth === 0 ? prev - 1 : prev));
+  };
+
+  const handleNextMonth = () => {
+    const now = new Date();
+    const currentMonthDate = new Date(currentYear, currentMonth);
+    const nextMonthDate = new Date(currentYear, currentMonth + 1);
+    
+    // Only allow navigating up to the current month
+    if (nextMonthDate <= now) {
+      setCurrentMonth(prev => (prev === 11 ? 0 : prev + 1));
+      setCurrentYear(prev => (currentMonth === 11 ? prev + 1 : prev));
+    }
+  };
+
+  // Add isCurrentMonthCurrent function to check if we're at the current month
+  const isCurrentMonthCurrent = () => {
+    const now = new Date();
+    const currentMonthDate = new Date(currentYear, currentMonth);
+    const nextMonthDate = new Date(currentYear, currentMonth + 1);
+    
+    return nextMonthDate > now;
+  };
+
+  // Function to refresh bank feeds
+  const refreshBankFeeds = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      const response = await axios.post(getApiUrl('/refresh-shared-bank-feeds'));
+      
+      if (response.data.success) {
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Bank feeds refreshed successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Refresh the transactions data
+        const transactionsResponse = await axios.get(getApiUrl('/transactions'));
+        setTransactions(transactionsResponse.data);
+        
+        // Reapply filters to new data
+        let filtered = applyFilters(transactionsResponse.data, {
+          dateFilter,
+          bankCategoryFilter,
+          labelFilter,
+          sortBy: filters.sortBy
+        });
+        
+        if (categoryFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            const category = transaction.category;  // Use direct category field
+            if (categoryFilter.includes(null) && category === null) {
+              return true;
+            }
+            return categoryFilter.includes(category);
+          });
+        }
+        
+        setAllFilteredTransactions(filtered);
+        
+        // Apply month filtering for table view
+        let tableFiltered = filtered;
+        if (!dateFilter.startDate && !dateFilter.endDate) {
+          tableFiltered = filtered.filter(transaction => {
+            const date = new Date(transaction.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          });
+        }
+        
+        setFilteredTransactions(tableFiltered);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Failed to refresh bank feeds: ' + response.data.message;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 5 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error refreshing bank feeds:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Error refreshing bank feeds. Check console for details.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      
+      document.body.appendChild(notification);
+      
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Now update the useEffect that filters transactions to also filter by month
+  useEffect(() => {
+    // Use the applyFilters utility function instead of inline logic
+    let filtered = applyFilters(transactions, {
+      dateFilter,
+      bankCategoryFilter,
+      labelFilter,
+      sortBy: filters.sortBy
+    }, (transaction) => getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading));
+
+    // Apply additional category filtering if needed
+    if (categoryFilter.length > 0) {
+      filtered = filtered.filter(transaction => {
+        const category = transaction.category;  // Use direct category field
+        
+        // Check if we're filtering for null and the transaction category is null
+        if (categoryFilter.includes(null) && category === null) {
+          return true;
+        }
+        
+        // Check if the transaction category is in the filter
+        return categoryFilter.includes(category);
+      });
+    }
+    
+    // Group split transactions together after filtering and sorting
+    filtered = groupSplitTransactions(filtered);
+    
+    // Store the filtered transactions without month filter for the chart
+    setAllFilteredTransactions(filtered);
+    
+    // Apply month filtering for the table view ONLY if no date filter is active
+    let tableFiltered = filtered;
+    
+    // Only apply month filter if there's no date range filter
+    if (!dateFilter.startDate && !dateFilter.endDate) {
+      tableFiltered = filtered.filter(transaction => {
+        const date = new Date(transaction.date);
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+      });
+      
+      // Re-group after month filtering to maintain split transaction grouping
+      tableFiltered = groupSplitTransactions(tableFiltered);
+    }
+
+    setFilteredTransactions(tableFiltered);
+  }, [
+    transactions, 
+    filters.sortBy, 
+    dateFilter, 
+    bankCategoryFilter, 
+    labelFilter, 
+    categoryFilter, 
+    currentMonth,
+    currentYear,
+    users,
+    splitAllocations,
+    isTransactionsLoading
+  ]);
+
+  // Recalculate totals whenever the filtered list, users, or allocations change
+  useEffect(() => {
+    const nextTotals = calculateTotalsFromAllocations(filteredTransactions, users, splitAllocations);
+    setTotals(nextTotals);
+  }, [filteredTransactions, users, splitAllocations]);
+
+  // Update user color styles when users change
+  useEffect(() => {
+    if (users && users.length > 0) {
+      try {
+        updateUserColorStyles(users);
+        updateUserTotalColors(users);
+      } catch (error) {
+        console.error('Error updating user colors:', error);
+      }
+    }
+  }, [users]);
+
+  // Listen for total color updates
+  useEffect(() => {
+    const handleTotalColorsUpdate = (event) => {
+      setUserTotalColors(event.detail.userTotalColors);
+      setColorRefreshCounter(prev => prev + 1);
+    };
+
+    window.addEventListener('userTotalColorsUpdated', handleTotalColorsUpdate);
+    
+    return () => {
+      window.removeEventListener('userTotalColorsUpdated', handleTotalColorsUpdate);
+    };
+  }, []);
+
+  const data = {
+    labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    datasets: []
+  };
+
+  // Create datasets for each category (instead of bank category)
+  const uniqueCategories = [...new Set(
+    allFilteredTransactions
+      .map(transaction => transaction.category)  // Use direct category field
+      .filter(category => category !== null && category !== undefined && category !== '')
+  )].sort();
+
+  // Store colors for consistency
+  const categoryColors = useRef({});
+  
+  // Initialize colors for any new categories
+  uniqueCategories.forEach(category => {
+    if (!categoryColors.current[category]) {
+      categoryColors.current[category] = getRandomColor();
+    }
+  });
+
+  // Filter transactions based on chart label filter and current year
+  const getChartFilteredTransactions = () => {
+    return allFilteredTransactions.filter(transaction => {
+      const allocations = splitAllocations[transaction.id];
+      
+      // 0. Filter by the currently selected year
+      const transactionYear = new Date(transaction.date).getFullYear();
+      if (transactionYear !== currentYear) {
+        return false;
+      }
+      
+      // 1. Filter out transactions without allocations (and fallback for legacy unlabelled)
+      if (!allocations || allocations.length === 0) {
+        if (!transaction.label) {
+          return false;
+        }
+      }
+      
+      // 2. Apply chart label filter using new user system
+      if (chartLabelFilter !== 'All') {
+        // Find the user by display name
+        const selectedUser = users.find(user => user.display_name === chartLabelFilter);
+        if (selectedUser && allocations) {
+          // Check if this user has an allocation for this transaction
+          const hasUserAllocation = allocations.some(allocation => allocation.user_id === selectedUser.id);
+          if (!hasUserAllocation) {
+            return false;
+          }
+        } else if (selectedUser && !allocations) {
+          // Fallback to legacy label system
+          const isUserTransaction = transaction.label === selectedUser.display_name;
+          const isBothTransaction = transaction.label === 'Both' && users.length >= 2;
+          if (!isUserTransaction && !isBothTransaction) {
+            return false;
+          }
+        }
+      }
+      
+      // 3. Skip positive transfer transactions if needed
+      if (transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0) {
+        return false;
+      }
+      
+      // Include transaction if it passed all filters
+      return true;
+    });
+  };
+  
+  // Use the filtering function to get filtered transactions
+  const chartFilteredTransactions = getChartFilteredTransactions();
+  
+    // Process the transactions and only include categories with data
+  uniqueCategories.forEach(category => {
+    const categoryData = Array(12).fill(0); // Initialize an array for each month
+    let hasData = false; // Track if this category has any data points
+    
+    chartFilteredTransactions.forEach(transaction => {
+      const month = new Date(transaction.date).getMonth();
+      const transactionCategory = transaction.category;  // Use direct category field
+      
+      if (transactionCategory === category) {
+        let amount = 0;
+        
+        // Use allocation system if available
+        const allocations = splitAllocations[transaction.id];
+        if (allocations && chartLabelFilter !== 'All') {
+          // Get the specific user's allocation
+          const selectedUser = users.find(user => user.display_name === chartLabelFilter);
+          if (selectedUser) {
+            const userAllocation = allocations.find(allocation => allocation.user_id === selectedUser.id);
+            if (userAllocation) {
+              amount = userAllocation.amount;
+            }
+          }
+        } else if (allocations && chartLabelFilter === 'All') {
+          // Sum all allocations for "All" view
+          amount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+        } else {
+          // Fallback to legacy label system
+          amount = parseFloat(transaction.amount) || 0;
+          
+          // If it's a "Both" transaction and we're filtering by a specific user, divide by 2
+          if (transaction.label === 'Both' && chartLabelFilter !== 'All') {
+            amount = amount / 2;
+          }
+        }
+        
+        if (amount !== 0) {
+          categoryData[month] += amount;
+          hasData = true; // Mark that we found data for this category
+        }
+      }
+    });
+
+    // Only add to datasets if this category has data
+    if (hasData) {
+      data.datasets.push({
+        label: category,
+        data: categoryData,
+        backgroundColor: categoryColors.current[category],
+      });
+    }
+  });
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: false, // Removed built-in title since we have custom title
+      },
+    },
+    scales: {
+      x: {
+        stacked: true, // Enable stacking on the x-axis
+      },
+      y: {
+        stacked: true, // Enable stacking on the y-axis
+      },
+    },
+    maintainAspectRatio: false,
+  };
+
+  // Helper function to get user total colors with fallback
+  const getDynamicUserTotalColors = (userDisplayName) => {
+    // Try to get colors from our dynamic system first
+    if (userTotalColors[userDisplayName]) {
+      return userTotalColors[userDisplayName];
+    }
+    
+    // Fallback to context function if dynamic colors aren't ready yet
+    return getUserTotalColors(userDisplayName);
+  };
+
+  // Updated getRowColor function using dynamic user system
+  const getRowLabelClass = (label) => {
+    if (!label || !users || !Array.isArray(users)) {
+      return '';
+    }
+    const lowerLabel = label.toLowerCase();
+    
+    // Check for exact or partial match with any user display_name
+    for (const user of users) {
+      if (user.username === 'default') continue;
+      if (lowerLabel.includes(user.display_name.toLowerCase())) {
+        const className = `row-${user.display_name.toLowerCase().replace(/\s+/g, '-')}`;
+        return className;
+      }
+    }
+    
+    // Group split (e.g., 'Both', 'All users', or any label with 2+ users)
+    if (lowerLabel.includes('both') || lowerLabel.includes('all user') || /\+\d+/.test(lowerLabel)) {
+      return 'row-group';
+    }
+    
+    return '';
+  };
+  
+  const toggleColumnFilter = (column) => {
+    setActiveFilterColumn(activeFilterColumn === column ? null : column);
+  };
+  
+  // Handle sorting when clicking on table headers
+  const handleHeaderSort = (column) => {
+    const currentSort = filters.sortBy;
+    let newSort;
+    
+    // Determine new sort direction
+    if (currentSort === `${column}-desc`) {
+      newSort = `${column}-asc`;
+    } else if (currentSort === `${column}-asc`) {
+      newSort = `${column}-desc`;
+    } else {
+      // Default to descending for the clicked column
+      newSort = `${column}-desc`;
+    }
+    
+    setFilters(prev => ({ ...prev, sortBy: newSort }));
+  };
+  
+  const handleDateFilterChange = (e) => {
+    const { name, value } = e.target;
+    setDateFilter(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleBankCategoryFilterChange = (category) => {
+    setBankCategoryFilter(prev => {
+      if (prev.includes(category)) {
+        return prev.filter(cat => cat !== category);
+      } else {
+        return [...prev, category];
+      }
+    });
+  };
+  
+  const handleLabelFilterChange = (label, e) => {
+    // Stop event propagation to prevent closing the dropdown
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    setLabelFilter(prev => {
+      // Check if the label is already in the filter
+      const isAlreadyIncluded = prev.some(item => 
+        // Handle null equality properly
+        (item === null && label === null) || item === label
+      );
+
+      if (isAlreadyIncluded) {
+        // Remove the label if it's already included
+        return prev.filter(item => 
+          !((item === null && label === null) || item === label)
+        );
+      } else {
+        // Add the label if it's not already included
+        return [...prev, label];
+      }
+    });
+  };
+  
+  const clearFilters = () => {
+    setDateFilter({ startDate: '', endDate: '' });
+    setBankCategoryFilter([]);
+    setLabelFilter([]);
+    setCategoryFilter([]);
+    setActiveFilterColumn(null);
+  };
+  
+  // Get min and max dates for the date filter
+  const getMinMaxDates = () => {
+    if (transactions.length === 0) return { min: '', max: '' };
+    
+    let minDate = new Date(transactions[0].date);
+    let maxDate = new Date(transactions[0].date);
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      if (date < minDate) minDate = date;
+      if (date > maxDate) maxDate = date;
+    });
+    
+    return {
+      min: minDate.toISOString().split('T')[0],
+      max: maxDate.toISOString().split('T')[0]
+    };
+  };
+  
+  const dateRange = getMinMaxDates();
+
+  const handleDoubleClick = (transactionId, field, value) => {
+    setEditCell({ transactionId, field });
+    setEditValue(value);
+  };
+
+  const handleInputChange = (e) => {
+    // Handle special case for "null" string value in bank_category field
+    if (editCell && editCell.field === 'bank_category' && e.target.value === 'null') {
+      setEditValue(null);
+    } else {
+      setEditValue(e.target.value);
+    }
+  };
+
+  // New function to handle split configuration updates for label field
+  const handleSplitConfigUpdate = async (transactionId, newLabelValue) => {
+    try {
+      setIsUpdating(true);
+      // Guard clause: return early if users is not loaded yet
+      if (!users || !Array.isArray(users)) {
+        throw new Error('Users data not loaded yet');
+      }
+
+      // Handle empty/null label value - delete existing split configuration
+      if (!newLabelValue || newLabelValue === '') {
+        try {
+          const response = await axios.delete(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=shared`));
+          if (response.data.success) {
+            // Update local state to reflect the change - clear legacy label
+            setTransactions(prevTransactions => 
+              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            setFilteredTransactions(prevFiltered => 
+              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            
+            // Update split allocations state
+            setSplitAllocations(prev => {
+              const updated = {...prev};
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            // Show success notification
+            showSuccessNotification('Split configuration removed successfully');
+            
+            // Clear edit state to exit edit mode
+            setEditCell(null);
+            return;
+          }
+        } catch (deleteErr) {
+          if (deleteErr.response?.status === 404) {
+            // Split config doesn't exist, just update the label to null
+            
+            // Still update local state even if no split config existed - clear legacy label
+            setTransactions(prevTransactions => 
+              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            setFilteredTransactions(prevFiltered => 
+              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            );
+            
+            // Update split allocations state
+            setSplitAllocations(prev => {
+              const updated = {...prev};
+              delete updated[transactionId];
+              return updated;
+            });
+            
+            showSuccessNotification('Label cleared successfully');
+            
+            // Clear edit state to exit edit mode
+            setEditCell(null);
+            return;
+          } else {
+            throw deleteErr;
+          }
+        }
+        return;
+      }
+
+      // Determine users for the split based on the new label value
+      let splitUsers = [];
+      
+      if (newLabelValue === 'Both' || newLabelValue === 'All users') {
+        // Equal split between all active users (excluding default)
+        const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+        splitUsers = activeUsers.map(user => ({ id: user.id }));
+      } else if (newLabelValue && newLabelValue !== '') {
+        // Single user assignment
+        const selectedUser = users.find(user => user.display_name === newLabelValue);
+        if (selectedUser) {
+          splitUsers = [{ id: selectedUser.id }];
+        } else {
+          throw new Error(`User not found: ${newLabelValue}`);
+        }
+      }
+
+      if (splitUsers.length === 0) {
+        throw new Error('No valid users found for split configuration');
+      }
+
+      // Check if split configuration already exists
+      let existingSplitConfig = null;
+      try {
+        const existingResponse = await axios.get(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=shared`));
+        if (existingResponse.data.success && existingResponse.data.data) {
+          existingSplitConfig = existingResponse.data.data;
+        }
+      } catch (checkErr) {
+        // Split config doesn't exist yet, will create new one
+      }
+
+      const splitConfigData = {
+        transaction_type: 'shared',
+        split_type_code: 'equal', // Default to equal split as specified
+        users: splitUsers,
+        created_by: 1 // Default user ID, could be made dynamic based on current user
+      };
+
+      let response;
+      if (existingSplitConfig) {
+        // Update existing split configuration
+        response = await axios.put(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+      } else {
+        // Create new split configuration
+        response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+      }
+
+      if (response.data.success) {
+        const { allocations } = response.data.data;
+        
+        // Update split allocations state for this transaction
+        setSplitAllocations(prev => ({
+          ...prev,
+          [transactionId]: allocations
+        }));
+
+        // Update transaction state - clear the legacy label since we now have split allocations
+        setTransactions(prevTransactions => 
+          prevTransactions.map(t => 
+            t.id === transactionId 
+              ? {...t, label: null} // Clear legacy label since we now use split allocations
+              : t
+          )
+        );
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(t => 
+            t.id === transactionId 
+              ? {...t, label: null} // Clear legacy label since we now use split allocations
+              : t
+          )
+        );
+
+        // Show success notification
+        showSuccessNotification(
+          existingSplitConfig 
+            ? 'Split configuration updated successfully' 
+            : 'Split configuration created successfully'
+        );
+        
+        // Clear edit state to exit edit mode
+        setEditCell(null);
+      }
+
+    } catch (err) {
+      console.error('Error in handleSplitConfigUpdate:', err);
+      
+      let errorMessage = 'Failed to update split configuration. Please try again.';
+      
+      if (err.response && err.response.data) {
+        errorMessage = err.response.data.error || 
+                       (err.response.data.errors && err.response.data.errors.join(', ')) || 
+                       errorMessage;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Show error notification
+      showErrorNotification(errorMessage);
+      
+      // Clear edit state even on error
+      setEditCell(null);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Helper function to show success notifications
+  const showSuccessNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #c3e6cb';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 3000);
+  };
+
+  // Helper function to show error notifications
+  const showErrorNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#f8d7da';
+    notification.style.color = '#721c24';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    notification.style.zIndex = '1000';
+    notification.style.border = '1px solid #f5c6cb';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 5000);
+  };
+
+  // Helper function to generate dynamic dropdown options based on active users
+  const getLabelDropdownOptions = () => {
+    // Guard clause: return default options if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return [{ value: '', label: 'None' }];
+    }
+    
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    const options = [
+      { value: '', label: 'None' }
+    ];
+    
+    // Add individual user options
+    activeUsers.forEach(user => {
+      options.push({
+        value: user.display_name,
+        label: user.display_name
+      });
+    });
+    
+    // Add collective option based on number of users
+    if (activeUsers.length === 2) {
+      options.push({
+        value: 'Both',
+        label: 'Both (Equal Split)'
+      });
+    } else if (activeUsers.length >= 3) {
+      options.push({
+        value: 'All users',
+        label: 'All users (Equal Split)'
+      });
+    }
+    
+    return options;
+  };
+
+  // Helper function to create split configuration for newly created transactions
+  const createSplitConfigForNewTransaction = async (transactionId, labelValue) => {
+    // Guard clause: return early if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      console.error('Users data not loaded yet');
+      return;
+    }
+    
+    // If no label value is provided, don't create a split configuration
+    if (!labelValue || labelValue === '') {
+      return;
+    }
+    
+    // Determine users for the split based on the label value
+    let splitUsers = [];
+    
+    if (labelValue === 'Both' || labelValue === 'All users') {
+      // Equal split between all active users (excluding default)
+      const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+      splitUsers = activeUsers.map(user => ({ id: user.id }));
+    } else if (labelValue && labelValue !== '') {
+      // Single user assignment
+      const selectedUser = users.find(user => user.display_name === labelValue);
+      if (selectedUser) {
+        splitUsers = [{ id: selectedUser.id }];
+      } else {
+        throw new Error(`User not found: ${labelValue}`);
+      }
+    }
+
+    if (splitUsers.length === 0) {
+      throw new Error('No valid users found for split configuration');
+    }
+
+    const splitConfigData = {
+      transaction_type: 'shared',
+      split_type_code: 'equal', // Default to equal split
+      users: splitUsers,
+      created_by: 1 // Default user ID
+    };
+
+    const response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
+    
+    if (response.data.success) {
+      const { allocations } = response.data.data;
+      
+      // Update split allocations state for this transaction
+      setSplitAllocations(prev => ({
+        ...prev,
+        [transactionId]: allocations
+      }));
+    }
+  };
+
+  const handleUpdate = async (transactionId, field) => {
+    // Special handling for label field - use new split configuration system
+    if (field === 'label') {
+      await handleSplitConfigUpdate(transactionId, editValue);
+    } else {
+      // For all other fields, use the existing optimized update handler
+      await optimizedHandleUpdate(
+        transactionId,
+        field,
+        editValue,
+        transactions,
+        setTransactions,
+        setFilteredTransactions,
+        setEditCell,
+        setIsUpdating
+      );
+
+      // BUG FIX: When the amount changes, split allocations become stale because
+      // getUserTotalFromAllocations reads per-user amounts from splitAllocations state
+      // (not transaction.amount). Re-submit the existing split config so the backend
+      // recalculates allocation amounts against the new transaction amount, and sync
+      // the result into local state so the summary totals update immediately.
+      if (field === 'amount' && splitAllocations && splitAllocations[transactionId]) {
+        const existingAllocations = splitAllocations[transactionId];
+        if (Array.isArray(existingAllocations) && existingAllocations.length > 0) {
+          try {
+            const splitTypeCode = existingAllocations[0].split_type_code || 'equal';
+
+            // Rebuild the users payload from cached allocations. For percentage/fixed
+            // splits, pass the stored percentage so the backend preserves the same
+            // ratios against the new amount (fixed amounts would no longer sum correctly).
+            const splitUsers = existingAllocations.map(a => {
+              const u = { id: a.user_id };
+              if (splitTypeCode !== 'equal' && a.percentage != null) {
+                u.percentage = parseFloat(a.percentage);
+              }
+              return u;
+            });
+
+            const recalcResponse = await axios.put(
+              getApiUrl(`/transactions/${transactionId}/split-config`),
+              {
+                transaction_type: 'shared',
+                split_type_code: splitTypeCode === 'fixed' ? 'percentage' : splitTypeCode,
+                users: splitUsers
+              }
+            );
+
+            if (recalcResponse.data.success) {
+              const { allocations, split_type } = recalcResponse.data.data;
+              // Enrich with split_type_code so getTransactionLabel and subsequent
+              // amount edits can read it (matches initial-data shape).
+              const enrichedAllocations = allocations.map(a => ({
+                ...a,
+                amount: parseFloat(a.amount),
+                split_type_code: split_type?.code,
+                split_type_label: split_type?.label
+              }));
+              setSplitAllocations(prev => ({
+                ...prev,
+                [transactionId]: enrichedAllocations
+              }));
+            }
+          } catch (recalcErr) {
+            console.error('Failed to recalculate split allocations after amount update:', recalcErr);
+            showErrorNotification('Amount saved, but split totals may be out of sync. Please re-select the label to refresh.');
+          }
+        }
+      }
+    }
+  };
+
+  // Modernized renderCell function
+    const renderCell = (transaction, field) => {
+    if (editCell && editCell.transactionId === transaction.id && editCell.field === field) {
+      switch (field) {
+        case 'date':
+          return (
+            <input
+              type="date"
+              className="modern-input"
+              value={editValue || ''}
+              onChange={handleInputChange}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
+              style={{ textAlign: 'center' }}
+              autoFocus
+            />
+          );
+        case 'amount':
+          return (
+            <input
+              type="number"
+              step="0.01"
+              className="modern-input"
+              value={editValue || ''}
+              onChange={handleInputChange}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
+              style={{ textAlign: 'center' }}
+              autoFocus
+            />
+          );
+        case 'bank_category':
+          return (
+            <div 
+              style={{ 
+                position: 'relative',
+                width: '100%',
+                zIndex: 1000,
+                pointerEvents: 'auto'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <select 
+                className="modern-select"
+                value={editValue === null ? 'null' : (editValue || '')}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleInputChange(e);
+                }} 
+                onBlur={(e) => {
+                  e.stopPropagation();
+                  handleUpdate(transaction.id, field);
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleUpdate(transaction.id, field);
+                  }
+                }}
+                onFocus={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ 
+                  textAlign: 'center',
+                  width: '100%',
+                  position: 'relative',
+                  zIndex: 1001,
+                  pointerEvents: 'auto',
+                  backgroundColor: 'var(--color-inputBackground)',
+                  color: 'var(--color-inputText)',
+                  border: '1px solid var(--color-inputBorder)',
+                  outline: 'none'
+                }}
+                autoFocus
+              >
+                <option value="">Select a category</option>
+                {availableBankCategories
+                  .filter(category => category !== null && category !== undefined && category !== '')
+                  .map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))
+                }
+                <option value="null">(Empty/Null)</option>
+              </select>
+            </div>
+          );
+        case 'label':
+          return (
+            <select 
+              className="modern-select"
+              value={editValue || ''} 
+              onChange={handleInputChange}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
+              style={{ 
+                textAlign: 'center',
+                width: '100%',
+                position: 'relative',
+                zIndex: 1001,
+                pointerEvents: 'auto',
+                backgroundColor: 'var(--color-inputBackground)',
+                color: 'var(--color-inputText)',
+                border: '1px solid var(--color-inputBorder)',
+                outline: 'none'
+              }}
+              autoFocus
+            >
+              {getLabelDropdownOptions().map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          );
+        default:
+          // No inline width here — .modern-input is box-sizing:border-box
+          // with width:100%, so the input fits exactly within the cell
+          // column width (previously hardcoded 400px/200px made the
+          // description edit burst out of its column).
+          return (
+            <input
+              type="text"
+              className="modern-input"
+              value={editValue || ''}
+              onChange={handleInputChange}
+              onBlur={() => handleUpdate(transaction.id, field)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleUpdate(transaction.id, field);
+                }
+              }}
+              style={{ textAlign: 'left' }}
+              autoFocus
+            />
+          );
+      }
+    }
+
+    // Display cell content
+    const isEmpty = 
+      transaction[field] === null || 
+      transaction[field] === undefined || 
+      transaction[field] === '';
+    
+    const isInEditMode = editCell && editCell.transactionId === transaction.id && editCell.field === field;
+  
+    return (
+      <div 
+          className={isInEditMode ? '' : 'cell-content editable-cell'}
+          onDoubleClick={isInEditMode ? undefined : () => handleDoubleClick(transaction.id, field, transaction[field] || '')}
+          style={{
+            pointerEvents: isInEditMode ? 'none' : 'auto',
+            position: 'relative',
+            width: '100%',
+            height: '100%'
+          }}
+        >
+        {field === 'label' ? (
+          (() => {
+            const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
+            
+            // Show loading indicator if data is still loading
+            if (isTransactionsLoading || splitAllocations === null) {
+              return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '12px' }}>Loading...</span>;
+            }
+            
+            // Return clean label display
+            return label || '';
+          })()
+        ) : isEmpty ? (
+          <span className="empty-value"></span>
+        ) : field === 'date' ? (
+          new Date(transaction[field]).toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: '2-digit'
+          })
+        ) : field === 'amount' ? (
+          <span className={transaction[field] < 0 ? 'amount-negative' : 'amount-positive'}>
+            {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
+          </span>
+        ) : field === 'description' ? (
+          // Description renders via AutoFitText on a single line that
+          // shrinks to fit the full column width. The outer wrapper is
+          // `flex w-full min-w-0` so AutoFitText's container truly gets
+          // the remaining width of the description column, and a
+          // `min-w-0 flex-1` child is needed so the flex item doesn't
+          // expand to its intrinsic text width.
+          <div className="flex w-full min-w-0 items-center">
+            <div className="min-w-0 flex-1">
+              <AutoFitText text={String(transaction[field] ?? '')} />
+            </div>
+            {transaction.mark && (
+              <div
+                className="paid-indicator"
+                title="Paid Off"
+                style={{
+                  fontSize: '9px',
+                  width: '14px',
+                  height: '14px',
+                  marginLeft: '6px',
+                  flexShrink: 0,
+                  backgroundColor: 'var(--color-backgroundTertiary)',
+                  color: 'var(--color-textSecondary)',
+                  border: '1px solid var(--color-border)',
+                  opacity: 0.85,
+                  fontWeight: '600'
+                }}
+              >
+                ✓
+              </div>
+            )}
+          </div>
+        ) : (
+          transaction[field]
+        )}
+      </div>
+    );
+  };
+
+  // Loading spinner component
+  const LoadingSpinner = () => (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      padding: '20px',
+      height: '100px'
+    }}>
+      <div style={{ 
+        width: '40px', 
+        height: '40px', 
+        border: '4px solid rgba(0, 0, 0, 0.1)', 
+        borderLeft: '4px solid #3498db', 
+        borderRadius: '50%', 
+        animation: 'spin 1s linear infinite' 
+      }}></div>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+
+  // Add handlers for new transaction form
+  const handleNewTransactionChange = (e) => {
+    const { name, value } = e.target;
+    setNewTransaction(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const resetNewTransactionForm = () => {
+    setNewTransaction({
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      amount: '',
+      bank_category: '',
+      label: '' // Default to empty (no split)
+    });
+  };
+
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
+      alert('Please fill out all required fields: Date, Description, and Amount');
+      return;
+    }
+    
+    try {
+      setIsUpdating(true);
+      
+      // Create a copy of the transaction data with amount converted to number
+      const transactionData = {
+        ...newTransaction,
+        amount: parseFloat(newTransaction.amount)
+      };
+      
+      // Check if amount is a valid number
+      if (isNaN(transactionData.amount)) {
+        alert('Please enter a valid number for the amount');
+        setIsUpdating(false);
+        return;
+      }
+      
+      // Extract label value and remove from transaction data for separate handling
+      const labelValue = transactionData.label;
+      const transactionDataForCreation = { ...transactionData };
+      delete transactionDataForCreation.label; // Remove label from transaction creation
+
+      // Send data to backend
+      const response = await axios.post(getApiUrl('/transactions'), transactionDataForCreation);
+      
+      if (response.data.success) {
+        // Add the new transaction to state
+        const addedTransaction = response.data.data;
+
+        // If a label was specified, create split configuration
+        if (labelValue) {
+          try {
+            await createSplitConfigForNewTransaction(addedTransaction.id, labelValue);
+            // Clear the legacy label since we now have split allocations
+            addedTransaction.label = null;
+          } catch (splitErr) {
+            console.error('Error creating split configuration for new transaction:', splitErr);
+            // Don't fail the entire transaction creation, just show a warning
+            showErrorNotification('Transaction created but split configuration failed. You can edit the label to set it up.');
+          }
+        } else {
+          // Ensure no legacy label if no split was specified
+          addedTransaction.label = null;
+        }
+        
+        // Update transactions list
+        setTransactions(prev => [addedTransaction, ...prev]);
+        
+        // Filter logic for newly added transaction to match our filtering rules
+        const transactionDate = new Date(addedTransaction.date);
+        const isInCurrentMonth = transactionDate.getMonth() === currentMonth && 
+                                transactionDate.getFullYear() === currentYear;
+        
+        // Only add to filtered transactions if it matches current month/year filter
+        if (isInCurrentMonth) {
+          // Check other filters
+          let shouldAdd = true;
+          
+          // Check date filter
+          if (dateFilter.startDate || dateFilter.endDate) {
+            if (dateFilter.startDate && new Date(addedTransaction.date) < new Date(dateFilter.startDate)) {
+              shouldAdd = false;
+            }
+            if (dateFilter.endDate && new Date(addedTransaction.date) > new Date(dateFilter.endDate)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check bank category filter
+          if (bankCategoryFilter.length > 0) {
+            if (!bankCategoryFilter.includes(addedTransaction.bank_category) && 
+                !(bankCategoryFilter.includes(null) && !addedTransaction.bank_category)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check label filter
+          if (labelFilter.length > 0) {
+            if (!labelFilter.includes(addedTransaction.label)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Check category filter
+          if (categoryFilter.length > 0) {
+            const category = addedTransaction.category;  // Use direct category field
+            if (!categoryFilter.includes(category) && 
+                !(categoryFilter.includes(null) && category === null)) {
+              shouldAdd = false;
+            }
+          }
+          
+          // Add to filtered transactions if it passes all filters
+          if (shouldAdd) {
+            setFilteredTransactions(prev => [addedTransaction, ...prev]);
+          }
+        }
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Transaction added successfully!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Reset form and close it
+        resetNewTransactionForm();
+        setIsAddingTransaction(false);
+      } else {
+        // Handle case where server returned error
+        const errorMessage = response.data.error || response.data.errors?.join(', ') || 'Failed to add transaction';
+        alert(errorMessage);
+      }
+    } catch (err) {
+      console.error('Error adding transaction:', err);
+      
+      let errorMessage = 'Failed to add transaction. Please try again.';
+      
+      // Try to extract more specific error from response if available
+      if (err.response && err.response.data) {
+        errorMessage = err.response.data.error || 
+                      (err.response.data.errors && err.response.data.errors.join(', ')) || 
+                      errorMessage;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Function to toggle add transaction form
+  const toggleAddTransactionForm = () => {
+    if (!isAddingTransaction) {
+      // Initialize with current month/year when opening the form
+      resetNewTransactionForm();
+    }
+    setIsAddingTransaction(!isAddingTransaction);
+  };
+
+  const cancelAddTransaction = () => {
+    setIsAddingTransaction(false);
+    resetNewTransactionForm();
+  };
+
+  // Add this function to handle navigation from budget chart
+  const handleBudgetChartClick = (category, month, year) => {
+    // Switch to transactions tab
+    setActiveTab('transactions');
+    
+    // Set the month and year to match the budget view
+    setCurrentMonth(month);
+    setCurrentYear(year);
+    
+    // Clear date filter so month navigation works
+    setDateFilter({ startDate: '', endDate: '' });
+    
+    // Clear all filters first
+    setCategoryFilter([]);
+    setBankCategoryFilter([]);
+    setLabelFilter([]);
+    
+    // Set the category filter directly to the clicked category
+    setCategoryFilter([category]);
+    
+    // Scroll to top to show the transactions table
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Add screen grab handler
+  const handleScreenGrab = async () => {
+    setIsScreenGrabOpen(true);
+    // Wait for the modal to render
+    setTimeout(async () => {
+      if (screenGrabRef.current) {
+        try {
+          const canvas = await html2canvas(screenGrabRef.current, {
+            scale: 2, // Higher quality
+            useCORS: true,
+            backgroundColor: '#ffffff'
+          });
+          
+          // Get date range for filename
+          const getDateRangeForFilename = () => {
+            if (filteredTransactions.length === 0) return '';
+            
+            const dates = filteredTransactions.map(t => new Date(t.date));
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date(Math.max(...dates));
+            
+            // If all transactions are from the same month
+            if (minDate.getMonth() === maxDate.getMonth() && 
+                minDate.getFullYear() === maxDate.getFullYear()) {
+              // If it's the same day
+              if (minDate.getDate() === maxDate.getDate()) {
+                return `${minDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${minDate.getFullYear()}`;
+              }
+              // If it's different days in the same month
+              return `${minDate.getDate()}-${maxDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${minDate.getFullYear()}`;
+            }
+            
+            // If transactions span multiple months
+            return `${minDate.getDate()}-${minDate.toLocaleString('default', { month: 'short' })}-${maxDate.getDate()}-${maxDate.toLocaleString('default', { month: 'short' })}-${maxDate.getFullYear()}`;
+          };
+          
+          // Create download link with date range in filename
+          const link = document.createElement('a');
+          link.download = `transactions-${getDateRangeForFilename()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        } catch (error) {
+          console.error('Error generating screen grab:', error);
+          alert('Failed to generate screen grab. Please try again.');
+        }
+      }
+    }, 100);
+  };
+
+  // Add this function before the renderTransactionsTable function to group related split transactions
+  const getRelatedTransactions = (transaction) => {
+    // If this is an original transaction that's been split
+    if (transaction.has_split) {
+      return transactions.filter(t => t.split_from_id === transaction.id);
+    }
+    // If this is a split transaction
+    else if (transaction.split_from_id) {
+      const originalTransaction = transactions.find(t => t.id === transaction.split_from_id);
+      const allSplits = transactions.filter(t => t.split_from_id === transaction.split_from_id);
+      return [originalTransaction, ...allSplits.filter(t => t.id !== transaction.id)];
+    }
+    return [];
+  };
+
+  // Modify the function to render the related transactions indicator as an inline element
+  const renderRelatedTransactionIndicator = (transaction) => {
+    const relatedTransactions = getRelatedTransactions(transaction);
+    
+    if (relatedTransactions.length === 0) return null;
+    
+    if (transaction.has_split) {
+      return (
+        <span style={{
+          backgroundColor: '#e0f2fe',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0369a1',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px solid #bae6fd',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+          </svg>
+          <span>Split ({relatedTransactions.length})</span>
+        </span>
+      );
+    } else if (transaction.split_from_id) {
+      const originalTransaction = relatedTransactions[0];
+      return (
+        <span style={{
+          backgroundColor: '#f0f9ff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#0284c7',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: '1px dashed #7dd3fc',
+          marginLeft: '8px',
+          whiteSpace: 'nowrap'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+          </svg>
+          <span>Split from</span>
+        </span>
+      );
+    }
+    return null;
+  };
+
+  // Transactions table — rewritten with shadcn Table primitives and Tailwind
+  // chrome. Sorting, filtering, inline editing, split-row grouping, and
+  // expand-row actions are unchanged; only the markup and styling changed.
+  const renderTransactionsTable = () => (
+    <div className="fade-in overflow-visible rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+      {isTransactionsLoading ? (
+        <div className="flex h-52 items-center justify-center">
+          <div className="loading-spinner" />
+        </div>
+      ) : (
+        <Table className="table-fixed">
+          <TableHeader>
+            <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
+              <TableHead className="col-date relative h-9 px-2 text-center">
+                <SortableHeader
+                  column="date"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('date')}
+                  isFilterActive={activeFilterColumn === 'date'}
+                >
+                  Date
+                </SortableHeader>
+                <DateFilterDropdown
+                  isActive={activeFilterColumn === 'date'}
+                  dateFilter={dateFilter}
+                  onChange={handleDateFilterChange}
+                  onClear={() => setDateFilter({ startDate: '', endDate: '' })}
+                  dateRange={dateRange}
+                />
+              </TableHead>
+              <TableHead className="col-description h-9 px-3 text-center">
+                <SortableHeader
+                  column="description"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                >
+                  Description
+                </SortableHeader>
+              </TableHead>
+              <TableHead className="col-amount h-9 px-2 text-center">
+                <SortableHeader
+                  column="amount"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                >
+                  Amount
+                </SortableHeader>
+              </TableHead>
+              <TableHead className="col-category relative h-9 px-2 text-center">
+                <SortableHeader
+                  column="bank_category"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('bankCategory')}
+                  isFilterActive={activeFilterColumn === 'bankCategory'}
+                >
+                  Bank Category
+                </SortableHeader>
+                <TableDropdownMenu
+                  isActive={activeFilterColumn === 'bankCategory'}
+                  onClose={() => setActiveFilterColumn(null)}
+                  availableOptions={availableBankCategories}
+                  selectedOptions={bankCategoryFilter}
+                  onChange={handleBankCategoryFilterChange}
+                  onClear={() => setBankCategoryFilter([])}
+                  skipSearch={true}
+                />
+              </TableHead>
+              <TableHead className="col-label relative h-9 px-2 text-center">
+                <SortableHeader
+                  column="label"
+                  sortBy={filters.sortBy}
+                  onSort={handleHeaderSort}
+                  hasFilter={true}
+                  onFilterToggle={() => toggleColumnFilter('label')}
+                  isFilterActive={activeFilterColumn === 'label'}
+                >
+                  Label
+                </SortableHeader>
+                <TableDropdownMenu
+                  isActive={activeFilterColumn === 'label'}
+                  onClose={() => setActiveFilterColumn(null)}
+                  availableOptions={getLabelFilterOptions(users, splitAllocations, transactions)}
+                  selectedOptions={labelFilter}
+                  onChange={handleLabelFilterChange}
+                  onClear={() => setLabelFilter([])}
+                  width="240px"
+                />
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredTransactions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan="5" className="h-40 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <h3 className="text-sm font-semibold text-foreground">No transactions found</h3>
+                    <p className="text-xs">Try adjusting your filters or add a new transaction</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredTransactions.map(transaction => {
+                // Row label class (row-jack, row-ruby, row-group, …) drives
+                // the per-user background color via CSS injected by
+                // generateUserRowCSS(). When we have one of these classes,
+                // we deliberately leave backgroundColor off the inline
+                // style so the CSS class wins with the correct user's
+                // color — otherwise everyone ends up with the current
+                // viewer's accent instead of the allocated user's.
+                const labelClass = getRowLabelClass(
+                  getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading)
+                );
+                let rowBg;
+                if (expandedRow === transaction.id) {
+                  rowBg = 'var(--color-backgroundTertiary)';
+                } else if (transaction.split_from_id) {
+                  rowBg = 'var(--color-infoLight)';
+                } else if (!labelClass) {
+                  // Unlabelled row — rely on shadcn TableRow's themed bg.
+                  rowBg = undefined;
+                } else {
+                  // Labelled row — injected CSS (scoped to tr.row-*) paints
+                  // it with the allocated user's color. Inline bg stays
+                  // undefined so it can't override the CSS.
+                  rowBg = undefined;
+                }
+                return (
+                <React.Fragment key={transaction.id}>
+                  <TableRow
+                    className={cn(
+                      labelClass,
+                      'transition-colors'
+                    )}
+                    style={{
+                      backgroundColor: rowBg,
+                      borderLeft: transaction.split_from_id ? '4px solid var(--color-info)' : undefined
+                    }}
+                  >
+                    <TableCell className="col-date px-2 py-1 text-sm">{renderCell(transaction, 'date')}</TableCell>
+                    <TableCell className="col-description px-3 py-1 text-sm">
+                      {/* In edit mode, delegate to renderCell which
+                          returns the editable <input>. Otherwise render
+                          the text directly via AutoFitText — we skip
+                          the legacy .cell-content/.editable-cell
+                          wrappers whose inherited display:flex and
+                          padding were constraining the column width. */}
+                      {editCell && editCell.transactionId === transaction.id && editCell.field === 'description' ? (
+                        renderCell(transaction, 'description')
+                      ) : (
+                        <div className="flex w-full items-center gap-1.5">
+                          {transaction.split_from_id && (
+                            <span className="inline-flex shrink-0 items-center text-info">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M7 17l-5-5 5-5"/>
+                              </svg>
+                            </span>
+                          )}
+                          {/* min-w-0 lets the overflow-hidden child
+                              actually clip (without it, the flex item
+                              would expand to the text's intrinsic
+                              width and blow out the column). flex-1
+                              makes it take all remaining space.
+                              `editable-cell` reuses the same hover
+                              affordance (cursor + background highlight
+                              + border-radius) that date/amount/category/
+                              label cells already get, so users see
+                              consistent edit hints across all columns. */}
+                          <div
+                            className="editable-cell min-w-0 flex-1"
+                            onDoubleClick={() => handleDoubleClick(transaction.id, 'description', transaction.description || '')}
+                            title={transaction.description || ''}
+                          >
+                            <AutoFitText text={String(transaction.description ?? '')} />
+                          </div>
+                          {transaction.mark && (
+                            <span
+                              className="flex shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground"
+                              style={{ fontSize: '9px', width: '14px', height: '14px', fontWeight: 600, opacity: 0.85 }}
+                              title="Paid Off"
+                            >
+                              ✓
+                            </span>
+                          )}
+                          {renderRelatedTransactionIndicator(transaction)}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
+                            }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            title="Click to expand transaction options"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className={cn(
+                                'transition-transform',
+                                expandedRow === transaction.id ? 'rotate-180' : 'rotate-0'
+                              )}
+                            >
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="col-amount px-2 py-1 text-sm">{renderCell(transaction, 'amount')}</TableCell>
+                    <TableCell className="col-category px-2 py-1 text-sm">{renderCell(transaction, 'bank_category')}</TableCell>
+                    <TableCell className="col-label px-2 py-1 text-sm">
+                      {renderCell(transaction, 'label')}
+                    </TableCell>
+                  </TableRow>
+                  {expandedRow === transaction.id && (
+                    <TableRow>
+                      <TableCell colSpan="5" className="border border-border bg-muted/60 p-0">
+                        <div style={{ 
+                          padding: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSplitTransaction(transaction);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s',
+                                fontWeight: '500'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                              </svg>
+                              Split Transaction
+                            </button>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleTransactionPaidStatus(transaction.id, transaction.mark);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: transaction.mark === true ? '#dc2626' : '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                transition: 'background-color 0.2s',
+                                fontWeight: '500'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (transaction.mark === true) {
+                                  e.target.style.backgroundColor = '#b91c1c';
+                                } else {
+                                  e.target.style.backgroundColor = '#047857';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (transaction.mark === true) {
+                                  e.target.style.backgroundColor = '#dc2626';
+                                } else {
+                                  e.target.style.backgroundColor = '#059669';
+                                }
+                              }}
+                              title={transaction.mark === true ? 'Click to unmark as paid' : 'Click to mark as paid off'}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                {transaction.mark === true ? (
+                                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/>
+                                ) : (
+                                  <path d="M20 6L9 17l-5-5"/>
+                                )}
+                              </svg>
+                              {transaction.mark === true ? 'Unmark as Paid' : 'Mark as Paid'}
+                            </button>
+                          </div>
+                          
+                          {/* Show related transaction details when expanded */}
+                          <div>
+                            
+                            {/* Show related transactions when expanded */}
+                            {getRelatedTransactions(transaction).length > 0 && (
+                              <div style={{ 
+                                marginTop: '12px', 
+                                borderTop: '1px dashed #cbd5e1',
+                                paddingTop: '12px'
+                              }}>
+                                <div style={{ 
+                                  fontSize: '14px', 
+                                  fontWeight: '500', 
+                                  marginBottom: '8px',
+                                  color: 'var(--color-text)'
+                                }}>
+                                  {transaction.has_split ? 'Split Transactions:' : 'Related Transactions:'}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {getRelatedTransactions(transaction).map(related => (
+                                    <div key={related.id} style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between',
+                                      padding: '8px',
+                                      backgroundColor: 'var(--color-backgroundSecondary)',
+                                      borderRadius: '4px',
+                                      border: '1px solid var(--color-border)'
+                                    }}>
+                                      <div style={{ 
+                                        display: 'flex', 
+                                        gap: '12px', 
+                                        alignItems: 'center',
+                                        fontSize: '13px',
+                                        flex: 1,
+                                        marginRight: '16px'
+                                      }}>
+                                        <div>{new Date(related.date).toLocaleDateString()}</div>
+                                        <div style={{ fontWeight: '500' }}>{related.description}</div>
+                                      </div>
+                                      <div style={{ 
+                                        fontWeight: '500',
+                                        fontSize: '13px',
+                                        color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
+                                      }}>
+                                        {parseFloat(related.amount) < 0 ? 
+                                          `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                          `$${parseFloat(related.amount).toFixed(2)}`}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+
+  // Add this before the return statement
+  const renderMobileTransactions = () => {
+    // Get date range from filtered transactions
+    const getDateRange = () => {
+      if (filteredTransactions.length === 0) return '';
+      
+      const dates = filteredTransactions.map(t => new Date(t.date));
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+      
+      // If all transactions are from the same month
+      if (minDate.getMonth() === maxDate.getMonth() && 
+          minDate.getFullYear() === maxDate.getFullYear()) {
+        // If it's the same day
+        if (minDate.getDate() === maxDate.getDate()) {
+          return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} ${minDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+        }
+        // If it's different days in the same month
+        return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} - ${maxDate.getDate()}${getOrdinalSuffix(maxDate.getDate())} ${minDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+      }
+      
+      // If transactions span multiple months
+      return `${minDate.getDate()}${getOrdinalSuffix(minDate.getDate())} ${minDate.toLocaleString('default', { month: 'short', year: 'numeric' })} - ${maxDate.getDate()}${getOrdinalSuffix(maxDate.getDate())} ${maxDate.toLocaleString('default', { month: 'short', year: 'numeric' })}`;
+    };
+
+    // Helper function to get ordinal suffix for dates
+    const getOrdinalSuffix = (day) => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+
+    // Get transaction count
+    const transactionCount = filteredTransactions.length;
+    
+    return (
+      <div ref={screenGrabRef} style={{
+        padding: '10px',
+        backgroundColor: 'var(--color-backgroundSecondary)',
+        maxWidth: '500px',
+        margin: '0 auto',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <h2 style={{
+          textAlign: 'center',
+          marginBottom: '10px',
+          color: '#2c3e50',
+          fontSize: '20px',
+          borderBottom: '2px solid #4a90e2',
+          paddingBottom: '5px'
+        }}>
+          {transactionCount} Transactions - {getDateRange()}
+        </h2>
+        
+        {filteredTransactions.map(transaction => (
+          <div key={transaction.id} style={{
+            marginBottom: '8px',
+            padding: '8px',
+            borderRadius: '4px',
+            backgroundColor: (() => {
+              const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
+              const userColors = getUserTotalColors(label);
+              return userColors ? userColors.bg : '#f8f9fa';
+            })(),
+            borderLeft: `3px solid ${(() => {
+              const label = getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading);
+              const userColors = getUserTotalColors(label);
+              return userColors ? userColors.border : '#d1d1d1';
+            })()}`,
+            fontSize: '13px',
+            lineHeight: '1.3'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '2px'
+                }}>
+                  <span style={{ 
+                    fontWeight: 'bold', 
+                    color: '#2c3e50',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    marginRight: '8px'
+                  }}>
+                    {new Date(transaction.date).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short'
+                    })}
+                  </span>
+                  <span style={{
+                    fontWeight: 'bold',
+                    color: transaction.amount < 0 ? '#e53935' : '#43a047',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {transaction.amount < 0 ? `-$${Math.abs(transaction.amount)}` : `$${transaction.amount}`}
+                  </span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: '#34495e',
+                  fontSize: '12px'
+                }}>
+                  <span style={{ 
+                    flex: 1, 
+                    marginRight: '8px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    {transaction.description}
+                    {transaction.mark && (
+                      <div 
+                        className="paid-indicator"
+                        title="Paid Off"
+                        style={{
+                          fontSize: '9px',
+                          width: '14px',
+                          height: '14px',
+                          marginLeft: '6px',
+                          flexShrink: 0,
+                          backgroundColor: '#e8f5e8',
+                          color: '#4a7c59',
+                          border: '1px solid #c8e6c9',
+                          opacity: 0.7
+                        }}
+                      >
+                        ✓
+                      </div>
+                    )}
+                  </span>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px',
+                    whiteSpace: 'nowrap',
+                    fontSize: '11px',
+                    color: '#7f8c8d'
+                  }}>
+                    <span>{transaction.bank_category || 'No Cat'}</span>
+                    <span>{transaction.label || 'No Label'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        <div style={{ 
+          marginTop: '10px', 
+          padding: '8px', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          <h3 style={{ 
+            marginBottom: '5px', 
+            color: '#2c3e50',
+            fontSize: '14px',
+            borderBottom: '1px solid #dee2e6',
+            paddingBottom: '3px'
+          }}>Summary</h3>
+          {/* Dynamically render user totals */}
+          {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map(user => (
+            <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>{user.display_name}</span>
+              <span style={{ fontWeight: 'bold', color: (totals[user.display_name] || 0) < 0 ? '#e53935' : '#43a047' }}>
+                {(totals[user.display_name] || 0) < 0 ? 
+                  `-$${Math.abs(totals[user.display_name] || 0).toFixed(2)}` : 
+                  `$${(totals[user.display_name] || 0).toFixed(2)}`}
+              </span>
+            </div>
+          ))}
+          {/* Total Spend - sum of all users */}
+          {users && Array.isArray(users) && users.filter(user => user.username !== 'default').length >= 2 && (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              marginTop: '5px', 
+              paddingTop: '5px', 
+              borderTop: '1px solid #dee2e6',
+              fontWeight: 'bold'
+            }}>
+              <span>Total Spend</span>
+              <span style={{ 
+                color: (() => {
+                  const totalSpend = (users && Array.isArray(users)) ? users
+                    .filter(user => user.username !== 'default')
+                    .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                  return totalSpend < 0 ? '#e53935' : '#43a047';
+                })()
+              }}>
+                {(() => {
+                  const totalSpend = (users && Array.isArray(users)) ? users
+                    .filter(user => user.username !== 'default')
+                    .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                  return totalSpend < 0 ? 
+                    `-$${Math.abs(totalSpend).toFixed(2)}` : 
+                    `$${totalSpend.toFixed(2)}`;
+                })()}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Split Transaction Handlers
+  const handleSplitTransaction = (transaction) => {
+    setTransactionToSplit(transaction);
+    setSplitTransactions([{
+      description: '',
+      amount: '',
+      bank_category: transaction.bank_category || '',
+      label: transaction.label || ''
+    }]);
+    setIsSplitting(true);
+  };
+
+  const handleSplitChange = (index, field, value) => {
+    setSplitTransactions(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  const addSplitTransaction = () => {
+    setSplitTransactions(prev => [...prev, {
+      description: '',
+      amount: '',
+      bank_category: transactionToSplit ? transactionToSplit.bank_category : '',
+      label: transactionToSplit ? transactionToSplit.label : ''
+    }]);
+  };
+
+  const removeSplitTransaction = (index) => {
+    if (splitTransactions.length > 1) {
+      setSplitTransactions(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const calculateRemainingAmount = () => {
+    if (!transactionToSplit) return 0;
+    
+    const originalAmount = parseFloat(transactionToSplit.amount) || 0;
+    const splitTotal = splitTransactions.reduce((sum, split) => {
+      return sum + (parseFloat(split.amount) || 0);
+    }, 0);
+    
+    return originalAmount - splitTotal;
+  };
+
+  const handleSaveSplit = async () => {
+    // Validate split transactions
+    const hasEmptyFields = splitTransactions.some(split => 
+      !split.description || !split.amount || split.amount === ''
+    );
+    
+    if (hasEmptyFields) {
+      showErrorNotification('Please fill out all required fields for each split transaction');
+      return;
+    }
+    
+    const totalSplitAmount = splitTransactions.reduce((sum, split) => 
+      sum + parseFloat(split.amount || 0), 0
+    );
+    
+    const originalAmount = parseFloat(transactionToSplit.amount) || 0;
+    
+    // For negative transactions (expenses), ensure splits are also negative
+    if (originalAmount < 0) {
+      const hasPositiveSplit = splitTransactions.some(split => parseFloat(split.amount) > 0);
+      if (hasPositiveSplit) {
+        showErrorNotification('For expense transactions, all split amounts must be negative');
+        return;
+      }
+    }
+    
+    // For positive transactions (income), ensure splits are also positive
+    if (originalAmount > 0) {
+      const hasNegativeSplit = splitTransactions.some(split => parseFloat(split.amount) < 0);
+      if (hasNegativeSplit) {
+        showErrorNotification('For income transactions, all split amounts must be positive');
+        return;
+      }
+    }
+    
+    // Check if the total split amount exceeds the original (considering sign)
+    if (originalAmount < 0) {
+      // For expenses: total splits should not be less than original (more negative)
+      if (totalSplitAmount < originalAmount) {
+        showErrorNotification('Split amounts exceed the original transaction amount');
+        return;
+      }
+    } else {
+      // For income: total splits should not exceed original
+      if (totalSplitAmount > originalAmount) {
+        showErrorNotification('Split amounts exceed the original transaction amount');
+        return;
+      }
+    }
+    
+    try {
+      setIsSavingSplit(true);
+      
+      // Prepare the data for the API (remove label field for new system)
+      const splitData = {
+        originalTransactionId: transactionToSplit.id,
+        remainingAmount: calculateRemainingAmount(),
+        splitTransactions: splitTransactions.map(split => ({
+          date: transactionToSplit.date, // Use the same date as original
+          description: split.description,
+          amount: parseFloat(split.amount),
+          bank_category: split.bank_category
+          // Note: label field removed - will be handled via split configs
+        }))
+      };
+      
+      const response = await axios.post(getApiUrl('/transactions/split'), splitData);
+      
+      if (response.data.success) {
+        // Refresh the transactions to get the newly created split transactions
+        const transactionsResponse = await axios.get(getApiUrl('/transactions'));
+        setTransactions(transactionsResponse.data);
+        
+        // Find the newly created split transactions (they have split_from_id = originalTransactionId)
+        // Sort by ID descending to get the most recent ones first, then take only the number we just created
+        const allSplitTransactions = transactionsResponse.data
+          .filter(t => t.split_from_id === transactionToSplit.id)
+          .sort((a, b) => b.id - a.id); // Sort by ID descending (highest/newest first)
+        
+        // Take only the number of transactions we just created (they should be the newest ones)
+        const newSplitTransactions = allSplitTransactions.slice(0, splitTransactions.length);
+        
+        // Create split configurations for each split transaction that had a label
+        const splitConfigPromises = splitTransactions.map(async (split, index) => {
+          if (split.label && split.label !== '') {
+            const correspondingSplitTransaction = newSplitTransactions[index];
+            if (correspondingSplitTransaction && correspondingSplitTransaction.id) {
+              try {
+                await createSplitConfigForNewTransaction(correspondingSplitTransaction.id, split.label);
+              } catch (splitErr) {
+                console.error(`Error creating split configuration for split transaction ${correspondingSplitTransaction.id}:`, splitErr);
+                // Don't fail the entire operation, just log the error
+              }
+            } else {
+              console.error(`No corresponding split transaction found for index ${index}, label: ${split.label}`);
+            }
+          }
+        });
+        
+        // Wait for all split configurations to be created
+        await Promise.all(splitConfigPromises);
+        
+        showSuccessNotification('Transaction split successfully!');
+        
+        // Close the modal
+        setIsSplitting(false);
+        setTransactionToSplit(null);
+        setSplitTransactions([{
+          description: '',
+          amount: '',
+          bank_category: '',
+          label: ''
+        }]);
+        
+        // Reapply filters to new data
+        let filtered = applyFilters(transactionsResponse.data, {
+          dateFilter,
+          bankCategoryFilter,
+          labelFilter,
+          sortBy: filters.sortBy
+        });
+
+        // Apply additional category filtering if needed
+        if (categoryFilter.length > 0) {
+          filtered = filtered.filter(transaction => {
+            const category = transaction.category;  // Use direct category field
+            if (categoryFilter.includes(null) && category === null) {
+              return true;
+            }
+            return categoryFilter.includes(category);
+          });
+        }
+        
+        // Store the filtered transactions without month filter for the chart
+        setAllFilteredTransactions(filtered);
+        
+        // Apply month filtering for the table view ONLY if no date filter is active
+        let tableFiltered = filtered;
+        
+        // Only apply month filter if there's no date range filter
+        if (!dateFilter.startDate && !dateFilter.endDate) {
+          tableFiltered = filtered.filter(transaction => {
+            const date = new Date(transaction.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          });
+        }
+
+        setFilteredTransactions(tableFiltered);
+      } else {
+        showErrorNotification(response.data.error || 'Failed to split transaction');
+      }
+    } catch (error) {
+      console.error('Error splitting transaction:', error);
+      showErrorNotification('Failed to split transaction. Please try again.');
+    } finally {
+      setIsSavingSplit(false);
+    }
+  };
+
+  const cancelSplit = () => {
+    setIsSplitting(false);
+    setTransactionToSplit(null);
+    setSplitTransactions([{
+      description: '',
+      amount: '',
+      bank_category: '',
+      label: ''
+    }]);
+  };
+
+  // Bulk update function to mark transactions as paid off
+  const handleBulkMarkAsPaid = async () => {
+    try {
+      setIsBulkUpdating(true);
+      
+      // Get the IDs of all currently filtered transactions
+      const transactionIds = filteredTransactions.map(t => t.id);
+      
+      if (transactionIds.length === 0) {
+        // Show warning notification
+        const notification = document.createElement('div');
+        notification.textContent = 'No transactions found to mark as paid off';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#fff3cd';
+        notification.style.color = '#856404';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #ffeaa7';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        setIsBulkUpdating(false);
+        return;
+      }
+      
+      // Prepare bulk update data - simplified approach using just transaction IDs
+      const bulkUpdateData = {
+        mark_value: true,
+        transaction_ids: transactionIds
+            };
+      
+      const response = await axios.put(getApiUrl('/transactions/bulk-update-mark'), bulkUpdateData);
+      
+      if (response.data.success) {
+        // Update local state to reflect the changes
+        setTransactions(prevTransactions => 
+          prevTransactions.map(transaction => 
+            transactionIds.includes(transaction.id) 
+              ? { ...transaction, mark: true }
+              : transaction
+          )
+        );
+        
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(transaction => 
+            transactionIds.includes(transaction.id) 
+              ? { ...transaction, mark: true }
+              : transaction
+          )
+        );
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = `Successfully marked ${response.data.updated_count} transactions as paid off!`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #c3e6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 4000);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = response.data.error || 'Failed to mark transactions as paid off';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error in bulk mark as paid:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Show error notification with more details
+      const errorMessage = error.response?.data?.error || 
+                           error.response?.data?.details || 
+                           error.message || 
+                           'Failed to mark transactions as paid off. Please try again.';
+      
+      const notification = document.createElement('div');
+      notification.textContent = errorMessage;
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      notification.style.maxWidth = '400px';
+      notification.style.wordWrap = 'break-word';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 8000);
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  // Function to toggle transaction paid status (mark/unmark as paid)
+  const handleToggleTransactionPaidStatus = async (transactionId, currentMarkStatus) => {
+    try {
+      setIsUpdating(true);
+      
+      // Toggle the mark value (opposite of current status)
+      const newMarkValue = !currentMarkStatus;
+      
+      // Prepare the data for updating single transaction
+      const updateData = {
+        mark_value: newMarkValue,
+        transaction_ids: [transactionId]
+      };
+      
+      const response = await axios.put(getApiUrl('/transactions/bulk-update-mark'), updateData);
+      
+      if (response.data.success) {
+        // Update local state to reflect the changes
+        setTransactions(prevTransactions => 
+          prevTransactions.map(transaction => 
+            transaction.id === transactionId 
+              ? { ...transaction, mark: newMarkValue }
+              : transaction
+          )
+        );
+        
+        setFilteredTransactions(prevFiltered => 
+          prevFiltered.map(transaction => 
+            transaction.id === transactionId 
+              ? { ...transaction, mark: newMarkValue }
+              : transaction
+          )
+        );
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.textContent = newMarkValue 
+          ? 'Transaction marked as paid off!' 
+          : 'Transaction unmarked as paid off!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #c3e6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 3000);
+        
+        // Close the expanded row
+        setExpandedRow(null);
+        
+      } else {
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.textContent = response.data.error || 'Failed to update transaction status';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        notification.style.zIndex = '1000';
+        notification.style.border = '1px solid #f5c6cb';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error updating transaction paid status:', error);
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.textContent = 'Failed to update transaction status. Please try again.';
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = '#f8d7da';
+      notification.style.color = '#721c24';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '4px';
+      notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+      notification.style.zIndex = '1000';
+      notification.style.border = '1px solid #f5c6cb';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 5000);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div style={{ fontFamily: 'Arial, sans-serif' }}>
+      {/* Global CSS styles */}
+      
+      <style>
+      {`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+          font-family: 'Inter', sans-serif;
+        }
+        
+        /* Center-aligned headings */
+        .dashboard-title {
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 28px;
+          color: var(--color-text);
+          margin-bottom: 24px;
+          position: relative;
+          display: block;
+          padding-bottom: 8px;
+          text-align: center;
+        }
+        
+        .dashboard-title:after {
+          content: '';
+          position: absolute;
+          left: 50%;
+          bottom: 0;
+          height: 3px;
+          width: 40px;
+          background-color: #4a90e2;
+          border-radius: 2px;
+          transform: translateX(-50%);
+        }
+        
+        .section-title {
+          font-family: 'Inter', sans-serif;
+          font-weight: 600;
+          font-size: 22px;
+          color: var(--color-text);
+          margin: 20px 0 10px 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          text-align: center;
+        }
+        
+        /* Styles for the enhanced edit inputs */
+        .modern-input, 
+        .modern-select {
+          border-radius: 20px;
+          border: 1px solid #e2e8f0;
+          padding: 8px 16px;
+          font-size: 14px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+          outline: none;
+          transition: all 0.2s ease;
+          background-color: white;
+          min-width: 180px;
+        }
+        
+        .modern-input:focus, 
+        .modern-select:focus {
+          border-color: #4a90e2;
+          box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+        }
+        
+        .modern-select {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 16px;
+          padding-right: 36px;
+        }
+        
+        /* Special styling for description field */
+        input[type="text"].modern-input {
+          width: 300px;
+        }
+        
+        /* Compact table styling */
+        .modern-table {
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 14px;
+        }
+        
+        .modern-table td {
+          padding: 2px 8px;
+          vertical-align: middle;
+          transition: all 0.15s ease;
+          height: 20px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: center;
+          line-height: 1;
+        }
+        
+        .modern-table th {
+          padding: 6px;
+          font-weight: 600;
+          background-color: var(--color-backgroundTertiary);
+          text-align: center;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          height: 20px;
+          border-bottom: 1px solid #eaecef;
+          line-height: 1;
+        }
+        
+        /* Add extra right padding for specific columns with filter buttons */
+        .modern-table th:nth-child(1),
+        .modern-table th:nth-child(4),
+        .modern-table th:nth-child(5) {
+          padding-right: 24px;
+        }
+        
+        .modern-table tr {
+          line-height: 1;
+          border-bottom: 1px solid #f1f1f1;
+        }
+        
+        .modern-table tbody tr:hover {
+          background-color: rgba(0,0,0,0.02);
+        }
+        
+        /* Cell content styling */
+        .cell-content {
+          max-width: 250px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          line-height: 1;
+        }
+        
+        /* Description column specific width */
+        .modern-table td:nth-child(2) .cell-content {
+          max-width: 400px;
+          padding-right: 0;
+          min-width: 150px;
+          justify-content: center;
+          text-align: center;
+        }
+        
+        /* Amount column specific width */
+        .modern-table td:nth-child(3) {
+          min-width: 80px;
+          text-align: right;
+        }
+        
+        /* Category and label columns */
+        .modern-table td:nth-child(4),
+        .modern-table td:nth-child(5) {
+          min-width: 100px;
+          max-width: 120px;
+        }
+        
+        /* Modern inputs when editing */
+        .modern-table td input.modern-input,
+        .modern-table td select.modern-select {
+          padding: 0px 8px;
+          font-size: 14px;
+          height: 20px;
+          line-height: 1;
+        }
+        
+        /* Filter header */
+        .modern-filter-header {
+          position: relative;
+          padding: 0;
+          line-height: 1;
+          width: 100%;
+          text-align: center;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        
+        /* Headers without filter buttons should be perfectly centered */
+        .modern-filter-header:not(.sortable) {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        
+        /* Headers with filter buttons need special alignment */
+        .modern-filter-header.sortable {
+          justify-content: space-between;
+        }
+        
+        .sortable-header {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          width: 100%;
+        }
+        
+        /* Filter button */
+        .filter-button {
+          position: absolute;
+          right: 6px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 20px;
+          height: 20px;
+          z-index: 5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        
+        /* Center align header content */
+        .modern-filter-header .header-content {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 5px;
+          cursor: pointer;
+          transition: color 0.2s ease;
+          gap: 6px;
+          white-space: nowrap;
+          width: 100%;
+          text-align: center;
+        }
+        
+        /* Center the text within the header content */
+        .modern-filter-header .header-content > span:first-child {
+          flex: 1;
+          text-align: center;
+        }
+        
+        /* Add hover effect to all header content */
+        .modern-filter-header .header-content:hover {
+          color: #3498db;
+        }
+        
+        /* Special styling for non-filterable headers */
+        .modern-filter-header:not(.sortable) .header-content {
+          display: flex;
+          width: 100%;
+          justify-content: center;
+        }
+        
+        /* Ensure the clickable area covers the entire header */
+        .sortable-header {
+          cursor: pointer;
+          padding: 2px 0;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .modern-table {
+            font-size: 13px;
+          }
+          
+          .modern-table td {
+            padding: 2px 6px;
+            height: 18px;
+          }
+          
+          .modern-table th {
+            padding: 2px 6px;
+            height: 18px;
+          }
+          
+          .modern-table td:nth-child(2) .cell-content {
+            max-width: 200px;
+            min-width: 120px;
+          }
+          
+          .modern-table td:nth-child(4),
+          .modern-table td:nth-child(5) {
+            min-width: 80px;
+            max-width: 100px;
+          }
+          
+          .modern-table td input.modern-input,
+          .modern-table td select.modern-select {
+            padding: 0px 6px;
+            font-size: 13px;
+            height: 18px;
+          }
+        }
+        
+        .nav-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 5px var(--color-shadowLight);
+          font-family: 'Inter', sans-serif;
+        }
+        
+        .nav-button.active {
+          background-color: var(--color-buttonPrimary);
+          color: var(--color-buttonPrimaryText);
+        }
+        
+        .nav-button:not(.active) {
+          background-color: var(--color-buttonSecondary);
+          color: var(--color-buttonSecondaryText);
+          border: 1px solid var(--color-buttonSecondaryBorder);
+        }
+        
+        .nav-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px var(--color-shadow);
+        }
+        
+        .nav-button.active:hover {
+          background-color: var(--color-buttonPrimaryHover);
+        }
+        
+        .nav-button:not(.active):hover {
+          background-color: var(--color-buttonSecondaryHover);
+        }
+        
+        .help-toggle {
+          background-color: var(--color-buttonSecondary);
+          border: 1px solid var(--color-buttonSecondaryBorder);
+          border-radius: 20px;
+          padding: 6px 12px;
+          font-size: 13px;
+          color: var(--color-buttonSecondaryText);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: auto;
+          font-family: 'Inter', sans-serif;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px var(--color-shadowLight);
+        }
+        
+        .help-toggle:hover {
+          background-color: var(--color-buttonSecondaryHover);
+          box-shadow: 0 2px 5px var(--color-shadow);
+          transform: translateY(-1px);
+        }
+        
+        .help-toggle svg {
+          transition: all 0.2s ease;
+        }
+        
+        .help-toggle:hover svg {
+          transform: scale(1.1);
+        }
+        
+        /* Enhanced row styling for better discernibility */
+        /* User-specific row styles are now dynamically generated based on user preferences */
+        
+        .row-group {
+          background-color: rgba(75, 192, 95, 0.25) !important;
+          border-left: 4px solid rgba(75, 192, 95, 0.8);
+        }
+        
+        /* Styling for unlabeled rows */
+        .modern-table tbody tr:not(.row-group):not([class*="row-"]) {
+          background-color: white;
+          border-left: 4px solid #d1d1d1;
+        }
+        
+        .empty-value {
+          font-style: italic;
+          color: transparent;
+        }
+        
+        .amount-negative {
+          color: #e53935;
+          font-weight: 500;
+        }
+        
+        .amount-positive {
+          color: #43a047;
+          font-weight: 500;
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        .paid-indicator {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          height: 14px;
+          background-color: var(--color-backgroundTertiary);
+          color: var(--color-textSecondary);
+          border: 1px solid var(--color-border);
+          border-radius: 50%;
+          font-size: 9px;
+          font-weight: 600;
+          margin-left: 6px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          flex-shrink: 0;
+          opacity: 0.85;
+          transition: all 0.2s ease;
+          title: "Paid Off";
+        }
+        
+        .paid-indicator:hover {
+          background-color: #e2e8f0;
+          color: #475569;
+          opacity: 1;
+          border-color: #94a3b8;
+        }
+        
+        .editable-cell {
+          position: relative;
+          cursor: pointer;
+        }
+        
+        .editable-cell:hover::after {
+          content: '✎';
+          position: absolute;
+          top: 2px;
+          right: 5px;
+          font-size: 12px;
+          color: #aaa;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        /* Description column specific width and alignment */
+        .modern-table td:nth-child(2) {
+          text-align: left; /* Left align description cells */
+        }
+        
+        .modern-table td:nth-child(2) .cell-content {
+          max-width: 600px;
+          padding-right: 0;
+          min-width: 180px;
+          justify-content: flex-start; /* Left align description content */
+          text-align: left;
+        }
+        
+        /* When editing description, make input left-aligned */
+        .modern-table td:nth-child(2) input[type="text"].modern-input {
+          text-align: left;
+        }
+        
+        /* Keep description header centered */
+        .modern-table th:nth-child(2) {
+          text-align: center;
+        }
+        
+        .modern-table th:nth-child(2) .modern-filter-header {
+          justify-content: center;
+        }
+        
+        /* Ensure Amount column is properly centered */
+        .modern-table th:nth-child(3) {
+          text-align: center;
+        }
+        
+        .modern-table th:nth-child(3) .modern-filter-header {
+          justify-content: center;
+        }
+        
+        /* Ensure filter buttons don't overlap with text */
+        .modern-table th {
+          position: relative;
+        }
+        
+        /* Properly position sort indicators */
+        .sort-indicator {
+          display: inline-flex;
+          align-items: center;
+          margin-left: 4px;
+          position: relative;
+          top: auto;
+          right: auto;
+          transform: none;
+        }
+        
+        /* Additional spacing for filter buttons */
+        .modern-filter-header.sortable {
+          padding-right: 20px;
+        }
+        
+        /* Ensure proper spacing in sortable headers */
+        .modern-filter-header.sortable .sortable-header {
+          padding-right: 0;
+          margin-right: 10px;
+          flex: 1;
+        }
+        
+        /* Ensure header content is centered without accounting for filter button */
+        .modern-filter-header.sortable {
+          position: relative;
+        }
+      `}
+      </style>
+      
+      {/* Top tab bar, help toggle, and settings gear button were removed in
+          the refactor to a sidebar layout. Navigation happens via the
+          Sidebar NavLinks which drive activeTab through useLocation(). The
+          help toggle and theme toggle live in the sidebar footer; settings
+          is its own route (/settings) which auto-opens UserPreferencesModal. */}
+      {activeTab === 'transactions' && (
+        <div className="space-y-6 relative">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Transactions
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Review, edit, split, and categorize your shared bank transactions.
+            </p>
+          </header>
+          {isUpdating && (
+            <div style={{ 
+              position: 'absolute', 
+              top: '0', 
+              left: '0', 
+              width: '100%', 
+              height: '100%', 
+              backgroundColor: 'var(--color-modalOverlay)', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              zIndex: 10,
+              borderRadius: '8px'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: '3px solid #f3f3f3',
+                  borderTop: '3px solid #4a90e2',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
+              </div>
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          )}
+
+          <div>
+            {/* Active filters display */}
+            {(dateFilter.startDate || dateFilter.endDate ||bankCategoryFilter.length > 0 || labelFilter.length > 0 || categoryFilter.length > 0) && (
+              <div style={{ 
+                margin: '10px 0', 
+                padding: '12px', 
+                backgroundColor: '#e8f4fd', 
+                borderRadius: '8px',
+                border: '1px solid #d0e8f9',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <strong style={{ color: '#1e40af', fontSize: '14px' }}>Active Filters:</strong>
+                    {(dateFilter.startDate || dateFilter.endDate) && (
+                      <span style={{ 
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        📅 {dateFilter.startDate || 'Start'} to {dateFilter.endDate || 'Today'}
+                      </span>
+                    )}
+                                         {bankCategoryFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#f0fdf4',
+                         color: '#166534',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #bbf7d0'
+                       }}>
+                         🏷️ Bank: {bankCategoryFilter.slice(0, 3).join(', ')}{bankCategoryFilter.length > 3 ? ` +${bankCategoryFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                                         {categoryFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#fef3c7',
+                         color: '#92400e',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #fde68a'
+                       }}>
+                         📋 Categories: {categoryFilter.slice(0, 3).map(cat => cat === null ? '(empty)' : cat).join(', ')}{categoryFilter.length > 3 ? ` +${categoryFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                                         {labelFilter.length > 0 && (
+                       <span style={{ 
+                         backgroundColor: '#fce7f3',
+                         color: '#be185d',
+                         padding: '4px 8px',
+                         borderRadius: '4px',
+                         fontSize: '12px',
+                         fontWeight: '500',
+                         border: '1px solid #f9a8d4'
+                       }}>
+                         👤 Labels: {labelFilter.slice(0, 3).join(', ')}{labelFilter.length > 3 ? ` +${labelFilter.length - 3} more` : ''}
+                       </span>
+                     )}
+                    <span style={{ 
+                      fontSize: '13px', 
+                      color: '#4b5563',
+                      fontWeight: '500'
+                    }}>
+                      ({filteredTransactions.length} transactions)
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button 
+                      onClick={handleBulkMarkAsPaid}
+                      disabled={isBulkUpdating || filteredTransactions.length === 0}
+                      style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        backgroundColor: isBulkUpdating ? '#9ca3af' : '#059669',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: isBulkUpdating || filteredTransactions.length === 0 ? 'not-allowed' : 'pointer',
+                        fontWeight: '500',
+                        fontSize: '13px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        opacity: isBulkUpdating || filteredTransactions.length === 0 ? 0.7 : 1
+                      }}
+                      title={filteredTransactions.length === 0 ? 'No transactions to mark' : 'Mark all filtered transactions as paid off'}
+                    >
+                      {isBulkUpdating ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                            style={{ animation: 'spin 1s linear infinite' }}>
+                            <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
+                          </svg>
+                          Marking...
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M20 6L9 17l-5-5"/>
+                          </svg>
+                          Mark as Paid Off
+                        </>
+                      )}
+                    </button>
+                    
+                    <button 
+                      onClick={clearFilters}
+                      style={{ 
+                        padding: '8px 14px',
+                        backgroundColor: 'var(--color-buttonSecondary)',
+                        color: 'var(--color-buttonSecondaryText)',
+                        border: '1px solid var(--color-buttonSecondaryBorder)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        fontSize: '13px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chart section with loading indicator */}
+          <div style={{ height: '500px', marginBottom: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {isTransactionsLoading ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                {/* Custom title section with integrated controls */}
+                <div style={{ 
+                  width: '100%', 
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                  marginTop: '20px'
+                }}>
+                  <h3 style={{
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    color: 'var(--color-text)',
+                    margin: 0,
+                    fontFamily: 'Inter, sans-serif',
+                    textAlign: 'center'
+                  }}>
+                    {chartLabelFilter === 'All' 
+                      ? `All Users - ${currentYear} Transactions` 
+                      : `${chartLabelFilter}'s ${currentYear} Transactions`}
+                  </h3>
+                  
+                  <div style={{ 
+                    position: 'absolute',
+                    right: '20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    display: 'flex', 
+                    gap: '8px', 
+                    alignItems: 'center',
+                    zIndex: 100
+                  }}>
+                    <select
+                      value={chartLabelFilter}
+                      onChange={(e) => setChartLabelFilter(e.target.value)}
+                      style={{
+                        padding: '5px 10px',
+                        margin: '0px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px var(--color-shadowLight)',
+                        outline: 'none',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <option value="All" style={{ backgroundColor: 'var(--color-inputBackground)', color: 'var(--color-inputText)' }}>All Users Combined</option>
+                      {users.filter(user => user.username !== 'default').map(user => (
+                        <option key={user.id} value={user.display_name} style={{ backgroundColor: 'var(--color-inputBackground)', color: 'var(--color-inputText)' }}>
+                          {user.display_name}'s
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        data-filter="category"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterColumn(activeFilterColumn === 'categoryFilter' ? null : 'categoryFilter');
+                        }}
+                        className="modern-button"
+                        style={{ 
+                          padding: '6px 12px',
+                          backgroundColor: categoryFilter.length > 0 ? 'var(--color-infoLight)' : 'var(--color-buttonSecondary)',
+                          color: categoryFilter.length > 0 ? 'var(--color-info)' : 'var(--color-buttonSecondaryText)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                        </svg>
+                        <span>Categories</span>
+                        {categoryFilter.length > 0 && (
+                          <span style={{ 
+                            backgroundColor: 'var(--color-buttonPrimary)', 
+                            color: 'var(--color-buttonPrimaryText)', 
+                            borderRadius: '50%', 
+                            width: '16px', 
+                            height: '16px', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '11px'
+                          }}>
+                            {categoryFilter.length}
+                          </span>
+                        )}
+                      </button>
+                      <TableDropdownMenu
+                        isActive={activeFilterColumn === 'categoryFilter'}
+                        onClose={() => setActiveFilterColumn(null)}
+                        availableOptions={availableCategories}
+                        selectedOptions={categoryFilter}
+                        onChange={(option, e) => handleCategoryFilterChange(option, e)}
+                        onClear={() => setCategoryFilter([])}
+                        width="250px"
+                        maxHeight="350px"
+                        skipSearch={true}
+                        alignRight={true}
+                        dropdownRef={filterPopupRef}
+                        emptyLabel="null"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ width: '90%', maxWidth: '1200px', height: '400px', margin: '0 auto' }}>
+                  <Bar data={data} options={options} />
+                  <HelpText isVisible={helpTextVisible}>
+                    Chart displays data for all months of the selected year and respects all other applied filters. Unlabelled transactions are excluded from the chart view.
+                  </HelpText>
+                </div>
+              </>
+            )}
+          </div>
+
+          <h2 className="section-title">
+            Shared Transactions 
+            <span className="date-label">
+              {dateFilter.startDate || dateFilter.endDate ? (
+                `(${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'Start'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Today'})`
+              ) : (
+                `(${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })} ${currentYear})`
+              )}
+            </span>
+          </h2>
+
+          <div className="table-navigation-container">
+            <div className="table-navigation-left">
+              <button 
+                onClick={handlePrevMonth}
+                className="modern-button navigation prev"
+                style={{ marginRight: 0 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Prev
+              </button>
+              <div className="month-display" style={{
+                textAlign: 'center',
+                padding: '0 12px',
+                whiteSpace: 'nowrap'
+              }}>
+                {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short', year: 'numeric' })}
+              </div>
+              <button 
+                onClick={handleNextMonth}
+                className="modern-button navigation next"
+                disabled={isCurrentMonthCurrent()}
+                style={{
+                  opacity: isCurrentMonthCurrent() ? 0.7 : 1,
+                  cursor: isCurrentMonthCurrent() ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Next
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="table-navigation-right">
+              <button 
+                onClick={refreshBankFeeds}
+                disabled={isRefreshing}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '8px 15px',
+                  backgroundColor: isRefreshing ? 'var(--color-textTertiary)' : 'var(--color-buttonPrimary)',
+                  color: 'var(--color-buttonPrimaryText)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  transition: 'background-color 0.2s ease',
+                  opacity: isRefreshing ? 0.7 : 1
+                }}
+              >
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  style={{
+                    animation: isRefreshing ? 'spin 2s linear infinite' : 'none'
+                  }}
+                >
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                {isRefreshing ? 'Refreshing...' : 'Refresh Bank Feeds'}
+              </button>
+              
+              <button 
+                onClick={toggleAddTransactionForm}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '8px 15px',
+                  backgroundColor: 'var(--color-success)',
+                  color: 'var(--color-textInverse)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Transaction
+              </button>
+            </div>
+          </div>
+          
+          <HelpText isVisible={helpTextVisible}>
+            Use the month navigation to browse your transaction history. Only transactions from the selected month are shown unless a date filter is active.
+          </HelpText>
+          
+          {/* Add Transaction Form Modal */}
+          {isAddingTransaction && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: 'var(--color-modalBackground)',
+                padding: '20px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px var(--color-shadowDark)',
+                width: '400px',
+                maxWidth: '90%',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}>
+                <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add New Transaction</h2>
+                
+                <form onSubmit={handleAddTransaction}>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Date *
+                    </label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={newTransaction.date}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
+                      }}
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Description *
+                    </label>
+                    <input
+                      type="text"
+                      name="description"
+                      value={newTransaction.description}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
+                      }}
+                      placeholder="Enter transaction description"
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Amount *
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      step="0.01"
+                      value={newTransaction.amount}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)'
+                      }}
+                      placeholder="Enter amount (negative for expenses)"
+                      required
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Bank Category
+                    </label>
+                    <select
+                      name="bank_category"
+                      value={newTransaction.bank_category}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        fontSize: '14px',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Select a category</option>
+                      {availableBankCategories
+                        .filter(category => category !== null && category !== undefined && category !== '')
+                        .map(category => (
+                          <option key={category} value={category}>{category}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                      Label
+                    </label>
+                    <select
+                      name="label"
+                      value={newTransaction.label}
+                      onChange={handleNewTransactionChange}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--color-inputBorder)',
+                        fontSize: '14px',
+                        backgroundColor: 'var(--color-inputBackground)',
+                        color: 'var(--color-inputText)',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {getLabelDropdownOptions().map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                    <button
+                      type="button"
+                      onClick={cancelAddTransaction}
+                      style={{
+                        padding: '10px 16px',
+                        backgroundColor: 'var(--color-buttonSecondary)',
+                        color: 'var(--color-buttonSecondaryText)',
+                        border: '1px solid var(--color-buttonSecondaryBorder)',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: 'var(--color-success)',
+                        color: 'var(--color-textInverse)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Add Transaction
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {/* Transactions table (shadcn Table primitives + Tailwind chrome).
+              renderTransactionsTable owns its own card styling; no extra
+              wrapper here to avoid double borders. */}
+          {renderTransactionsTable()}
+          
+          {isTransactionsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="totals-container" key={`totals-${colorRefreshCounter}`}>
+              {/* ===== REFACTORED USER TOTALS DISPLAY ===== */}
+              {/* This section displays totals calculated by the refactored system that: */}
+              {/* - Ignores unlabelled transactions */}
+              {/* - Splits "Both" transactions equally between users */}
+              {/* - Splits "All users" transactions equally between all active users */}
+              {/* - Respects date filtering and shows totals for filtered date ranges */}
+              {/* - Uses user data from the initial-data endpoint */}
+              
+              {/* Dynamically render user totals */}
+              {users && Array.isArray(users) && users.filter(user => user.username !== 'default').map((user, index) => {
+                const colors = getDynamicUserTotalColors(user.display_name);
+                
+                return (
+                  <div 
+                    key={user.id}
+                    style={{ 
+                      backgroundColor: colors.bg, 
+                      padding: '15px', 
+                      borderRadius: '8px',
+                      borderRight: `5px solid ${colors.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      maxWidth: 'fit-content'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                      {user.display_name}
+                    </div>
+                    <div style={{ minWidth: '100px', textAlign: 'right' }}>
+                      {(() => {
+                        const userTotal = totals[user.display_name];
+                        const safeTotal = typeof userTotal === 'number' && !isNaN(userTotal) ? userTotal : 0;
+                        return safeTotal < 0 ? 
+                          `-$${Math.abs(safeTotal).toFixed(2)}` : 
+                          `$${safeTotal.toFixed(2)}`;
+                      })()}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Total Spend - sum of all users */}
+              {users && Array.isArray(users) && users.filter(user => user.username !== 'default').length >= 2 && (
+                <div 
+                  style={{ 
+                    backgroundColor: 'rgba(75, 192, 95, 0.2)', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    borderRight: '5px solid rgba(75, 192, 95, 1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    maxWidth: 'fit-content'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginRight: '15px' }}>
+                    Total Spend
+                  </div>
+                  <div style={{ minWidth: '100px', textAlign: 'right' }}>
+                    {(() => {
+                      const totalSpend = (users && Array.isArray(users)) ? users
+                        .filter(user => user.username !== 'default')
+                        .reduce((sum, user) => sum + (totals[user.display_name] || 0), 0) : 0;
+                      return totalSpend < 0 ? 
+                        `-$${Math.abs(totalSpend).toFixed(2)}` : 
+                        `$${totalSpend.toFixed(2)}`;
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Screen Grab Button */}
+              <div className="table-navigation-container" style={{ 
+                justifyContent: 'center', 
+                marginTop: '20px',
+                padding: '15px',
+                borderTop: '1px solid #eee'
+              }}>
+                <button 
+                  onClick={handleScreenGrab}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 20px',
+                    backgroundColor: 'var(--color-buttonPrimary)',
+                    color: 'var(--color-buttonPrimaryText)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  Download Mobile View
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'budgets' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Budgets</h1>
+            <p className="text-sm text-muted-foreground">
+              Plan monthly spending targets and reorder categories to match your priorities.
+            </p>
+          </header>
+          <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />
+        </div>
+      )}
+      {activeTab === 'personal' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Personal</h1>
+            <p className="text-sm text-muted-foreground">
+              Track your personal transactions and organize your saving buckets.
+            </p>
+          </header>
+          <PersonalTransactions helpTextVisible={helpTextVisible} users={users} splitAllocations={splitAllocations} />
+        </div>
+      )}
+      {activeTab === 'offset' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Offset</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage offset account transactions and categorizations.
+            </p>
+          </header>
+          <OffsetTransactions helpTextVisible={helpTextVisible} />
+        </div>
+      )}
+      
+      {/* User Preferences Modal */}
+      <UserPreferencesModal 
+        isOpen={isPreferencesModalOpen} 
+        onClose={() => setIsPreferencesModalOpen(false)} 
+      />
+
+      {/* Add this at the end of the transactions view, before the closing div */}
+      {isScreenGrabOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--color-modalBackground)',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 20px var(--color-shadowDark)',
+            maxWidth: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                              <h2 style={{ margin: 0, color: 'var(--color-text)' }}>Mobile View</h2>
+              <button
+                onClick={() => setIsScreenGrabOpen(false)}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {renderMobileTransactions()}
+          </div>
+        </div>
+      )}
+      
+      {/* Split Transaction Modal - REFACTORED VERSION */}
+      {isSplitting && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--color-modalBackground)',
+            padding: '24px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 32px var(--color-shadowDark)',
+            width: '600px',
+            maxWidth: '90%',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Header */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--color-border)',
+              paddingBottom: '16px'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                color: 'var(--color-text)',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                Split Transaction
+              </h2>
+              <button
+                onClick={cancelSplit}
+                style={{
+                  padding: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-textSecondary)',
+                  borderRadius: '6px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-backgroundHover)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            
+            {transactionToSplit && (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* Original Transaction Summary - Compact Version */}
+                <div style={{ 
+                  marginBottom: '16px', 
+                  padding: '12px', 
+                  backgroundColor: 'var(--color-backgroundTertiary)', 
+                  borderRadius: '8px',
+                  border: '1px solid var(--color-border)'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontSize: '13px', 
+                        color: 'var(--color-textSecondary)', 
+                        marginBottom: '4px',
+                        fontWeight: '500'
+                      }}>
+                        Original Transaction
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: 'var(--color-text)',
+                        fontWeight: '500'
+                      }}>
+                        {transactionToSplit.description}
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap',
+                        gap: '8px', 
+                        marginTop: '12px'
+                      }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'var(--color-infoLight)',
+                          color: 'var(--color-info)',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          border: '1px solid var(--color-info)'
+                        }}>
+                          📅 {new Date(transactionToSplit.date).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                        {transactionToSplit.bank_category && (
+                          <span style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'var(--color-successLight)',
+                            color: 'var(--color-success)',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: '1px solid var(--color-success)'
+                          }}>
+                            🏷️ {transactionToSplit.bank_category}
+                          </span>
+                        )}
+                        {transactionToSplit.label && (
+                          <span style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'var(--color-warningLight)',
+                            color: 'var(--color-warning)',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: '1px solid var(--color-warning)'
+                          }}>
+                            👤 {transactionToSplit.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: parseFloat(transactionToSplit.amount) < 0 ? 'var(--color-error)' : 'var(--color-success)',
+                      marginLeft: '16px'
+                    }}>
+                      {parseFloat(transactionToSplit.amount) < 0 
+                        ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
+                        : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Remaining Amount - Compact Status Bar */}
+                <div style={{ 
+                  marginBottom: '16px',
+                  padding: '10px 12px',
+                  backgroundColor: calculateRemainingAmount() === 0 ? 'var(--color-successLight)' : 'var(--color-warningLight)',
+                  borderRadius: '8px',
+                  border: `1px solid ${calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ 
+                    fontSize: '13px', 
+                    color: 'var(--color-text)',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>Remaining:</span>
+                    <span style={{ 
+                      color: calculateRemainingAmount() < 0 ? 'var(--color-error)' : 'var(--color-success)',
+                      fontWeight: '600'
+                    }}>
+                      {calculateRemainingAmount() < 0 
+                        ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}` 
+                        : `$${calculateRemainingAmount().toFixed(2)}`}
+                    </span>
+                  </span>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'
+                  }}>
+                    {calculateRemainingAmount() === 0 
+                      ? '✓ Fully allocated' 
+                      : 'Will remain on original'}
+                  </span>
+                </div>
+                
+                {/* Split Transactions - More Compact */}
+                <div style={{ 
+                  flex: 1, 
+                  overflowY: 'auto',
+                  marginBottom: '16px'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600',
+                    color: 'var(--color-text)',
+                    marginBottom: '12px'
+                  }}>
+                    Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
+                  </h3>
+                  
+                  {splitTransactions.map((split, index) => (
+                    <div key={index} style={{ 
+                      marginBottom: '12px', 
+                      padding: '12px', 
+                      backgroundColor: 'var(--color-backgroundSecondary)', 
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)',
+                      position: 'relative'
+                    }}>
+                      {splitTransactions.length > 1 && (
+                        <button
+                          onClick={() => removeSplitTransaction(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            padding: '2px',
+                            backgroundColor: 'var(--color-errorLight)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            width: '20px',
+                            height: '20px'
+                          }}
+                          title="Remove split"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="3">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      )}
+                      
+                      {/* Modern form layout with labels */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '-8px' }}>
+                          Split #{index + 1}
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                            Description *
+                          </label>
+                          <input
+                            type="text"
+                            value={split.description}
+                            onChange={(e) => handleSplitChange(index, 'description', e.target.value)}
+                            style={{
+                              padding: '10px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--color-inputBorder)',
+                              fontSize: '14px',
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              backgroundColor: 'var(--color-inputBackground)',
+                              color: 'var(--color-inputText)'
+                            }}
+                            placeholder="Enter transaction description"
+                            required
+                          />
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Amount *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={split.amount}
+                              onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)'
+                              }}
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Bank Category
+                            </label>
+                            <select
+                              value={split.bank_category}
+                              onChange={(e) => handleSplitChange(index, 'bank_category', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <option value="">Select a category</option>
+                              {availableBankCategories
+                                .filter(category => category !== null && category !== undefined && category !== '')
+                                .map(category => (
+                                  <option key={category} value={category}>{category}</option>
+                                ))
+                              }
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
+                              Label
+                            </label>
+                            <select
+                              value={split.label}
+                              onChange={(e) => handleSplitChange(index, 'label', e.target.value)}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-inputBorder)',
+                                fontSize: '14px',
+                                width: '100%',
+                                backgroundColor: 'var(--color-inputBackground)',
+                                color: 'var(--color-inputText)',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {getLabelDropdownOptions().map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Add split button */}
+                  <button
+                    onClick={addSplitTransaction}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      backgroundColor: 'transparent',
+                      color: 'var(--color-buttonPrimary)',
+                      border: '1px dashed var(--color-buttonPrimary)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                                      onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'var(--color-backgroundHover)';
+                    e.target.style.borderColor = 'var(--color-buttonPrimaryHover)';
+                    e.target.style.color = 'var(--color-buttonPrimaryHover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.borderColor = 'var(--color-buttonPrimary)';
+                    e.target.style.color = 'var(--color-buttonPrimary)';
+                  }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Another Split
+                  </button>
+                </div>
+                
+                {/* Action buttons - Sticky footer */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: '8px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid var(--color-border)'
+                }}>
+                  <button
+                    onClick={cancelSplit}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-buttonSecondary)',
+                      color: 'var(--color-buttonSecondaryText)',
+                      border: '1px solid var(--color-buttonSecondaryBorder)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = 'var(--color-buttonSecondaryHover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'var(--color-buttonSecondary)';
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSplit}
+                    disabled={isSavingSplit}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: isSavingSplit ? 'var(--color-textTertiary)' : 'var(--color-buttonPrimary)',
+                      color: 'var(--color-buttonPrimaryText)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: isSavingSplit ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSavingSplit) {
+                        e.target.style.backgroundColor = 'var(--color-buttonPrimaryHover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSavingSplit) {
+                        e.target.style.backgroundColor = 'var(--color-buttonPrimary)';
+                      }
+                    }}
+                  >
+                    {isSavingSplit ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                          style={{ animation: 'spin 1s linear infinite' }}>
+                          <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
+                        </svg>
+                        Processing...  
+                      </>
+                    ) : (
+                      <>
+                        Save Splits
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Main App component. Order of providers from outside in:
+//   BrowserRouter   — enables useLocation/useNavigate/NavLink
+//   UserPreferencesProvider — existing per-user theme + accent pipeline
+//   AppLayout       — sidebar + main content shell (owns help-visible state)
+//   AppContent      — legacy top-level with all data fetching and tab bodies
+const App = () => {
+  return (
+    <BrowserRouter>
+      <UserPreferencesProvider>
+        <AppLayout>
+          <AppContent />
+        </AppLayout>
+      </UserPreferencesProvider>
+    </BrowserRouter>
+  );
+};
+
+export default App;

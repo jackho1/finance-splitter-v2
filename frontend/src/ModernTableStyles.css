@@ -1,0 +1,361 @@
+/* Modern Table Styles - Updated for App.jsx */
+
+/* Table Container */
+.modern-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px var(--color-shadowLight);
+  margin: 20px 0;
+  background-color: var(--color-backgroundSecondary);
+  transition: all 0.3s ease;
+}
+
+/* Base table style */
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* Table header */
+.modern-table thead th {
+  background-color: var(--color-tableHeader) !important;
+  color: var(--color-tableHeaderText) !important;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-align: left;
+  padding: 16px;
+  position: relative;
+  border-bottom: 2px solid var(--color-border);
+  transition: background-color 0.2s ease;
+}
+
+.modern-table thead th:hover {
+  background-color: var(--color-backgroundHover) !important;
+}
+
+/* Table cells */
+.modern-table tbody td {
+  padding: 14px 16px;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.2s ease;
+}
+
+/* Row styles */
+.modern-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.modern-table tbody tr:hover:not([class*="row-"]) {
+  background-color: var(--color-tableRowHover);
+}
+
+/* Color-coded rows - Now dynamically generated based on user preferences */
+
+/* Amount colors */
+.amount-positive {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.amount-negative {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+/* Filter header */
+.modern-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Filter button */
+.filter-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  color: var(--color-textSecondary);
+  transition: all 0.2s ease;
+}
+
+.filter-button:hover {
+  background-color: var(--color-backgroundHover);
+  color: var(--color-text);
+}
+
+.filter-button.active {
+  color: var(--color-buttonPrimary);
+  background-color: var(--color-infoLight);
+}
+
+/* Filter dropdown */
+.filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 250px;
+  background: var(--color-backgroundElevated);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px var(--color-shadow);
+  padding: 16px;
+  margin-top: 4px;
+  z-index: 1000;
+  border: 1px solid var(--color-border);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Filter groups */
+.filter-group {
+  margin-bottom: 12px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-text);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+/* Filter options */
+.filter-options {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding-right: 4px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-option:hover {
+  background-color: var(--color-backgroundHover);
+}
+
+/* Modern checkbox */
+.modern-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: var(--color-buttonPrimary);
+}
+
+/* Filter actions */
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Modern buttons */
+.btn-primary {
+  background-color: var(--color-buttonPrimary);
+  color: var(--color-buttonPrimaryText);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-buttonPrimaryHover);
+}
+
+.btn-secondary {
+  background-color: var(--color-buttonSecondary);
+  color: var(--color-buttonSecondaryText);
+  border: 1px solid var(--color-buttonSecondaryBorder);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-buttonSecondaryHover);
+}
+
+/* Modern inputs */
+.modern-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-inputBorder);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--color-inputText);
+  background-color: var(--color-inputBackground);
+  transition: all 0.2s ease;
+}
+
+.modern-input:focus {
+  outline: none;
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
+}
+
+/* Modern select */
+.modern-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-inputBorder);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--color-inputText);
+  background-color: var(--color-inputBackground);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  padding-right: 32px;
+}
+
+.modern-select:focus {
+  outline: none;
+  border-color: var(--color-borderFocus);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-textSecondary);
+}
+
+.empty-state-icon {
+  margin-bottom: 16px;
+  color: var(--color-textTertiary);
+}
+
+.empty-state h3 {
+  color: var(--color-text);
+  font-size: 1.125rem;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: var(--color-textSecondary);
+  font-size: 0.875rem;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-shadowLight);
+  border-radius: 50%;
+  border-top-color: var(--color-buttonPrimary);
+  animation: spin 0.8s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Editable cell */
+.cell-content {
+  position: relative;
+  min-height: 20px;
+}
+
+.editable-cell {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.editable-cell:hover {
+  background-color: var(--color-backgroundHover);
+}
+
+.editable-cell::after {
+  content: "✏️";
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.editable-cell:hover::after {
+  opacity: 0.5;
+}
+
+/* Empty value styling */
+.empty-value {
+  color: var(--color-textTertiary);
+  font-style: italic;
+  font-size: 0.813rem;
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modern-table thead th,
+  .modern-table tbody td {
+    padding: 12px;
+  }
+  
+  .filter-dropdown {
+    min-width: 220px;
+  }
+  
+  .modern-filter-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .filter-button {
+    padding: 2px;
+  }
+}

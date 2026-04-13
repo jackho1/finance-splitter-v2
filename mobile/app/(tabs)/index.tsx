@@ -1,0 +1,3398 @@
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
+import { 
+  StyleSheet, 
+  Dimensions, 
+  RefreshControl, 
+  ScrollView, 
+  ActivityIndicator, 
+  Platform, 
+  View, 
+  Text,
+  TextInput,
+  Alert,
+  Pressable,
+  FlatList,
+  Animated,
+  Easing,
+  Keyboard,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
+
+// Lucide React Native icons
+import { 
+  Receipt, 
+  Gamepad2, 
+  UtensilsCrossed, 
+  Gift, 
+  Plane, 
+  Home as HomeIcon, 
+  Heart, 
+  House, 
+  ShoppingBag, 
+  PiggyBank, 
+  MapPin, 
+  Car,
+  HelpCircle,
+  Edit3,
+  X,
+  Trash2,
+  Split,
+  Bookmark,
+  User,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react-native';
+
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { KeyboardAwareBottomSheet } from '@/components/KeyboardAwareBottomSheet';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { UserFilterDropdown } from '@/components/UserFilterDropdown';
+import { SortDropdown, SortOption } from '@/components/SortDropdown';
+import { RunningTotalDisplay } from '@/components/RunningTotalDisplay';
+
+// Constants
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CHART_HEIGHT = 280;
+const BAR_WIDTH = SCREEN_WIDTH / 6;
+
+// Types
+interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: string;
+  bank_category: string;
+  category: string;
+  label: string;
+  mark?: boolean;
+}
+
+interface DateHeader {
+  type: 'date';
+  date: string;
+  id: string;
+}
+
+interface TransactionWithType extends Transaction {
+  type: 'transaction';
+}
+
+type ListItem = DateHeader | TransactionWithType;
+
+interface CategoryData {
+  category: string;
+  data: number[];
+  color: string;
+}
+
+interface CategoryTotal {
+  category: string;
+  total: number;
+  color: string;
+  percentage: number;
+}
+
+interface SelectedSegment {
+  category: string;
+  amount: number;
+  month: number;
+  color: string;
+}
+
+// Add new interfaces for split allocations
+interface SplitAllocation {
+  id: number;
+  split_id: number;
+  user_id: number;
+  amount: string;
+  percentage: string | null;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  display_name: string;
+  split_type_code: string;
+  split_type_label: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+// API Configuration
+const API_CONFIG = {
+  development: {
+    ios: 'http://192.168.50.203:8080',
+    android: 'http://192.168.241.111:5000',
+    web: 'http://192.168.241.111:5000',
+  },
+  production: 'https://your-production-api-url.com',
+};
+
+const getApiBaseUrl = (): string => {
+  if (__DEV__) {
+    return API_CONFIG.development[Platform.OS as keyof typeof API_CONFIG.development] || API_CONFIG.development.web;
+  }
+  return API_CONFIG.production;
+};
+
+// Color palette for categories
+const CATEGORY_COLORS = [
+  '#4361EE', '#3A0CA3', '#7209B7', '#F72585', '#4CC9F0', 
+  '#4895EF', '#560BAD', '#B5179E', '#F15BB5', '#9D4EDD',
+  '#06D6A0', '#118AB2', '#073B4C', '#FFD166', '#EF476F'
+];
+
+// User color themes - compatible with light and dark modes
+const USER_COLORS = {
+  // Ruby - Red theme
+  ruby: {
+    light: {
+      background: 'rgba(255, 99, 132, 0.1)',
+      border: 'rgba(255, 99, 132, 0.3)',
+      accent: '#e53935'
+    },
+    dark: {
+      background: 'rgba(255, 99, 132, 0.15)',
+      border: 'rgba(255, 99, 132, 0.4)',
+      accent: '#ff6b6b'
+    }
+  },
+  // Jack - Blue theme
+  jack: {
+    light: {
+      background: 'rgba(54, 162, 235, 0.1)',
+      border: 'rgba(54, 162, 235, 0.3)',
+      accent: '#1976d2'
+    },
+    dark: {
+      background: 'rgba(54, 162, 235, 0.15)',
+      border: 'rgba(54, 162, 235, 0.4)',
+      accent: '#42a5f5'
+    }
+  },
+  // Both - Green theme
+  both: {
+    light: {
+      background: 'rgba(75, 192, 95, 0.1)',
+      border: 'rgba(75, 192, 95, 0.3)',
+      accent: '#388e3c'
+    },
+    dark: {
+      background: 'rgba(75, 192, 95, 0.15)',
+      border: 'rgba(75, 192, 95, 0.4)',
+      accent: '#66bb6a'
+    }
+  }
+};
+
+// Category to icon mapping using Lucide React Native
+const CATEGORY_ICONS = {
+  'Bills': Receipt,
+  'Entertainment': Gamepad2,
+  'Food': UtensilsCrossed,
+  'Gifts': Gift,
+  'Holidays': Plane,
+  'Home': HomeIcon,
+  'Medical': Heart,
+  'Mortgage': House,
+  'Other': HelpCircle,
+  'Personal Items': ShoppingBag,
+  'Savings': PiggyBank,
+  'Transfer': HelpCircle,
+  'Travel': MapPin,
+  'Vehicle': Car,
+};
+
+// Month labels
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Helper function to format date to "17th July, 2025" style
+const formatDateWithOrdinal = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  const date = new Date(dateString);
+  const day = date.getDate();
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  const year = date.getFullYear();
+  
+  // Add ordinal suffix
+  const getOrdinalSuffix = (day: number) => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+  
+  return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+};
+
+// Helper function to format date in "17th July, 2025" format (for display)
+const formatDateDisplay = (dateString: string): string => {
+  if (!dateString) return 'Unknown Date';
+  
+  const date = new Date(dateString);
+  
+  const day = date.getDate();
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  const year = date.getFullYear();
+  
+  // Add ordinal suffix to day
+  const getOrdinalSuffix = (day: number): string => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+  
+  return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+};
+
+// Helper function to get category icon
+const getCategoryIcon = (category: string) => {
+  return CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS] || HelpCircle;
+};
+// Helper function to get optimal icon color that works with all transaction colors
+const getCategoryIconColor = (isDark: boolean): string => {
+  // Use a neutral icon color that works well with all transaction background colors
+  // and maintains good contrast in both light and dark modes
+  if (isDark) {
+    return '#94A3B8'; // Light slate-gray for dark mode - softer and more modern
+  } else {
+    return '#475569'; // Dark slate-gray for light mode - professional and readable
+  }
+};
+// Helper function to get bottom sheet theme
+const getBottomSheetTheme = (isDark: boolean) => ({
+  backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+  handleColor: isDark ? '#48484a' : '#c6c6c8',
+  textColor: isDark ? '#ffffff' : '#000000',
+  subtitleColor: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+  cardBg: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+  buttonBg: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+});
+
+// Helper function to get category from bank_category using mappings (like frontend)
+const getCategoryFromMapping = (bankCategory: string | null | undefined, categoryMappings: Record<string, string>): string | null => {
+  if (!bankCategory) return null;
+  // Only return a value if it exists in the mappings
+  return categoryMappings[bankCategory] || null;
+};
+
+// Helper function to determine the actual category for a transaction
+const getTransactionCategory = (transaction: Transaction, categoryMappings: Record<string, string>): string => {
+  // First check if the transaction already has a category set
+  if (transaction.category) {
+    return transaction.category;
+  }
+  
+  // If no category is set, try to get it from the bank_category mapping
+  const mappedCategory = getCategoryFromMapping(transaction.bank_category, categoryMappings);
+  
+  // If the bank_category is not mapped or is empty, it's unknown
+  if (!mappedCategory) {
+    return 'Unknown';
+  }
+  
+  return mappedCategory;
+};
+
+// Memoized Components
+const ChartBar = memo<{
+  month: number;
+  segments: Array<{ category: string; value: number; color: string }>;
+  maxValue: number;
+  height: number;
+  onSegmentPress: (segment: SelectedSegment) => void;
+}>(({ month, segments, maxValue, height, onSegmentPress }) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const currentMonth = new Date().getMonth();
+  const isCurrentMonth = month === currentMonth;
+  
+  const monthTotal = segments.reduce((sum, seg) => sum + seg.value, 0);
+  const scaledHeight = (monthTotal / maxValue) * height;
+  
+  return (
+    <View style={styles.barContainer}>
+      <View style={[
+        styles.bar,
+        { height: scaledHeight },
+        isCurrentMonth && styles.currentMonthBar
+      ]}>
+        {segments.map((segment, index) => {
+          const segmentHeight = (segment.value / monthTotal) * scaledHeight;
+          return (
+            <Pressable
+              key={`${segment.category}-${index}`}
+              style={[
+                styles.barSegment,
+                { 
+                  height: segmentHeight,
+                  backgroundColor: segment.color,
+                }
+              ]}
+              onPress={() => onSegmentPress({
+                category: segment.category,
+                amount: segment.value,
+                month,
+                color: segment.color
+              })}
+            />
+          );
+        })}
+      </View>
+      
+      <Text style={[
+        styles.monthLabel,
+        { color: isDark ? '#fff' : '#000' },
+        isCurrentMonth && styles.currentMonthLabel
+      ]}>
+        {MONTH_LABELS[month]}
+      </Text>
+      
+      {monthTotal > 0 && (
+        <Text style={[
+          styles.barTotal,
+          { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }
+        ]}>
+          ${Math.round(monthTotal)}
+        </Text>
+      )}
+    </View>
+  );
+});
+
+const DateHeader = memo<{
+  date: string;
+  colorScheme: 'light' | 'dark';
+}>(({ date, colorScheme }) => {
+  const isDark = colorScheme === 'dark';
+  
+  const formatDateHeader = (dateString: string) => {
+    if (!dateString) return { dateText: 'Unknown Date', relativeText: '' };
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    const isToday = date.toDateString() === today.toDateString();
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+    
+    // Calculate days difference
+    const diffTime = today.getTime() - date.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Format the main date (left side)
+    const isCurrentYear = date.getFullYear() === today.getFullYear();
+    const dateText = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: isCurrentYear ? undefined : 'numeric'
+    });
+    
+    // Format relative time (right side)
+    let relativeText = '';
+    if (isToday) {
+      relativeText = 'Today';
+    } else if (isYesterday) {
+      relativeText = 'Yesterday';
+    } else if (diffDays > 0) {
+      relativeText = `${diffDays} days ago`;
+    } else {
+      relativeText = 'Future';
+    }
+    
+    return {
+      dateText,
+      relativeText
+    };
+  };
+  
+  const dateInfo = formatDateHeader(date);
+  
+  return (
+    <View style={[
+      styles.dateHeader,
+      { borderBottomColor: isDark ? '#333' : '#e1e5e9' }
+    ]}>
+      <View style={styles.dateHeaderContent}>
+        <Text style={[
+          styles.dateHeaderText,
+          { color: isDark ? '#fff' : '#000' }
+        ]}>
+          {dateInfo.dateText}
+        </Text>
+        {dateInfo.relativeText && (
+          <Text style={[
+            styles.dateHeaderSubText,
+            { color: isDark ? '#888' : '#666' }
+          ]}>
+            {dateInfo.relativeText}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+});
+
+const TransactionItem = memo<{
+  transaction: Transaction;
+  onPress: (event: any) => void;
+  colorScheme: 'light' | 'dark';
+  categoryMappings: Record<string, string>;
+  getTransactionLabel: (transaction: Transaction) => string | null;
+  getUserColors: (transaction: Transaction) => any;
+}>(({ transaction, onPress, colorScheme, categoryMappings, getTransactionLabel, getUserColors }) => {
+  const isDark = colorScheme === 'dark';
+  // Use the same category determination logic for consistent coloring
+  const actualCategory = getTransactionCategory(transaction, categoryMappings);
+  const categoryColor = useMemo(() =>
+    CATEGORY_COLORS[actualCategory.charCodeAt(0) % CATEGORY_COLORS.length],
+    [actualCategory]
+  );
+  const label = getTransactionLabel(transaction);
+  const userColors = useMemo(() => getUserColors(transaction), [transaction]);
+  
+  // Determine if this is a user background (Ruby, Jack, Both)
+  const normalizedLabel = label ? label.toLowerCase() : '';
+  const isUserBackground = normalizedLabel === 'ruby' || normalizedLabel === 'jack' || normalizedLabel === 'both';
+
+  // Match the icon color to the bottom sheet view
+  const vibrantIconColor = isDark ? '#a78bfa' : '#6366f1';
+  // Consistent background tint (still slightly colored for vibrancy)
+  const iconBgColor = isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)';
+  // Consistent subtle border color
+  const iconBorderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  // Consistent shadow
+  const iconShadow = isDark ? '#000' : '#aaa';
+
+  // Get the appropriate icon for the category
+  const CategoryIcon = getCategoryIcon(actualCategory);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.transactionItem,
+        {
+          backgroundColor: userColors.background,
+          borderColor: userColors.border,
+          opacity: pressed ? 0.7 : 1,
+        }
+      ]}
+      onPress={onPress}
+    >
+      <View style={styles.transactionRow}>
+        {/* Vibrant Category Icon on the left */}
+        <View style={[
+          styles.categoryIconContainer,
+          {
+            backgroundColor: iconBgColor,
+            shadowColor: iconShadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 6,
+            elevation: 4,
+          },
+        ]}>
+          <CategoryIcon
+            size={18}
+            color={vibrantIconColor}
+            strokeWidth={2.5}
+          />
+        </View>
+        <View style={styles.transactionContent}>
+          <View style={styles.transactionHeader}>
+            <Text
+              style={[styles.transactionDescription, { color: isDark ? '#fff' : '#000' }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {transaction.description || 'No description'}
+            </Text>
+            <Text
+              style={[
+                styles.transactionAmount,
+                {
+                  color: isDark ? '#ccc' : '#666',
+                },
+              ]}
+            >
+              {parseFloat(transaction.amount || '0') < 0 ? '-' : ''}${Math.abs(parseFloat(transaction.amount || '0')).toFixed(2)}
+            </Text>
+          </View>
+          <View style={styles.transactionTags}>
+            {/* Only show bank_category tag if it's different from the mapped category */}
+            {transaction.bank_category && actualCategory === 'Unknown' && (
+              <View style={[styles.categoryTag, { backgroundColor: categoryColor + '20' }]}> 
+                <Text style={[styles.categoryTagText, { color: categoryColor }]}> 
+                  {transaction.bank_category}
+                </Text>
+              </View>
+            )}
+            {label && (
+              <View style={[styles.labelTag, {
+                backgroundColor: userColors.background,
+              }]}> 
+                <Text style={[styles.labelTagText, { color: userColors.accent }]}> 
+                  {label}
+                </Text>
+              </View>
+            )}
+            {/* Subtle paid indicator */}
+            {transaction.mark && (
+              <View style={[
+                styles.subtlePaidIndicator,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                  borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+                }
+              ]}>
+                <Check 
+                  size={10} 
+                  color={isDark ? 'rgba(16, 185, 129, 0.8)' : 'rgba(16, 185, 129, 0.7)'} 
+                  strokeWidth={2.5}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// Main Component
+export default function FinanceDashboard() {
+  // Hooks
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+  
+  // State
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [currentYear] = useState(new Date().getFullYear());
+  const [displayMonth, setDisplayMonth] = useState(new Date().getMonth());
+  const [lastPressTime, setLastPressTime] = useState<number>(0);
+  
+  // Swipe gesture state
+  const translateX = useRef(new Animated.Value(0)).current;
+  const swipeOpacity = useRef(new Animated.Value(1)).current;
+
+  // Enhanced bottom sheet state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTransaction, setEditedTransaction] = useState<Transaction | null>(null);
+  
+  // Category filtering state
+  const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
+  const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
+  const [isLoadingMappings, setIsLoadingMappings] = useState(false);
+  
+  // New state for split allocations and users
+  const [splitAllocations, setSplitAllocations] = useState<Record<string, SplitAllocation[]>>({});
+  const [users, setUsers] = useState<User[]>([]);
+  
+  // User filtering and sorting state
+  const [selectedUserFilters, setSelectedUserFilters] = useState<string[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  
+  // Dropdown options state
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableBankCategories, setAvailableBankCategories] = useState<string[]>([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  
+  // Notification banner state
+  const [notification, setNotification] = useState<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    visible: boolean;
+    duration?: number;
+  } | null>(null);
+
+  // Notification helper functions
+  const getNotificationColors = useCallback((type: 'success' | 'error' | 'info' | 'warning') => {
+    const colors = {
+      success: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+        border: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)',
+        text: isDark ? 'rgba(16, 185, 129, 0.95)' : 'rgba(16, 185, 129, 0.9)',
+        icon: '#10b981',
+      },
+      error: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.15)',
+        border: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.25)',
+        text: isDark ? 'rgba(239, 68, 68, 0.95)' : 'rgba(239, 68, 68, 0.9)',
+        icon: '#ef4444',
+      },
+      info: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.15)',
+        border: isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.25)',
+        text: isDark ? 'rgba(99, 102, 241, 0.95)' : 'rgba(99, 102, 241, 0.9)',
+        icon: '#6366f1',
+      },
+      warning: {
+        backdrop: isDark ? 'rgba(18, 18, 18, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)',
+        border: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)',
+        text: isDark ? 'rgba(245, 158, 11, 0.95)' : 'rgba(245, 158, 11, 0.9)',
+        icon: '#f59e0b',
+      },
+    };
+    return colors[type];
+  }, [isDark]);
+
+  const showNotification = useCallback((
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning' = 'info',
+    duration: number = 3000
+  ) => {
+    const id = Date.now().toString();
+    setNotification({ id, message, type, visible: true, duration });
+    
+    // Auto-dismiss after specified duration
+    setTimeout(() => {
+      setNotification(prev => prev && prev.id === id ? { ...prev, visible: false } : prev);
+      // Clear notification after fade animation
+      setTimeout(() => {
+        setNotification(prev => prev && prev.id === id ? null : prev);
+      }, 400);
+    }, duration);
+  }, []);
+
+  // Helper function to get transaction label from split allocations
+  const getTransactionLabel = useCallback((transaction: Transaction): string | null => {
+    if (!splitAllocations || !users || users.length === 0) {
+      return null;
+    }
+    const allocations = splitAllocations[transaction.id];
+    if (!allocations || allocations.length === 0) {
+      return null;
+    }
+    // If only one allocation, return that user's display name
+    if (allocations.length === 1) {
+      return allocations[0].display_name;
+    }
+    // If multiple allocations with equal split, return "Both"
+    if (allocations.length > 1 && allocations[0].split_type_code === 'equal') {
+      // Check if all active users are included
+      const activeUsers = users.filter(u => u.is_active);
+      const allocationUserIds = allocations.map(a => a.user_id);
+      const allActiveUsersIncluded = activeUsers.every(u => allocationUserIds.includes(u.id));
+      if (allActiveUsersIncluded && allocations.length === activeUsers.length) {
+        return 'Both';
+      }
+    }
+    // For other cases, return comma-separated list of users
+    return allocations.map(a => a.display_name).join(', ');
+  }, [splitAllocations, users]);
+
+  // Helper function to get user colors based on label and theme
+  const getUserColors = useCallback((transaction: Transaction) => {
+    const label = getTransactionLabel(transaction);
+    if (!label) {
+      // Use neutral color scheme for unlabelled
+      return {
+        background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+        border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+        accent: isDark ? '#666' : '#999'
+      };
+    }
+    const normalizedLabel = label.toLowerCase();
+    if (normalizedLabel === 'ruby') {
+      return isDark ? USER_COLORS.ruby.dark : USER_COLORS.ruby.light;
+    } else if (normalizedLabel === 'jack') {
+      return isDark ? USER_COLORS.jack.dark : USER_COLORS.jack.light;
+    } else if (normalizedLabel === 'both') {
+      return isDark ? USER_COLORS.both.dark : USER_COLORS.both.light;
+    }
+    return {
+      background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+      border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      accent: isDark ? '#666' : '#999'
+    };
+  }, [isDark, getTransactionLabel]);
+  
+  // Helper function to get bank categories for a given category
+  const getBankCategoriesForCategory = useCallback((category: string): string[] => {
+    return Object.entries(categoryMappings)
+      .filter(([_, mappedCategory]) => mappedCategory === category)
+      .map(([bankCategory, _]) => bankCategory);
+  }, [categoryMappings]);
+  
+  // Bottom sheet ref
+  const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+  
+  // Keyboard-aware snap points for bottom sheet
+  const { keyboardHeight: bottomSheetKeyboardHeight, isKeyboardVisible: bottomSheetKeyboardVisible } = useKeyboardHeight();
+  
+  // Calculate snap points that adjust for keyboard
+  const snapPoints = useMemo(() => {
+    if (bottomSheetKeyboardVisible && bottomSheetKeyboardHeight > 0) {
+      // When keyboard is visible, expand to a height that keeps content visible
+      const keyboardAdjustedHeight = (bottomSheetKeyboardHeight + 300) / SCREEN_HEIGHT * 100;
+      return ['40%', `${Math.min(keyboardAdjustedHeight, 90)}%`];
+    }
+    return ['40%', '85%'];
+  }, [bottomSheetKeyboardVisible, bottomSheetKeyboardHeight]);
+  
+  // Auto-expand bottom sheet when keyboard appears
+  useEffect(() => {
+    if (bottomSheetKeyboardVisible && bottomSheetModalRef.current) {
+      // Expand to the larger snap point when keyboard shows
+      setTimeout(() => {
+        bottomSheetModalRef.current?.snapToIndex(1);
+      }, 100);
+    }
+  }, [bottomSheetKeyboardVisible]);
+
+  // Computed values
+  const categoryData = useMemo(() => {
+    if (!transactions || !transactions.length) return [];
+    
+    // Filter transactions: only include those with labels and exclude transfers (matching index.tsx)
+    const filteredTransactions = transactions.filter(transaction => {
+      // Filter out unlabelled transactions (like index.tsx)
+      if (!getTransactionLabel(transaction)) {
+        return false;
+      }
+      
+      // Skip positive transfer transactions (deposits)
+      if (transaction.bank_category === "Transfer" && parseFloat(transaction.amount) > 0) {
+        return false;
+      }
+      
+      // Apply user filtering if any users are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(transaction);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    // Get unique categories using the enhanced category determination
+    const uniqueCategories = [...new Set(
+      filteredTransactions
+        .map(transaction => getTransactionCategory(transaction, categoryMappings))
+        .filter(category => category !== null && category !== undefined && category !== '' && category !== 'Unknown')
+    )].sort();
+    
+    const categories = new Map<string, number[]>();
+    const categoryColorMap = new Map<string, string>();
+    
+    // Assign colors to categories
+    uniqueCategories.forEach((category, index) => {
+      categories.set(category, new Array(12).fill(0));
+      categoryColorMap.set(category, CATEGORY_COLORS[index % CATEGORY_COLORS.length]);
+    });
+    
+    filteredTransactions.forEach((transaction) => {
+      // Use the enhanced category determination
+      const category = getTransactionCategory(transaction, categoryMappings);
+      
+      if (categories.has(category)) {
+        const { date, amount } = transaction;
+        const month = new Date(date || new Date()).getMonth();
+        const numAmount = parseFloat(amount || '0');
+        
+        // Use the same calculation logic as index.tsx:
+        // For visualization: add negative amounts, subtract positive amounts
+        const monthData = categories.get(category)!;
+        if (numAmount < 0) {
+          monthData[month] += Math.abs(numAmount);
+        } else {
+          monthData[month] -= numAmount;
+        }
+      }
+    });
+    
+    // Only include categories with data
+    const result = Array.from(categories.entries())
+      .map(([category, data]) => ({
+        category,
+        data,
+        color: categoryColorMap.get(category)!,
+      }))
+      .filter(categoryData => {
+        // Check if category has any non-zero data
+        return categoryData.data.some(value => value !== 0);
+      });
+    
+    return result;
+  }, [transactions, categoryMappings, selectedUserFilters, sortOption, getTransactionLabel]);
+  
+  const filteredCategoryData = useMemo(() => {
+    if (selectedCategories.length === 0 && selectedCategoryFilters.length === 0) return categoryData;
+    
+    let filtered = categoryData;
+    
+    // Filter by selected categories from chart legend
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter(cat => selectedCategories.includes(cat.category));
+    }
+    
+    // Filter by selected categories from category summary
+    if (selectedCategoryFilters.length > 0) {
+      filtered = filtered.filter(cat => selectedCategoryFilters.includes(cat.category));
+    }
+    
+    return filtered;
+  }, [categoryData, selectedCategories, selectedCategoryFilters]);
+  
+  const monthlyTransactions = useMemo(() => {
+    const filtered = transactions.filter(t => {
+      if (!t.date) return false;
+      const transactionDate = new Date(t.date);
+      
+      // Filter by month and year
+      if (transactionDate.getMonth() !== displayMonth || 
+          transactionDate.getFullYear() !== currentYear) {
+        return false;
+      }
+      
+      // Filter by selected categories if any are selected
+      if (selectedCategoryFilters.length > 0) {
+        const transactionCategory = getTransactionCategory(t, categoryMappings);
+        if (!selectedCategoryFilters.includes(transactionCategory)) {
+          return false;
+        }
+      }
+      
+      // Filter by selected users if any are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(t);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    // Apply sorting if specified
+    if (sortOption) {
+      if (sortOption === 'amount-desc') {
+        filtered.sort((a, b) => {
+          const amountA = Math.abs(parseFloat(a.amount) || 0);
+          const amountB = Math.abs(parseFloat(b.amount) || 0);
+          return amountB - amountA; // Descending order (highest first)
+        });
+      } else if (sortOption === 'date-desc') {
+        filtered.sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        });
+      }
+    }
+    return filtered;
+  }, [transactions, displayMonth, currentYear, selectedCategoryFilters, categoryMappings, selectedUserFilters, sortOption, getTransactionLabel]);
+  
+  // Group transactions by date and create flat array with date headers
+  const groupedTransactions = useMemo((): ListItem[] => {
+    const result: ListItem[] = [];
+    const addedDateHeaders = new Set<string>();
+    let lastDate: string | null = null;
+    
+    // monthlyTransactions is already sorted based on sortOption
+    monthlyTransactions.forEach(transaction => {
+      const currentDate = transaction.date;
+      
+      // Add date header only if we haven't added one for this date yet
+      // and it's different from the last date (to maintain grouping)
+      if (currentDate !== lastDate) {
+        if (!addedDateHeaders.has(currentDate)) {
+          result.push({
+            type: 'date',
+            date: currentDate,
+            id: `date-${currentDate}`
+          });
+          addedDateHeaders.add(currentDate);
+        }
+        lastDate = currentDate;
+      }
+      
+      // Add the transaction
+      result.push({
+        ...transaction,
+        type: 'transaction'
+      });
+    });
+    
+    return result;
+  }, [monthlyTransactions, sortOption]);
+  
+  // Calculate unfiltered monthly transactions for category totals
+  const unfileredMonthlyTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (!t.date) return false;
+      const transactionDate = new Date(t.date);
+      
+      // Filter by month and year
+      if (transactionDate.getMonth() !== displayMonth || 
+          transactionDate.getFullYear() !== currentYear) {
+        return false;
+      }
+      
+      // Apply user filtering if any users are selected
+      if (selectedUserFilters.length > 0) {
+        const transactionLabel = getTransactionLabel(t);
+        if (!transactionLabel || !selectedUserFilters.includes(transactionLabel)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [transactions, displayMonth, currentYear, selectedUserFilters, getTransactionLabel]);
+
+  const categoryTotals = useMemo((): CategoryTotal[] => {
+    const totals = new Map<string, { total: number; color: string }>();
+    
+    // Use unfiltered monthly transactions to show all categories
+    unfileredMonthlyTransactions.forEach(transaction => {
+      // Skip transactions without labels (only show labeled transactions in summary)
+      if (!getTransactionLabel(transaction)) {
+        return;
+      }
+      
+      // Use the same category determination logic for consistency
+      const category = getTransactionCategory(transaction, categoryMappings);
+      const amount = Math.abs(parseFloat(transaction.amount || '0'));
+      const existing = totals.get(category) || { total: 0, color: '' };
+      
+      totals.set(category, {
+        total: existing.total + amount,
+        color: existing.color || CATEGORY_COLORS[totals.size % CATEGORY_COLORS.length]
+      });
+    });
+    
+    const totalAmount = Array.from(totals.values()).reduce((sum, cat) => sum + cat.total, 0);
+    
+    const result = Array.from(totals.entries())
+      .map(([category, data]) => ({
+        category,
+        total: data.total,
+        color: data.color,
+        percentage: totalAmount > 0 ? (data.total / totalAmount) * 100 : 0
+      }))
+      .sort((a, b) => b.total - a.total);
+    
+    return result;
+  }, [unfileredMonthlyTransactions, categoryMappings, getTransactionLabel]);
+  
+  // API calls
+  const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const apiUrl = `${getApiBaseUrl()}/initial-data`;
+      console.log('Fetching initial data from:', apiUrl);
+      
+      const response = await fetch(apiUrl, { signal });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract data from the response including new fields
+      const { 
+        transactions, 
+        categoryMappings, 
+        users: userData, 
+        splitAllocations: splitData,
+        bankCategories
+      } = data.data;
+      
+      setTransactions(transactions);
+      setCategoryMappings(categoryMappings);
+      setUsers(userData || []);
+      setSplitAllocations(splitData || {});
+      setAvailableBankCategories(bankCategories || []);
+    } catch (error) {
+      // Don't show error for aborted requests
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Fetch was aborted');
+        return;
+      }
+      console.error('Error fetching initial data:', error);
+      Alert.alert('Error', 'Failed to load data. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+  
+  const updateTransaction = useCallback(async (transaction: Transaction, updatedFields: Partial<Transaction>) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+        throw new Error(errorMessage);
+      }
+      
+      await fetchTransactions();
+      setSelectedTransaction(null);
+      showNotification('Transaction updated successfully', 'success');
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
+    }
+  }, [fetchTransactions, showNotification]);
+  
+  /**
+   * Mark or unmark a transaction as paid
+   * @param transactionId - The ID of the transaction to mark/unmark
+   * @param isPaid - True to mark as paid, false to mark as unpaid
+   */
+  const markTransaction = useCallback(async (transactionId: string, isPaid: boolean) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mark: isPaid }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update transaction mark status');
+      }
+      
+      // Provide haptic feedback for successful action
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Refresh transactions to get updated data
+      await fetchTransactions();
+      
+      // Show success notification
+      showNotification(
+        `Transaction ${isPaid ? 'marked as paid' : 'unmarked'} successfully`,
+        'success'
+      );
+      
+    } catch (error) {
+      console.error('Error marking transaction:', error);
+      
+      // Provide error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Show error notification
+      showNotification(
+        `Failed to ${isPaid ? 'mark' : 'unmark'} transaction. Please try again.`,
+        'error'
+      );
+    }
+  }, [fetchTransactions, showNotification]);
+  
+  /**
+   * Toggle the mark status of a transaction
+   * @param transaction - The transaction to toggle mark status for
+   */
+  const toggleTransactionMark = useCallback(async (transaction: Transaction) => {
+    const newMarkStatus = !transaction.mark;
+    await markTransaction(transaction.id, newMarkStatus);
+  }, [markTransaction]);
+  
+  // Event handlers
+  const handleRefresh = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // Call the backend endpoint to run shared_bank_feed.py
+      const refreshUrl = `${getApiBaseUrl()}/refresh-shared-bank-feeds`;
+      console.log('Triggering shared bank feed refresh at:', refreshUrl);
+      
+      const response = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Show success notification
+        showNotification(
+          data.message || 'Bank feeds refreshed successfully!',
+          'success',
+          4000
+        );
+        
+        // Refresh the transactions data after successful bank feed refresh
+        await fetchTransactions();
+      } else {
+        // Show error notification for failed refresh
+        showNotification(
+          `Failed to refresh bank feeds: ${data.message || 'Unknown error'}`,
+          'error',
+          5000
+        );
+      }
+    } catch (error) {
+      console.error('Error refreshing bank feeds:', error);
+      
+      // Show error notification
+      showNotification(
+        'Error refreshing bank feeds. Please check your connection and try again.',
+        'error',
+        5000
+      );
+    } finally {
+      // Note: isRefreshing is set to false in fetchTransactions, so no need to set it here
+      // unless fetchTransactions wasn't called due to an error
+      if (isRefreshing) {
+        setIsRefreshing(false);
+      }
+    }
+  }, [showNotification, fetchTransactions]);
+  
+  const toggleCategoryFilter = useCallback((category: string) => {
+    // Add haptic feedback for better user interaction
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    setSelectedCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+    setSelectedSegment(null);
+  }, []);
+  
+  const resetFilters = useCallback(() => {
+    // Add haptic feedback for better user interaction
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    setSelectedCategories([]);
+    setSelectedSegment(null);
+    setSelectedCategoryFilters([]);
+    setSelectedUserFilters([]);
+    setSortOption('date-desc');
+  }, []);
+  
+  const handleCategorySummaryClick = useCallback((category: string) => {
+    // Add haptic feedback for better user interaction
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (selectedCategoryFilters.includes(category)) {
+      // If the category is already selected, remove it
+      setSelectedCategoryFilters(prev => prev.filter(c => c !== category));
+    } else {
+      // Add the category to the filters
+      setSelectedCategoryFilters(prev => [...prev, category]);
+    }
+  }, [selectedCategoryFilters]);
+  
+  // Bottom sheet functions
+  const handleTransactionPress = useCallback((transaction: Transaction) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedTransaction(transaction);
+    setTimeout(() => {
+      bottomSheetModalRef.current?.present();
+    }, 0);
+  }, []);
+  
+  const hideBottomSheet = useCallback(() => {
+    // Immediately dismiss keyboard for faster response
+    Keyboard.dismiss();
+    bottomSheetModalRef.current?.dismiss();
+    setSelectedTransaction(null);
+    setIsEditing(false);
+    setEditedTransaction(null);
+    setShowCategoryDropdown(false);
+    setShowLabelDropdown(false);
+  }, []);
+
+  const deleteTransaction = useCallback(async (id: string) => {
+    Alert.alert(
+      'Delete Transaction',
+      'Are you sure you want to delete this transaction?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${getApiBaseUrl()}/transactions/${id}`, {
+                method: 'DELETE',
+              });
+              
+              if (!response.ok) throw new Error('Failed to delete transaction');
+              
+              await fetchTransactions();
+              hideBottomSheet();
+              Alert.alert('Success', 'Transaction deleted successfully');
+            } catch (error) {
+              console.error('Error deleting transaction:', error);
+              Alert.alert('Error', 'Failed to delete transaction. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  }, [fetchTransactions, hideBottomSheet]);
+  
+  // Bottom sheet helper components
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.5}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
+  
+  const DetailRow = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.detailRow}>
+      <Text style={[styles.detailLabel, { color: isDark ? '#aaa' : '#666' }]}>
+        {label}
+      </Text>
+      <Text style={[styles.detailValue, { color: isDark ? '#fff' : '#000' }]}>
+        {value || 'N/A'}
+      </Text>
+    </View>
+  );
+
+  // Custom Dropdown Component
+  const CustomDropdown = ({ 
+    options, 
+    value, 
+    onSelect, 
+    placeholder = "Select option",
+    isOpen,
+    onToggle 
+  }: {
+    options: Array<{ value: string; label: string }>;
+    value: string;
+    onSelect: (value: string) => void;
+    placeholder?: string;
+    isOpen: boolean;
+    onToggle: () => void;
+  }) => {
+    const selectedOption = options.find(opt => opt.value === value);
+    
+    return (
+      <View style={styles.dropdownContainer}>
+        <Pressable
+          style={[
+            styles.dropdownTrigger,
+            {
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            }
+          ]}
+          onPress={onToggle}
+        >
+          <Text style={[
+            styles.dropdownTriggerText,
+            { color: getBottomSheetTheme(isDark).textColor }
+          ]}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </Text>
+          <ChevronDown 
+            size={16} 
+            color={getBottomSheetTheme(isDark).textColor} 
+            style={[
+              styles.dropdownChevron,
+              isOpen && styles.dropdownChevronRotated
+            ]}
+          />
+        </Pressable>
+
+        {isOpen && (
+          <View style={[
+            styles.dropdownOptions,
+            {
+              backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+            }
+          ]}>
+            <ScrollView 
+              style={[
+                styles.dropdownScrollView,
+                { backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }
+              ]} 
+              nestedScrollEnabled
+            >
+              {options.map((option, index) => (
+                <Pressable
+                  key={option.value || `empty-${index}`}
+                  style={[
+                    styles.dropdownOption,
+                    { backgroundColor: isDark ? '#1c1c1e' : '#ffffff' },
+                    option.value === value && {
+                      backgroundColor: isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.15)'
+                    }
+                  ]}
+                  onPress={() => {
+                    onSelect(option.value);
+                    onToggle();
+                  }}
+                >
+                  <Text style={[
+                    styles.dropdownOptionText,
+                    { color: isDark ? '#ffffff' : '#000000' },
+                    option.value === value && styles.dropdownOptionTextSelected
+                  ]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
+  
+
+  
+  // Helper function to update split configuration based on label changes
+  const updateSplitConfiguration = useCallback(async (transactionId: string, newLabel: string) => {
+    if (!users || users.length === 0) {
+      throw new Error('No users available for split configuration');
+    }
+
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+
+    if (!newLabel || newLabel === '') {
+      // Delete existing split configuration for empty label
+      console.log('Clearing split configuration for empty label');
+      return fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config?transaction_type=shared`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } 
+    
+    let splitUsers;
+    
+    if ((newLabel === 'Both' && activeUsers.length === 2) || (newLabel === 'All users' && activeUsers.length >= 3)) {
+      // Equal split between all active users for "Both" or "All users"
+      splitUsers = activeUsers.map(user => ({ id: user.id }));
+      console.log(`Creating equal split configuration for "${newLabel}" with users:`, splitUsers);
+    } else {
+      // Single user allocation
+      const targetUser = activeUsers.find(user => user.display_name === newLabel);
+      if (!targetUser) {
+        throw new Error(`User "${newLabel}" not found`);
+      }
+      
+      splitUsers = [{ id: targetUser.id }];
+      console.log('Creating single user split configuration for user:', targetUser.display_name);
+    }
+
+    // Check if split configuration already exists (like frontend does)
+    let existingSplitConfig = null;
+    try {
+      const existingResponse = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config?transaction_type=shared`);
+      if (existingResponse.ok) {
+        const existingData = await existingResponse.json();
+        if (existingData.success && existingData.data) {
+          existingSplitConfig = existingData.data;
+        }
+      }
+    } catch (checkErr) {
+      // Split config doesn't exist yet, will create new one
+      console.log('Split configuration does not exist yet, will create new one');
+    }
+
+    const splitConfigData = {
+      transaction_type: 'shared',
+      split_type_code: 'equal', // Default to equal split like frontend
+      users: splitUsers,
+      created_by: 1 // Default user ID like frontend
+    };
+
+    let response;
+    if (existingSplitConfig) {
+      // Update existing split configuration
+      console.log('Updating existing split configuration:', splitConfigData);
+      response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(splitConfigData),
+      });
+    } else {
+      // Create new split configuration
+      console.log('Creating new split configuration:', splitConfigData);
+      response = await fetch(`${getApiBaseUrl()}/transactions/${transactionId}/split-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(splitConfigData),
+      });
+    }
+
+    return response;
+  }, [users]);
+
+
+  const handleEditTransaction = useCallback(() => {
+    setIsEditing(!isEditing);
+    if (!isEditing && selectedTransaction) {
+      // Initialize edited transaction with current values, including computed label
+      const computedLabel = getTransactionLabel(selectedTransaction);
+      setEditedTransaction({ 
+        ...selectedTransaction, 
+        label: computedLabel || '' // Ensure label is properly set from split allocations
+      });
+    } else {
+      // Close dropdowns when exiting edit mode
+      setShowCategoryDropdown(false);
+      setShowLabelDropdown(false);
+    }
+  }, [isEditing, selectedTransaction, getTransactionLabel]);
+  
+  const splitTransaction = useCallback(async (transaction: Transaction) => {
+    hideBottomSheet();
+    // TODO: Implement split transaction functionality
+    Alert.alert('Split Transaction', 'Split transaction functionality coming soon!');
+  }, [hideBottomSheet]);
+  
+  
+  const updateTransactionWithDropdown = useCallback(async (transaction: Transaction, updatedFields: Partial<Transaction>) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+        throw new Error(errorMessage);
+      }
+      
+      await fetchTransactions();
+      hideBottomSheet();
+      showNotification('Transaction updated successfully', 'success');
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
+    }
+  }, [fetchTransactions, hideBottomSheet, showNotification]);
+
+  const saveTransactionChanges = useCallback(async () => {
+    if (!editedTransaction || !selectedTransaction) return;
+    
+    try {
+      // Compare current label with original computed label
+      const originalLabel = getTransactionLabel(selectedTransaction);
+      const newLabel = editedTransaction.label || '';
+      const labelChanged = originalLabel !== newLabel;
+      
+      // Handle standard field updates (excluding label which needs special handling)
+      const allowedFields = ['date', 'description', 'amount', 'bank_category', 'mark'];
+      const updatedFields: Partial<Transaction> = {};
+      
+      // Only include fields that have actually changed and are allowed
+      allowedFields.forEach(field => {
+        const editedValue = editedTransaction[field as keyof Transaction];
+        const originalValue = selectedTransaction[field as keyof Transaction];
+        
+        // Check if the value has actually changed
+        if (editedValue !== originalValue) {
+          (updatedFields as any)[field] = editedValue;
+        }
+      });
+      
+      // Handle label changes through split allocations
+      if (labelChanged) {
+        console.log('Label changed from:', originalLabel, 'to:', newLabel);
+        
+        // Update split allocation based on the new label
+        const splitConfigResponse = await updateSplitConfiguration(editedTransaction.id, newLabel);
+        if (!splitConfigResponse.ok) {
+          throw new Error('Failed to update transaction label');
+        }
+      }
+      
+      // If no standard fields have changed and label didn't change, show message and return
+      if (Object.keys(updatedFields).length === 0 && !labelChanged) {
+        setIsEditing(false);
+        setEditedTransaction(null);
+        showNotification('No changes to save', 'info', 2000);
+        return;
+      }
+      
+      // Update standard fields if any have changed
+      if (Object.keys(updatedFields).length > 0) {
+        console.log('Sending update with fields:', updatedFields);
+        
+        const response = await fetch(`${getApiBaseUrl()}/transactions/${editedTransaction.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedFields),
+        });
+        
+        if (!response.ok) {
+          // Try to get more detailed error information
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.error || errorData?.errors?.join(', ') || 'Failed to update transaction';
+          throw new Error(errorMessage);
+        }
+      }
+      
+      // Provide haptic feedback for successful update
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Refresh transactions and close edit mode
+      await fetchTransactions();
+      setIsEditing(false);
+      setEditedTransaction(null);
+      hideBottomSheet();
+      
+      // Show success notification instead of alert
+      showNotification('Transaction updated successfully', 'success');
+      
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      
+      // Provide error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Show detailed error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update transaction. Please try again.';
+      showNotification(errorMessage, 'error', 5000);
+    }
+  }, [editedTransaction, selectedTransaction, getTransactionLabel, updateSplitConfiguration, fetchTransactions, showNotification, hideBottomSheet]);
+
+  
+  // Handler functions for bottom sheet actions
+  const handleSplitTransaction = useCallback(() => {
+    if (selectedTransaction) {
+      splitTransaction(selectedTransaction);
+    }
+  }, [selectedTransaction, splitTransaction]);
+  
+  const handleMarkAsPaid = useCallback(() => {
+    if (selectedTransaction) {
+      toggleTransactionMark(selectedTransaction);
+    }
+  }, [selectedTransaction, toggleTransactionMark]);
+  
+  const navigateMonth = useCallback((direction: 'prev' | 'next') => {
+    setDisplayMonth(prev => {
+      if (direction === 'prev') {
+        return prev === 0 ? 11 : prev - 1;
+      } else {
+        return prev === 11 ? 0 : prev + 1;
+      }
+    });
+  }, []);
+
+  // Animated navigation function that mimics swipe animations
+  const navigateMonthWithAnimation = useCallback((direction: 'prev' | 'next') => {
+    // Add haptic feedback for button press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (direction === 'prev') {
+      // Animate out to the right (previous month)
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigateMonth('prev');
+        // Reset position and animate in from left
+        translateX.setValue(-SCREEN_WIDTH);
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    } else {
+      // Animate out to the left (next month)
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: -SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigateMonth('next');
+        // Reset position and animate in from right
+        translateX.setValue(SCREEN_WIDTH);
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, [navigateMonth, translateX, swipeOpacity]);
+  
+  const handleMonthPress = useCallback(() => {
+    const now = Date.now();
+    const DOUBLE_PRESS_DELAY = 400; // 400ms for double press detection
+    
+    if (now - lastPressTime < DOUBLE_PRESS_DELAY) {
+      // Double press detected - navigate to current month
+      const currentMonth = new Date().getMonth();
+      setDisplayMonth(currentMonth);
+      
+      // Add haptic feedback for double press
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    setLastPressTime(now);
+  }, [lastPressTime]);
+
+  const handleSwipeGesture = useCallback((event: any) => {
+    const { nativeEvent } = event;
+    
+    if (nativeEvent.state === State.ACTIVE) {
+      // Update translation during swipe
+      translateX.setValue(nativeEvent.translationX);
+      
+      // Update opacity based on swipe distance
+      const opacity = 1 - Math.abs(nativeEvent.translationX) / SCREEN_WIDTH;
+      swipeOpacity.setValue(Math.max(0.3, opacity));
+    } else if (nativeEvent.state === State.END) {
+      const swipeThreshold = 50; // Minimum distance to trigger navigation
+      
+      if (nativeEvent.translationX > swipeThreshold) {
+        // Swipe right - go to previous month
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Animate out
+        Animated.parallel([
+          Animated.timing(translateX, {
+            toValue: SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          navigateMonth('prev');
+          // Reset position
+          translateX.setValue(-SCREEN_WIDTH);
+          // Animate in from left
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      } else if (nativeEvent.translationX < -swipeThreshold) {
+        // Swipe left - go to next month
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Animate out
+        Animated.parallel([
+          Animated.timing(translateX, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          navigateMonth('next');
+          // Reset position
+          translateX.setValue(SCREEN_WIDTH);
+          // Animate in from right
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      } else {
+        // Snap back to center if swipe wasn't far enough
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }),
+          Animated.timing(swipeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  }, [navigateMonth, translateX, swipeOpacity]);
+
+  
+  // Helper function to generate label dropdown options (similar to web app)
+  const getLabelDropdownOptions = useCallback(() => {
+    // Guard clause: return default options if users is not loaded yet
+    if (!users || !Array.isArray(users)) {
+      return [{ value: '', label: 'None' }];
+    }
+    
+    const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
+    
+    const options = [
+      { value: '', label: 'None' }
+    ];
+    
+    // Add individual user options
+    activeUsers.forEach(user => {
+      options.push({
+        value: user.display_name,
+        label: user.display_name
+      });
+    });
+    
+    // Add collective option based on number of users
+    if (activeUsers.length === 2) {
+      options.push({
+        value: 'Both',
+        label: 'Both (Equal Split)'
+      });
+    } else if (activeUsers.length >= 3) {
+      options.push({
+        value: 'All users',
+        label: 'All users (Equal Split)'
+      });
+    }
+    
+    return options;
+  }, [users]);
+
+  // Effects
+  useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+    
+    const fetchWithTimeout = async () => {
+      try {
+        const apiUrl = `${getApiBaseUrl()}/initial-data`;
+        console.log('Fetching initial data from:', apiUrl);
+        
+        // Add timeout to prevent indefinite hanging (15 seconds)
+        const timeoutId = setTimeout(() => abortController.abort(), 15000);
+        
+        const response = await fetch(apiUrl, {
+          signal: abortController.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          const { 
+            transactions, 
+            categoryMappings, 
+            users: userData, 
+            splitAllocations: splitData,
+            bankCategories
+          } = data.data;
+          
+          setTransactions(transactions);
+          setCategoryMappings(categoryMappings);
+          setUsers(userData || []);
+          setSplitAllocations(splitData || {});
+          setAvailableBankCategories(bankCategories || []);
+        }
+      } catch (error) {
+        if (!isMounted) return; // Don't show error if unmounted
+        
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Fetch aborted (timeout or unmount)');
+          Alert.alert('Connection Timeout', 'Failed to connect to server. Please try again.');
+        } else {
+          console.error('Error fetching initial data:', error);
+          Alert.alert('Error', 'Failed to load data. Please try again.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    };
+    
+    fetchWithTimeout();
+    
+    // Cleanup function - runs when component unmounts
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, []);
+
+  // Note: We use availableBankCategories for editing (like frontend), no need to extract categories
+
+  useEffect(() => {
+    // Scroll to current month in chart
+    if (scrollViewRef.current) {
+      const currentMonth = new Date().getMonth();
+      const scrollPosition = Math.max(0, (currentMonth - 3) * BAR_WIDTH);
+      
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ x: scrollPosition, animated: true });
+      }, 500);
+    }
+  }, [categoryData]);
+  
+  // Render functions
+  const renderChart = () => {
+    const monthlyTotals = Array(12).fill(0);
+    
+    filteredCategoryData.forEach(category => {
+      category.data.forEach((value, monthIndex) => {
+        monthlyTotals[monthIndex] += value;
+      });
+    });
+    
+    const maxValue = Math.max(...monthlyTotals, 1);
+    
+    return (
+      <View style={styles.chartContainer}>
+        <View style={styles.chartHeader}>
+          <ThemedText type="subtitle">Shared Transactions</ThemedText>
+          
+          {(selectedCategories.length > 0 || selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0 || sortOption === 'amount-desc') && (
+            <Pressable 
+              style={({ pressed }) => [
+                styles.resetButton,
+                { opacity: pressed ? 0.7 : 1 }
+              ]}
+              onPress={resetFilters}
+            >
+              <Text style={[styles.resetButtonText, { color: isDark ? '#fff' : '#000' }]}>
+                Reset ({selectedCategories.length + selectedCategoryFilters.length + selectedUserFilters.length + (sortOption === 'amount-desc' ? 1 : 0)})
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        
+        {selectedSegment && (
+          <View style={[
+            styles.tooltip,
+            { backgroundColor: isDark ? '#2c2c2c' : '#fff' }
+          ]}>
+            <View style={[styles.tooltipDot, { backgroundColor: selectedSegment.color }]} />
+            <Text style={[styles.tooltipText, { color: isDark ? '#fff' : '#000' }]}>
+              {selectedSegment.category}: ${selectedSegment.amount.toFixed(2)}
+            </Text>
+            <Pressable onPress={() => setSelectedSegment(null)}>
+              <Text style={styles.tooltipClose}>×</Text>
+            </Pressable>
+          </View>
+        )}
+        
+        <ScrollView 
+          ref={scrollViewRef}
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chartScrollContent}
+        >
+          {Array.from({ length: 12 }, (_, month) => {
+            const segments = filteredCategoryData
+              .filter(cat => cat.data[month] > 0)
+              .map(cat => ({
+                category: cat.category,
+                value: cat.data[month],
+                color: cat.color
+              }));
+            
+            return (
+              <ChartBar
+                key={month}
+                month={month}
+                segments={segments}
+                maxValue={maxValue}
+                height={CHART_HEIGHT - 60}
+                onSegmentPress={setSelectedSegment}
+              />
+            );
+          })}
+        </ScrollView>
+        
+        {/* Category Legend */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.legendContainer}
+        >
+          {categoryData.map(cat => (
+            <Pressable
+              key={cat.category}
+              style={({ pressed }) => [
+                styles.legendItem,
+                selectedCategories.includes(cat.category) && styles.legendItemSelected,
+                { opacity: pressed ? 0.7 : 1 }
+              ]}
+              onPress={() => toggleCategoryFilter(cat.category)}
+            >
+              <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
+              <Text style={[
+                styles.legendText,
+                { color: isDark ? '#fff' : '#000' },
+                selectedCategories.includes(cat.category) && styles.legendTextSelected
+              ]}>
+                {cat.category}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+  
+  const renderTransactionListHeader = () => {
+    return (
+      <View style={[
+        styles.listContainer,
+        { backgroundColor: isDark ? '#121212' : '#f5f5f5' }
+      ]}>
+        {/* Month Navigation */}
+        <View style={styles.monthNav}>
+          <Pressable 
+            style={({ pressed }) => [
+              styles.navButton,
+              { opacity: pressed ? 0.5 : 1 }
+            ]}
+            onPress={() => navigateMonthWithAnimation('prev')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ChevronLeft 
+              size={24} 
+              color={isDark ? '#fff' : '#000'} 
+            />
+          </Pressable>
+          
+          <View style={styles.monthDisplay}>
+            <Pressable 
+              style={styles.monthTextPressable}
+              onPress={handleMonthPress}
+            >
+              {({ pressed }) => (
+                <Text style={[
+                  styles.monthText, 
+                  { 
+                    color: isDark ? '#fff' : '#000',
+                    opacity: pressed ? 0.5 : 1 
+                  }
+                ]}>
+                  {MONTH_LABELS[displayMonth]} {currentYear}
+                </Text>
+              )}
+            </Pressable>
+            
+            <Pressable 
+              style={styles.transactionCountPressable}
+              onPress={handleMonthPress}
+            >
+              {({ pressed }) => (
+                <Text style={[
+                  styles.transactionCount, 
+                  { 
+                    color: isDark ? '#999' : '#666',
+                    opacity: pressed ? 0.5 : 1 
+                  }
+                ]}>
+                  {monthlyTransactions.length} transactions
+                  {(selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0 || sortOption === 'amount-desc') && (
+                    <Text style={[styles.filterIndicator, { color: isDark ? '#0A84FF' : '#007AFF' }]}>
+                      {' '}•{' '}
+                      {selectedCategoryFilters.length > 0 && `Cat: ${selectedCategoryFilters.join(', ')}`}
+                      {selectedCategoryFilters.length > 0 && selectedUserFilters.length > 0 && ' | '}
+                      {selectedUserFilters.length > 0 && `User: ${selectedUserFilters.join(', ')}`}
+                      {(selectedCategoryFilters.length > 0 || selectedUserFilters.length > 0) && sortOption === 'amount-desc' && ' | '}
+                      {sortOption === 'amount-desc' && 'Sort: Highest'}
+                    </Text>
+                  )}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+          
+          <Pressable 
+            style={({ pressed }) => [
+              styles.navButton,
+              { opacity: pressed ? 0.5 : 1 }
+            ]}
+            onPress={() => navigateMonthWithAnimation('next')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ChevronRight 
+              size={24} 
+              color={isDark ? '#fff' : '#000'} 
+            />
+          </Pressable>
+        </View>
+        
+        {/* Category Summary */}
+        {categoryTotals.length > 0 && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.categorySummary}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+          >
+            {categoryTotals.map((cat, index) => {
+              return (
+                <Pressable 
+                  key={cat.category}
+                  style={({ pressed }) => [
+                    styles.categoryCard,
+                    { backgroundColor: isDark ? '#1c1c1c' : '#fff' },
+                    selectedCategoryFilters.includes(cat.category) && styles.categoryCardSelected,
+                    selectedCategoryFilters.includes(cat.category) && { 
+                      borderColor: cat.color,
+                      borderWidth: 2,
+                      backgroundColor: isDark ? cat.color + '20' : cat.color + '10'
+                    },
+                    { opacity: pressed ? 0.7 : 1 }
+                  ]}
+                  onPress={() => {
+                    handleCategorySummaryClick(cat.category);
+                  }}
+                >
+                <View style={[styles.categoryIndicator, { backgroundColor: cat.color }]} />
+                <Text style={[
+                  styles.categoryName, 
+                  { color: isDark ? '#fff' : '#000' },
+                  selectedCategoryFilters.includes(cat.category) && { fontWeight: '700' }
+                ]}>
+                  {cat.category}
+                </Text>
+                <Text style={[styles.categoryAmount, { color: cat.color }]}>
+                  ${cat.total.toFixed(0)}
+                </Text>
+                <Text style={[styles.categoryPercent, { color: isDark ? '#666' : '#999' }]}>
+                  {cat.percentage.toFixed(0)}%
+                </Text>
+                </Pressable>
+              );
+            })}
+            </ScrollView>
+        )}
+        
+        {/* Filter and Sort Controls */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        }}>
+          <UserFilterDropdown
+            users={users}
+            splitAllocations={splitAllocations}
+            transactions={monthlyTransactions}
+            selectedUsers={selectedUserFilters}
+            onSelectionChange={setSelectedUserFilters}
+            isDark={isDark}
+          />
+          <SortDropdown
+            selectedSort={sortOption}
+            onSortChange={setSortOption}
+            isDark={isDark}
+          />
+        </View>
+        
+        {/* Running Total Display */}
+        <RunningTotalDisplay
+          transactions={monthlyTransactions}
+          users={users}
+          splitAllocations={splitAllocations}
+          isDark={isDark}
+          selectedUsers={selectedUserFilters}
+        />
+        
+      </View>
+    );
+  };
+  
+
+  
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+          <ThemedText style={styles.loadingText}>Loading transactions...</ThemedText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  // Render function for list items
+  const renderListItem = ({ item }: { item: ListItem }) => {
+    if (item.type === 'date') {
+      return (
+        <DateHeader
+          date={item.date}
+          colorScheme={colorScheme || 'light'}
+        />
+      );
+    } else {
+      return (
+        <TransactionItem
+          transaction={item}
+          onPress={() => handleTransactionPress(item)}
+          colorScheme={colorScheme || 'light'}
+          categoryMappings={categoryMappings}
+          getTransactionLabel={getTransactionLabel}
+          getUserColors={getUserColors}
+        />
+      );
+    }
+  };
+  
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : '#fff' }]}>
+        <ScrollView 
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={isDark ? '#fff' : '#000'}
+            />
+          }
+        >
+          {/* Chart Section - No swipe animation, scrolls with content */}
+          {renderChart()}
+          
+          {/* Transaction List Header - No swipe animation */}
+          {renderTransactionListHeader()}
+          
+          {/* Swipeable Transaction List Section */}
+          <PanGestureHandler
+            onHandlerStateChange={handleSwipeGesture}
+            onGestureEvent={handleSwipeGesture}
+            activeOffsetX={[-10, 10]}
+            failOffsetY={[-5, 5]}
+          >
+            <Animated.View 
+              style={{
+                transform: [{ translateX }],
+                opacity: swipeOpacity,
+              }}
+            >
+              <FlatList
+                data={groupedTransactions}
+                keyExtractor={item => item.id}
+                renderItem={renderListItem}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <ThemedText style={styles.emptyText}>No transactions found</ThemedText>
+                    <ThemedText style={styles.emptySubtext}>
+                      Transactions for {MONTH_LABELS[displayMonth]} will appear here
+                    </ThemedText>
+                  </View>
+                }
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false} // Disable FlatList scrolling since we're using ScrollView
+              />
+            </Animated.View>
+          </PanGestureHandler>
+        </ScrollView>
+        
+        <BottomSheetModal
+        ref={bottomSheetModalRef}
+        index={0}
+        snapPoints={snapPoints}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            disappearsOnIndex={-1}
+            appearsOnIndex={0}
+            opacity={0.5}
+            pressBehavior="close"
+          />
+        )}
+        backgroundStyle={{
+          backgroundColor: getBottomSheetTheme(isDark).backgroundColor,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: getBottomSheetTheme(isDark).handleColor,
+          width: 36,
+          height: 5,
+        }}
+        enablePanDownToClose
+        onAnimate={(fromIndex, toIndex) => {
+          // Dismiss keyboard as soon as closing animation starts
+          if (toIndex === -1) {
+            Keyboard.dismiss();
+          }
+        }}
+        enableDynamicSizing={false}
+        onChange={(index) => {
+          // Dismiss keyboard immediately when sheet starts closing
+          if (index === -1) {
+            Keyboard.dismiss();
+          }
+        }}
+        onDismiss={hideBottomSheet}
+      >
+        <KeyboardAwareBottomSheet 
+          style={styles.bottomSheetContent}
+          contentContainerStyle={styles.bottomSheetScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.bottomSheetHeader}>
+            <Text style={[
+              styles.bottomSheetTitle,
+              { color: getBottomSheetTheme(isDark).textColor }
+            ]}>
+              Transaction Details
+            </Text>
+            <Pressable
+              style={[styles.editButton, { backgroundColor: getBottomSheetTheme(isDark).buttonBg }]}
+              onPress={handleEditTransaction}
+            >
+              {isEditing ? (
+                <X size={16} color={getBottomSheetTheme(isDark).textColor} />
+              ) : (
+                <Edit3 size={16} color={getBottomSheetTheme(isDark).textColor} />
+              )}
+            </Pressable>
+          </View>
+
+          {selectedTransaction && (
+            <View style={styles.transactionDetailsContainer}>
+              {/* Transaction Card */}
+              <View style={[
+                styles.transactionCard,
+                {
+                  backgroundColor: getBottomSheetTheme(isDark).cardBg,
+                  borderWidth: 1,
+                  borderColor: getBottomSheetTheme(isDark).borderColor,
+                }
+              ]}>
+                <View style={styles.transactionRow}>
+                  <View style={[
+                    styles.categoryIconContainer,
+                    { 
+                      backgroundColor: isDark 
+                        ? 'rgba(99,102,241,0.15)' 
+                        : 'rgba(99,102,241,0.1)' 
+                    }
+                  ]}>
+                    {(() => {
+                      const CategoryIcon = getCategoryIcon(
+                        getTransactionCategory(selectedTransaction, categoryMappings)
+                      );
+                      return (
+                        <CategoryIcon 
+                          size={20} 
+                          color={isDark ? '#a78bfa' : '#6366f1'} 
+                        />
+                      );
+                    })()}
+                  </View>
+                  
+                  <View style={styles.transactionInfo}>
+                    <View style={[
+                      styles.descriptionContainer,
+                      isEditing && {
+                        backgroundColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.03)' 
+                          : 'rgba(0, 0, 0, 0.02)',
+                        borderColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.08)' 
+                          : 'rgba(0, 0, 0, 0.06)',
+                        borderWidth: 1,
+                        borderRadius: 8,
+                      }
+                    ]}>
+                      {isEditing ? (
+                        <TextInput
+                          style={[
+                            styles.editableDescription,
+                            {
+                              color: getBottomSheetTheme(isDark).textColor,
+                              backgroundColor: 'transparent',
+                              borderWidth: 0,
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                            }
+                          ]}
+                          value={editedTransaction?.description || ''}
+                          onChangeText={(text) => 
+                            setEditedTransaction(prev => prev ? { ...prev, description: text } : null)
+                          }
+                          placeholder="Transaction description"
+                          placeholderTextColor={getBottomSheetTheme(isDark).subtitleColor}
+                          multiline
+                        />
+                      ) : (
+                        <Text style={[
+                          styles.merchantName, 
+                          { 
+                            color: getBottomSheetTheme(isDark).textColor,
+                            paddingHorizontal: isEditing ? 12 : 0,
+                            paddingVertical: isEditing ? 8 : 0,
+                          }
+                        ]}>
+                          {selectedTransaction.description}
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <View style={styles.transactionMeta}>
+                      <Text style={[
+                        styles.categoryName,
+                        { color: getBottomSheetTheme(isDark).subtitleColor }
+                      ]}>
+                        {getTransactionCategory(selectedTransaction, categoryMappings)}
+                      </Text>
+                      {getTransactionLabel(selectedTransaction) && (
+                        <>
+                          <Text style={[
+                            styles.metaSeparator,
+                            { color: getBottomSheetTheme(isDark).subtitleColor }
+                          ]}>
+                            •
+                          </Text>
+                          <Text style={[
+                            styles.userLabel,
+                            { color: getBottomSheetTheme(isDark).subtitleColor }
+                          ]}>
+                            {getTransactionLabel(selectedTransaction)}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                    
+                    <Text style={[
+                      styles.transactionDate,
+                      { color: getBottomSheetTheme(isDark).subtitleColor }
+                    ]}>
+                      {formatDateDisplay(selectedTransaction.date)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[
+                  styles.amountDisplay,
+                  { 
+                    color: selectedTransaction.amount.startsWith('-') 
+                      ? '#ef4444' 
+                      : '#10b981',
+                  }
+                ]}>
+                  {selectedTransaction.amount}
+                </Text>
+              </View>
+
+              {/* Edit Fields - Only shown when editing */}
+              {isEditing && (
+                <View style={styles.editSection}>
+                  {/* Full section backdrop when any dropdown is open */}
+                  {(showCategoryDropdown || showLabelDropdown) && (
+                    <View style={[
+                      styles.editSectionBackdrop,
+                      { backgroundColor: getBottomSheetTheme(isDark).backgroundColor }
+                    ]} />
+                  )}
+                  
+                  <View style={[
+                    styles.editField,
+                    { zIndex: showCategoryDropdown ? 1100 : 1000 }
+                  ]}>
+                    <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
+                      BANK CATEGORY
+                    </Text>
+                    <CustomDropdown
+                      options={[
+                        { value: '', label: 'None' },
+                        ...availableBankCategories.map(cat => ({ value: cat, label: cat || 'None' }))
+                      ]}
+                      value={editedTransaction?.bank_category || ''}
+                      onSelect={(value) => 
+                        setEditedTransaction(prev => prev ? { ...prev, bank_category: value } : null)
+                      }
+                      placeholder="Select category"
+                      isOpen={showCategoryDropdown}
+                      onToggle={() => {
+                        setShowCategoryDropdown(!showCategoryDropdown);
+                        setShowLabelDropdown(false); // Close other dropdown
+                      }}
+                    />
+                  </View>
+
+                  <View style={[
+                    styles.editField,
+                    { 
+                      zIndex: showLabelDropdown ? 1100 : 1000,
+                      opacity: showCategoryDropdown ? 0.3 : 1 // Fade out when category dropdown is open
+                    }
+                  ]}>
+                    <Text style={[styles.fieldLabel, { color: getBottomSheetTheme(isDark).subtitleColor }]}>
+                      LABEL
+                    </Text>
+                    <CustomDropdown
+                      options={getLabelDropdownOptions()}
+                      value={editedTransaction?.label || ''}
+                      onSelect={(value) => 
+                        setEditedTransaction(prev => prev ? { ...prev, label: value } : null)
+                      }
+                      placeholder="Select label"
+                      isOpen={showLabelDropdown}
+                      onToggle={() => {
+                        setShowLabelDropdown(!showLabelDropdown);
+                        setShowCategoryDropdown(false); // Close other dropdown
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.actionsContainer}>
+                {isEditing ? (
+                  <Pressable
+                    style={[styles.actionButton, styles.saveButton]}
+                    onPress={saveTransactionChanges}
+                  >
+                    <Text style={styles.actionButtonText}>Save Changes</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <Pressable 
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => selectedTransaction && deleteTransaction(selectedTransaction.id)}
+                    >
+                      <Trash2 size={14} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>Delete</Text>
+                    </Pressable>
+                    
+                    <Pressable style={[styles.actionButton, styles.splitButton]}>
+                      <Split size={14} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>Split</Text>
+                    </Pressable>
+                    
+                    <Pressable 
+                      style={[
+                        styles.actionButton, 
+                        selectedTransaction.mark ? styles.unmarkButton : styles.markButton
+                      ]}
+                      onPress={() => toggleTransactionMark(selectedTransaction)}
+                    >
+                      <Bookmark size={14} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>
+                        {selectedTransaction.mark ? 'Unmark' : 'Mark'}
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            </View>
+          )}
+        </KeyboardAwareBottomSheet>
+      </BottomSheetModal>
+      
+      {/* Notification Banner Overlay */}
+      {notification && (
+        <Animated.View
+          style={[
+            styles.notificationOverlay,
+            {
+              top: insets.top + 8, // Position below safe area + margin
+              opacity: notification.visible ? 1 : 0,
+              transform: [{
+                translateY: notification.visible ? 0 : -80
+              }],
+            }
+          ]}
+          pointerEvents={notification.visible ? 'auto' : 'none'}
+        >
+          {/* Backdrop Layer with Blur */}
+          <BlurView
+            intensity={15}
+            tint={isDark ? 'dark' : 'light'}
+            style={styles.notificationBackdrop}
+          >
+            <View style={[
+              styles.notificationBackdropOverlay,
+              { backgroundColor: getNotificationColors(notification.type).backdrop }
+            ]} />
+          </BlurView>
+          
+          {/* Colored Content Layer */}
+          <View style={[
+            styles.notificationColorLayer,
+            {
+              backgroundColor: getNotificationColors(notification.type).background,
+              borderColor: getNotificationColors(notification.type).border,
+            }
+          ]}>
+            <View style={styles.notificationContent}>
+              <View style={[
+                styles.notificationIcon,
+                { backgroundColor: getNotificationColors(notification.type).icon }
+              ]}>
+                {notification.type === 'success' && <Check size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'error' && <X size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'info' && <HelpCircle size={12} color="#ffffff" strokeWidth={2.5} />}
+                {notification.type === 'warning' && <HelpCircle size={12} color="#ffffff" strokeWidth={2.5} />}
+              </View>
+              <Text style={[
+                styles.notificationText,
+                { color: getNotificationColors(notification.type).text }
+              ]}>
+                {notification.message}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+    </SafeAreaView>
+    </GestureHandlerRootView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  
+  // Notification Overlay Styles
+  notificationOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    marginHorizontal: 12,
+  },
+  notificationBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  notificationBackdropOverlay: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  notificationColorLayer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  notificationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  notificationIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  
+  // Chart styles
+  chartContainer: {
+    paddingVertical: 16,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  resetButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  resetButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chartScrollContent: {
+    paddingHorizontal: 16,
+  },
+  barContainer: {
+    width: BAR_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: CHART_HEIGHT,
+    paddingHorizontal: 8,
+  },
+  bar: {
+    width: '80%',
+    borderRadius: 4,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  currentMonthBar: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  barSegment: {
+    width: '100%',
+  },
+  monthLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  currentMonthLabel: {
+    fontWeight: '700',
+  },
+  barTotal: {
+    fontSize: 10,
+    marginTop: 4,
+  },
+  
+  // Legend styles
+  legendContainer: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    maxHeight: 40,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  legendItemSelected: {
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderColor: '#007AFF',
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  legendTextSelected: {
+    fontWeight: '600',
+  },
+  
+  // Tooltip styles
+  tooltip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tooltipDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  tooltipText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  tooltipClose: {
+    fontSize: 24,
+    fontWeight: '300',
+    paddingLeft: 8,
+  },
+  
+  // Transaction list styles
+  listContainer: {
+    flex: 1,
+    marginTop: 24,
+  },
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  navButton: {
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
+  },
+  navButtonText: {
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  monthDisplay: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  monthTextPressable: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  monthText: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  transactionCountPressable: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  transactionCount: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  filterIndicator: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Category summary styles
+  categorySummary: {
+    paddingVertical: 12,
+  },
+  categoryCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 12,
+    borderRadius: 12,
+    minWidth: 100,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    minHeight: 80, // Ensure minimum touch target size
+  },
+  categoryCardSelected: {
+    transform: [{ scale: 1.02 }],
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  categoryIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  categoryName: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  categoryAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  categoryPercent: {
+    fontSize: 10,
+  },
+  
+  // Date header styles
+  dateHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+  },
+  dateHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  dateHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  dateHeaderSubText: {
+    fontSize: 13,
+    fontWeight: '500',
+    opacity: 0.8,
+  },
+  
+  // Transaction item styles
+  transactionItem: {
+    marginHorizontal: 16,
+    marginVertical: 3,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden'
+  },
+  transactionRow: {
+    flexDirection: 'row',
+    padding: 10,
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  transactionDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: 12,
+  },
+  transactionAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  subtlePaidIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  transactionTags: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  categoryTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  categoryTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  labelTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  labelTagText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  
+  // List content at the bottom of the screen
+  listContent: {
+    paddingBottom: 60,
+  },
+  
+  // Empty state
+  emptyState: {
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  
+
+  
+  // Category mapping info styles
+  mappingInfoField: {
+    marginBottom: 18,
+  },
+  mappingInfoContainer: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  mappingInfoText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginVertical: 2,
+  },
+  mappingArrow: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginVertical: 4,
+  },
+  mappingNoteText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  
+  // Enhanced Bottom Sheet Styles
+  bottomSheetContent: {
+    flex: 1,
+  },
+  bottomSheetScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 30,
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+    paddingBottom: 12,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Transaction Details Container
+  transactionDetailsContainer: {
+    flex: 1,
+  },
+  transactionCard: {
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 18,
+  },
+  transactionInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  leftCategoryIcon: {
+    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    },
+  categoryIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12, // Soft square edges
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  descriptionContainer: {
+    // Container for the description field that maintains consistent layout
+  },
+  merchantName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  editableDescription: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    textAlignVertical: 'top',
+    minHeight: 38,
+  },
+  transactionMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+    flexWrap: 'wrap',
+  },
+  metaSeparator: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginHorizontal: 6,
+  },
+  userLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  transactionDate: {
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  userText: {
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  amountDisplay: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  
+  // Edit Fields
+  editSection: {
+    marginBottom: 16,
+    position: 'relative',
+  },
+  editSectionBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: -20,
+    right: -20,
+    bottom: -20,
+    zIndex: 999,
+    borderRadius: 16,
+    opacity: 0.95,
+  },
+  editField: {
+    marginBottom: 16,
+    position: 'relative',
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  fieldInput: {
+    fontSize: 14,
+    fontWeight: '400',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    minHeight: 40,
+  },
+  
+  // Action Buttons
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  saveButton: {
+    backgroundColor: '#10b981',
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+  },
+  splitButton: {
+    backgroundColor: '#f59e0b',
+  },
+  markButton: {
+    backgroundColor: '#6366f1',
+  },
+  unmarkButton: {
+    backgroundColor: '#10b981',
+  },
+  
+  // Legacy bottom sheet styles (keeping for compatibility)
+  detailRow: {
+    marginBottom: 20,
+  },
+  detailLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+    opacity: 0.6,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  bottomSheetActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  bottomSheetActionButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  bottomSheetSecondaryButton: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  bottomSheetPrimaryButton: {
+    backgroundColor: '#007AFF',
+  },
+  bottomSheetActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  labelDisplay: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  labelDisplayDark: {
+    backgroundColor: '#374151',
+    borderColor: '#4b5563',
+  },
+  labelDisplayText: {
+    fontSize: 15,
+    color: '#111827',
+  },
+  labelHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+
+  // Dropdown Component Styles
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 1001,
+    marginBottom: 4, // Add space to prevent overlapping with content below
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    minHeight: 40,
+  },
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontWeight: '400',
+    flex: 1,
+  },
+  dropdownChevron: {
+    marginLeft: 8,
+  },
+  dropdownChevronRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  dropdownOptions: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    borderRadius: 10,
+    borderWidth: 2,
+    maxHeight: 200,
+    marginTop: 4,
+    zIndex: 1002,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 12,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  dropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+    minHeight: 44, // Ensure touch target size
+  },
+  dropdownOptionText: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  dropdownOptionTextSelected: {
+    fontWeight: '600',
+    color: '#6366f1',
+  },
+});

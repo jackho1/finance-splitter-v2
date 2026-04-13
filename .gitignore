@@ -1,0 +1,55 @@
+# Editor and OS files
+.DS_Store
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Environment variables - root directory
+.env
+.env.*
+!.env.template
+
+# Environment variables - any subdirectory
+*/**/.env
+*/**/.env.*
+!*/**/.env.template
+
+# API configuration files
+frontend/src/config/apiConfig.js
+*/**/apiConfig.js
+!*/**/apiConfig.template.js
+
+# Prompt files
+prompt.txt
+*/**/prompt.txt
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.code-workspace
+
+# Ignore node_modules in any directory
+**/node_modules/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Expo
+.expo/
+**/.expo/
+*/**/expo-env.d.ts

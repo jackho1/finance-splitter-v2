@@ -1,0 +1,79 @@
+html {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  /* Transition controlled by JavaScript to prevent flash */
+  transition: var(--theme-transition);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Body inherits background from html */
+  background-color: transparent;
+  color: inherit;
+  /* Transition controlled by JavaScript to prevent flash */
+  transition: var(--theme-transition);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid var(--color-border);
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background-color: var(--color-tableHeader) !important;
+  color: var(--color-tableHeaderText) !important;
+}
+
+/* All rows should use theme background */
+tr {
+  background-color: var(--color-tableRow);
+}
+
+h1, h2 {
+  color: var(--color-text);
+}
+
+select, label {
+  margin: 10px;
+  padding: 5px;
+}
+
+.totals {
+  margin-top: 20px;
+  font-size: 1.2em;
+}
+
+/* Responsive styles for mobile devices */
+@media (max-width: 768px) {
+  table, th, td {
+    display: block;
+    width: 100%;
+  }
+
+  th, td {
+    text-align: right;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+
+  th {
+    background-color: var(--color-tableHeader);
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+  }
+}
