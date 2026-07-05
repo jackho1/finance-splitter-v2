@@ -2,26 +2,26 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { getApiUrl, getApiUrlWithParams } from './utils/apiUtils';
 import { useUserPreferencesContext } from './contexts/UserPreferencesContext';
-import { 
-  updateUserColorStyles, 
-  updateUserTotalColors, 
-  setUserPreferencesCache 
+import {
+  updateUserColorStyles,
+  updateUserTotalColors,
+  setUserPreferencesCache
 } from './utils/userColorStyles';
 
 // Import utility functions
 import { applyFilters } from './utils/filterTransactions';
-import { 
-  filterTransactionsByCategoryAndLabel, 
-  groupSplitTransactions, 
-  filterByMonth 
+import {
+  filterTransactionsByCategoryAndLabel,
+  groupSplitTransactions,
+  filterByMonth
 } from './utils/transactionGrouping';
 import { optimizedHandleOffsetUpdate } from './utils/updateHandlers';
 import { getLabelFilterOptions, getLabelDropdownOptions } from './utils/getLabelFilterOptions';
-import { 
-  createDragImage, 
-  handleDragOverWithReorder, 
+import {
+  createDragImage,
+  handleDragOverWithReorder,
   handleDragEndCleanup,
-  getDraggableContainerStyles 
+  getDraggableContainerStyles
 } from './utils/dragAndDropUtils';
 
 // Import styles
@@ -34,13 +34,13 @@ import './CompactDropdown.css';
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
   if (!isVisible) return null;
-  
+
   return (
     <div className="help-text">
       <div className="help-text-icon" style={{ lineHeight: 0, marginBottom: 0 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
       <div className="help-text-content">{children}</div>
@@ -50,7 +50,7 @@ const HelpText = ({ children, isVisible }) => {
 
 // Refactored FilterButton component for more streamlined appearance
 const FilterButton = ({ isActive, onClick, count = 0 }) => (
-  <button 
+  <button
     className={`filter-button compact ${isActive ? 'active' : ''}`}
     onClick={onClick}
     title="Filter"
@@ -65,9 +65,9 @@ const FilterButton = ({ isActive, onClick, count = 0 }) => (
 );
 
 // Refactored table dropdown menu component
-const TableDropdownMenu = ({ 
-  isActive, 
-  onClose, 
+const TableDropdownMenu = ({
+  isActive,
+  onClose,
   availableOptions,
   selectedOptions,
   onChange,
@@ -79,11 +79,11 @@ const TableDropdownMenu = ({
 }) => {
   // Stop clicks from propagating and closing the dropdown
   const handleClick = (e) => e.stopPropagation();
-  
+
   if (!isActive) return null;
-  
+
   return (
-    <div 
+    <div
       className="filter-dropdown"
       onClick={handleClick}
       style={{
@@ -117,20 +117,20 @@ const TableDropdownMenu = ({
           />
         </div>
       )}
-      
-      <div className="filter-options" style={{ 
-        overflowY: 'auto', 
+
+      <div className="filter-options" style={{
+        overflowY: 'auto',
         flex: '1 1 auto',
-        padding: '8px 0' 
+        padding: '8px 0'
       }}>
         {/* Display non-null options */}
         {availableOptions
           .filter(option => option !== null && option !== undefined && option !== '')
           .map(option => (
-            <div 
-              key={option} 
+            <div
+              key={option}
               className="filter-option"
-              style={{ 
+              style={{
                 padding: '3px 1px',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
@@ -144,10 +144,10 @@ const TableDropdownMenu = ({
                 onChange(option, e);
               }}
             >
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={selectedOptions.includes(option)}
-                onChange={() => {}} // Handled by parent div onClick
+                onChange={() => { }} // Handled by parent div onClick
                 style={{ marginRight: '6px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '13px' }}>
@@ -156,12 +156,12 @@ const TableDropdownMenu = ({
             </div>
           ))
         }
-        
+
         {/* Display null/empty option at the bottom if it exists */}
         {availableOptions.some(option => option === null || option === undefined || option === '') && (
-          <div 
+          <div
             className="filter-option"
-            style={{ 
+            style={{
               padding: '6px 4px',
               cursor: 'pointer',
               transition: 'background 0.2s',
@@ -178,10 +178,10 @@ const TableDropdownMenu = ({
               onChange(null, e);
             }}
           >
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={selectedOptions.includes(null)}
-              onChange={() => {}} // Handled by parent div onClick
+              onChange={() => { }} // Handled by parent div onClick
               style={{ marginRight: '6px', cursor: 'pointer' }}
             />
             <span style={{ fontSize: '13px', fontStyle: 'italic', color: '#6b7280' }}>
@@ -190,12 +190,12 @@ const TableDropdownMenu = ({
           </div>
         )}
       </div>
-      
+
       {/* Footer with clear button only */}
       {selectedOptions.length > 0 && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
           padding: '3px 4px',
           borderTop: '1px solid var(--color-border)',
           backgroundColor: 'var(--color-backgroundElevated)',
@@ -205,12 +205,12 @@ const TableDropdownMenu = ({
           bottom: 0,
           flex: '0 0 auto'
         }}>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onClear();
             }}
-            style={{ 
+            style={{
               padding: '3px 6px',
               backgroundColor: 'transparent',
               color: '#6b7280',
@@ -238,8 +238,8 @@ const TableDropdownMenu = ({
 };
 
 // Specialized date filter dropdown component
-const DateFilterDropdown = ({ 
-  isActive, 
+const DateFilterDropdown = ({
+  isActive,
   dateFilter,
   onChange,
   onClear,
@@ -248,11 +248,11 @@ const DateFilterDropdown = ({
 }) => {
   // Stop clicks from propagating and closing the dropdown
   const handleClick = (e) => e.stopPropagation();
-  
+
   if (!isActive) return null;
-  
+
   return (
-    <div 
+    <div
       className="filter-dropdown"
       onClick={handleClick}
       style={{
@@ -269,17 +269,17 @@ const DateFilterDropdown = ({
       }}
     >
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: '12px', 
-          fontWeight: '500', 
-          color: 'var(--color-text)', 
-          marginBottom: '4px' 
+        <label style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: 'var(--color-text)',
+          marginBottom: '4px'
         }}>
           From:
         </label>
-        <input 
-          type="date" 
+        <input
+          type="date"
           name="startDate"
           value={dateFilter.startDate}
           onChange={onChange}
@@ -298,17 +298,17 @@ const DateFilterDropdown = ({
         />
       </div>
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: '12px', 
-          fontWeight: '500', 
-          color: 'var(--color-text)', 
-          marginBottom: '4px' 
+        <label style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: 'var(--color-text)',
+          marginBottom: '4px'
         }}>
           To:
         </label>
-        <input 
-          type="date" 
+        <input
+          type="date"
           name="endDate"
           value={dateFilter.endDate}
           onChange={onChange}
@@ -327,18 +327,18 @@ const DateFilterDropdown = ({
         />
       </div>
       {(dateFilter.startDate || dateFilter.endDate) && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
           paddingTop: '8px',
           borderTop: '1px solid var(--color-border)'
         }}>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onClear();
             }}
-            style={{ 
+            style={{
               padding: '4px 8px',
               backgroundColor: 'transparent',
               color: 'var(--color-textSecondary)',
@@ -373,10 +373,10 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
   // For headers without filters, use a simpler structure
   if (!hasFilter) {
     return (
-      <div 
+      <div
         className="modern-filter-header"
       >
-        <div 
+        <div
           className="header-content"
           onClick={() => onSort(column)}
         >
@@ -387,15 +387,15 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
           </span>
         </div>
       </div>
-  );
+    );
   }
 
   // For headers with filters
-    return (
-      <div 
+  return (
+    <div
       className="modern-filter-header sortable"
     >
-      <div 
+      <div
         className="sortable-header"
         onClick={() => onSort(column)}
         style={{ width: 'calc(100% - 30px)' }}
@@ -415,8 +415,8 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
           onFilterToggle();
         }}
       />
-      </div>
-    );
+    </div>
+  );
 };
 
 const OffsetTransactions = ({ helpTextVisible }) => {
@@ -442,7 +442,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // New: Add user management states
   const [users, setUsers] = useState([]);
   const [splitAllocations, setSplitAllocations] = useState(null); // Use null to distinguish from empty object
-  
+
   // User preferences context for getting color functions
   const { getUserTotalColors } = useUserPreferencesContext();
 
@@ -452,14 +452,14 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     if (isTransactionsLoading || !users || users.length === 0) {
       return null;
     }
-    
+
     // Check if splitAllocations is loaded
     if (splitAllocations === null || splitAllocations === undefined) {
       return null;
     }
-    
+
     const allocations = splitAllocations[transaction.id];
-    
+
     // If we have split allocations data for this transaction, use it
     if (allocations && Array.isArray(allocations) && allocations.length > 0) {
       // If single user, show their display name
@@ -467,55 +467,55 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         const displayName = allocations[0].display_name;
         return displayName;
       }
-      
+
       // For multiple users, check if it's an equal split
       const isEqualSplit = () => {
         // Check if all allocations have the same split_type_code and it's 'equal'
         const allEqualType = allocations.every(allocation => allocation.split_type_code === 'equal');
-        
+
         if (allEqualType) {
           return true;
         }
-        
+
         // Alternative check: if percentages are equal (indicating equal split)
         if (allocations.length > 1 && allocations[0].percentage) {
           const firstPercentage = parseFloat(allocations[0].percentage);
           const expectedPercentage = 100 / allocations.length;
           const tolerance = 0.1; // Small tolerance for floating point comparison
-          
+
           return allocations.every(allocation => {
             const percentage = parseFloat(allocation.percentage);
             return Math.abs(percentage - expectedPercentage) < tolerance;
           });
         }
-        
+
         // Alternative check: if amounts are equal (for equal splits)
         if (allocations.length > 1) {
           const firstAmount = Math.abs(parseFloat(allocations[0].amount));
           const tolerance = 0.01; // 1 cent tolerance
-          
+
           return allocations.every(allocation => {
             const amount = Math.abs(parseFloat(allocation.amount));
             return Math.abs(amount - firstAmount) < tolerance;
           });
         }
-        
+
         return false;
       };
-      
+
       // If it's an equal split among multiple users
       if (isEqualSplit()) {
         // If exactly 2 users with equal split, show "Both"
         if (allocations.length === 2) {
           return 'Both';
         }
-        
+
         // If 3+ users with equal split, show "All users"
         if (allocations.length >= 3) {
           return 'All users';
         }
       }
-      
+
       // For other cases (mixed split types), show first user + count
       return `${allocations[0].display_name} +${allocations.length - 1}`;
     } else {
@@ -541,12 +541,12 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // Helper function to calculate totals from allocations
   const calculateTotalsFromAllocations = (filteredTransactions) => {
     const totals = {};
-    
+
     // Guard clause: return empty totals if users is not loaded yet
     if (!users || !Array.isArray(users)) {
       return totals;
     }
-    
+
     users.forEach(user => {
       if (user.username !== 'default') {
         const userTotal = getUserTotalFromAllocations(user.id, filteredTransactions);
@@ -554,7 +554,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         totals[user.display_name] = safeTotal;
       }
     });
-    
+
     return totals;
   };
 
@@ -567,7 +567,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const [categoryOrder, setCategoryOrder] = useState([]);
   const [draggedCategory, setDraggedCategory] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   // Split transaction states
   const [isSplitting, setIsSplitting] = useState(false);
   const [transactionToSplit, setTransactionToSplit] = useState(null);
@@ -581,7 +581,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
 
   // Add state for expanded row
   const [expandedRow, setExpandedRow] = useState(null);
-  
+
   // Add settings states
   const [showSettings, setShowSettings] = useState(false);
   const [hideZeroBalanceBuckets, setHideZeroBalanceBuckets] = useState(false);
@@ -598,7 +598,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   // Key for localStorage
   const CATEGORY_ORDER_KEY = 'offset_categories_order';
   const SETTINGS_KEY = 'offset_transactions_settings';
-  
+
   // Load saved order from localStorage on mount
   useEffect(() => {
     const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
@@ -612,7 +612,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       }
     }
   }, []);
-  
+
   // Load saved settings on mount
   useEffect(() => {
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
@@ -627,7 +627,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       }
     }
   }, []);
-  
+
   // Initialize or update category order when transactions change
   useEffect(() => {
     if (transactions.length > 0) {
@@ -640,19 +640,19 @@ const OffsetTransactions = ({ helpTextVisible }) => {
             count: 0
           };
         }
-        const amount = typeof transaction.amount === 'number' ? 
+        const amount = typeof transaction.amount === 'number' ?
           transaction.amount : parseFloat(transaction.amount) || 0;
         acc[category].total += amount;
         acc[category].count += 1;
         return acc;
       }, {});
-      
+
       const currentCategories = Object.keys(categoryData);
-      
+
       // Get the current saved order
       const savedOrder = localStorage.getItem(CATEGORY_ORDER_KEY);
       let existingOrder = [];
-      
+
       if (savedOrder) {
         try {
           existingOrder = JSON.parse(savedOrder);
@@ -661,18 +661,18 @@ const OffsetTransactions = ({ helpTextVisible }) => {
           localStorage.removeItem(CATEGORY_ORDER_KEY);
         }
       }
-      
+
       // Check for new categories or removed categories
       const newCategories = currentCategories.filter(cat => !existingOrder.includes(cat));
       const removedCategories = existingOrder.filter(cat => !currentCategories.includes(cat));
-      
+
       if (newCategories.length > 0 || removedCategories.length > 0) {
         // Update the order: keep existing order but add new categories and remove old ones  
         const updatedOrder = [
           ...existingOrder.filter(cat => currentCategories.includes(cat)), // Keep existing categories in order
           ...newCategories // Add new categories at the end
         ];
-        
+
         setCategoryOrder(updatedOrder);
         localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(updatedOrder));
       } else if (existingOrder.length > 0 && categoryOrder.length === 0) {
@@ -686,7 +686,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   }, [transactions]); // Remove categoryOrder from dependencies
 
   const filterPopupRef = useRef(null);
-  
+
   // Add new transaction state
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
@@ -696,33 +696,33 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     category: null,
     label: ''
   });
-  
+
   // Combined useEffect to fetch all initial data sequentially to avoid overwhelming database connections
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
-      
+
       try {
         // Single API call to get all offset initial data
         const response = await axios.get(getApiUrl('/offset-initial-data'));
-        
+
         if (response.data.success) {
           const { offsetTransactions, offsetCategories, labels, users, splitAllocations } = response.data.data;
-          
+
           // Set all data from the combined response
           setTransactions(offsetTransactions);
           setFilteredTransactions(offsetTransactions);
           setAllFilteredTransactions(offsetTransactions);
           setIsTransactionsLoading(false);
-          
+
           setAvailableCategories(offsetCategories);
-          
+
           // Note: We no longer set labels - they are generated dynamically from users
 
           // New: Set users and split allocations
           setUsers(users || []);
           setSplitAllocations(splitAllocations || {});
-          
+
           // Initialize user preferences cache (prevents multiple API calls)
           setUserPreferencesCache(users || []);
         } else {
@@ -733,19 +733,19 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         setIsTransactionsLoading(false);
       }
     };
-    
+
     fetchInitialData();
   }, []);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) && 
-          !event.target.closest('button[data-filter="category"]')) {
+      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) &&
+        !event.target.closest('button[data-filter="category"]')) {
         setActiveFilterColumn(null);
       }
     }
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -760,7 +760,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     };
 
     window.addEventListener('userColorStylesUpdated', handleColorStylesUpdate);
-    
+
     return () => {
       window.removeEventListener('userColorStylesUpdated', handleColorStylesUpdate);
     };
@@ -771,14 +771,14 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     if (e) {
       e.stopPropagation();
     }
-    
+
     setCategoryFilter(prev => {
-      const isAlreadyIncluded = prev.some(item => 
+      const isAlreadyIncluded = prev.some(item =>
         (item === null && category === null) || item === category
       );
 
       if (isAlreadyIncluded) {
-        return prev.filter(item => 
+        return prev.filter(item =>
           !((item === null && category === null) || item === category)
         );
       } else {
@@ -791,16 +791,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const handleCategoryDoubleClick = (category) => {
     // Clear date filter so we see all transactions for this category
     setDateFilter({ startDate: '', endDate: '' });
-    
+
     // Set category filter to only show this category
     setCategoryFilter([category]);
-    
+
     // Clear other filters
     setLabelFilter([]);
-    
+
     // Set flag to show all transactions (bypass month filtering)
     setShowAllTransactions(true);
-    
+
     // Scroll to transactions table
     const transactionsSection = document.querySelector('h2');
     if (transactionsSection) {
@@ -813,14 +813,14 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     if (e) {
       e.stopPropagation();
     }
-    
+
     setLabelFilter(prev => {
-      const isAlreadyIncluded = prev.some(item => 
+      const isAlreadyIncluded = prev.some(item =>
         (item === null && label === null) || item === label
       );
 
       if (isAlreadyIncluded) {
-        return prev.filter(item => 
+        return prev.filter(item =>
           !((item === null && label === null) || item === label)
         );
       } else {
@@ -840,7 +840,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     const now = new Date();
     const currentMonthDate = new Date(currentYear, currentMonth);
     const nextMonthDate = new Date(currentYear, currentMonth + 1);
-    
+
     if (nextMonthDate <= now) {
       setCurrentMonth(prev => (prev === 11 ? 0 : prev + 1));
       setCurrentYear(prev => (currentMonth === 11 ? prev + 1 : prev));
@@ -852,7 +852,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     const now = new Date();
     const currentMonthDate = new Date(currentYear, currentMonth);
     const nextMonthDate = new Date(currentYear, currentMonth + 1);
-    
+
     return nextMonthDate > now;
   };
 
@@ -860,9 +860,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
   const refreshOffsetBankFeeds = async () => {
     try {
       setIsRefreshing(true);
-      
+
       const response = await axios.post(getApiUrl('/refresh-offset-bank-feeds'));
-      
+
       if (response.data.success) {
         // Show success notification
         const notification = document.createElement('div');
@@ -876,13 +876,13 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 3000);
-        
+
         // Refresh the transactions data - use the full initial data endpoint
         const transactionsResponse = await axios.get(getApiUrl('/offset-initial-data'));
         if (transactionsResponse.data.success) {
@@ -929,7 +929,7 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         } else {
           throw new Error(transactionsResponse.data.error || 'Failed to refresh data');
         }
-        
+
       } else {
         // Show error notification
         const notification = document.createElement('div');
@@ -943,16 +943,16 @@ const OffsetTransactions = ({ helpTextVisible }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 5000);
       }
     } catch (error) {
       console.error('Error refreshing offset bank feeds:', error);
-      
+
       const notification = document.createElement('div');
       notification.textContent = 'Error refreshing offset bank feeds. Check console for details.';
       notification.style.position = 'fixed';
@@ -964,9 +964,9 @@ const OffsetTransactions = ({ helpTextVisible }) => {
       notification.style.borderRadius = '4px';
       notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
       notification.style.zIndex = '1000';
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 5000);
@@ -975,37 +975,37 @@ const OffsetTransactions = ({ helpTextVisible }) => {
     }
   };
 
-// Update the filter logic in useEffect
-useEffect(() => {
-  // Apply date filter and sorting first
-  let filtered = applyFilters(transactions, {
-    dateFilter,
-    sortBy: filters.sortBy
-  }, getTransactionLabel);
+  // Update the filter logic in useEffect
+  useEffect(() => {
+    // Apply date filter and sorting first
+    let filtered = applyFilters(transactions, {
+      dateFilter,
+      sortBy: filters.sortBy
+    }, getTransactionLabel);
 
-  // Apply category and label filters (using the utility function)
-  filtered = filterTransactionsByCategoryAndLabel(
-    filtered, 
-    categoryFilter, 
-    labelFilter, 
-    getTransactionLabel
-  );
-  
-  // Group split transactions together after filtering and sorting
-  // Pass original transactions array to handle missing parents gracefully
-  filtered = groupSplitTransactions(filtered, transactions);
-  
-  setAllFilteredTransactions(filtered);
-  
-  let tableFiltered = filtered;
-  
-  // Only apply month filter if there's no date range filter AND showAllTransactions is false
-  if (!dateFilter.startDate && !dateFilter.endDate && !showAllTransactions) {
-    tableFiltered = filterByMonth(filtered, currentMonth, currentYear, transactions);
-  }
-  
-  setFilteredTransactions(tableFiltered);
-}, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
+    // Apply category and label filters (using the utility function)
+    filtered = filterTransactionsByCategoryAndLabel(
+      filtered,
+      categoryFilter,
+      labelFilter,
+      getTransactionLabel
+    );
+
+    // Group split transactions together after filtering and sorting
+    // Pass original transactions array to handle missing parents gracefully
+    filtered = groupSplitTransactions(filtered, transactions);
+
+    setAllFilteredTransactions(filtered);
+
+    let tableFiltered = filtered;
+
+    // Only apply month filter if there's no date range filter AND showAllTransactions is false
+    if (!dateFilter.startDate && !dateFilter.endDate && !showAllTransactions) {
+      tableFiltered = filterByMonth(filtered, currentMonth, currentYear, transactions);
+    }
+
+    setFilteredTransactions(tableFiltered);
+  }, [transactions, filters.sortBy, dateFilter, categoryFilter, labelFilter, currentMonth, currentYear, showAllTransactions]);
 
   // Update user color styles when users change
   useEffect(() => {
@@ -1022,12 +1022,12 @@ useEffect(() => {
   const toggleColumnFilter = (column) => {
     setActiveFilterColumn(activeFilterColumn === column ? null : column);
   };
-  
+
   // Handle sorting when clicking on table headers
   const handleHeaderSort = (column) => {
     const currentSort = filters.sortBy;
     let newSort;
-    
+
     // Determine new sort direction
     if (currentSort === `${column}-desc`) {
       newSort = `${column}-asc`;
@@ -1037,16 +1037,16 @@ useEffect(() => {
       // Default to descending for the clicked column
       newSort = `${column}-desc`;
     }
-    
+
     setFilters(prev => ({ ...prev, sortBy: newSort }));
   };
-  
+
   const handleDateFilterChange = (e) => {
     const { name, value } = e.target;
     setDateFilter(prev => ({ ...prev, [name]: value }));
     setShowAllTransactions(false); // Reset to date-filtered view when applying date filters
   };
-  
+
   const clearFilters = () => {
     setDateFilter({ startDate: '', endDate: '' });
     setCategoryFilter([]);
@@ -1054,25 +1054,25 @@ useEffect(() => {
     setActiveFilterColumn(null);
     setShowAllTransactions(false);
   };
-  
+
   const getMinMaxDates = () => {
     if (transactions.length === 0) return { min: '', max: '' };
-    
+
     let minDate = new Date(transactions[0].date);
     let maxDate = new Date(transactions[0].date);
-    
+
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
       if (date < minDate) minDate = date;
       if (date > maxDate) maxDate = date;
     });
-    
+
     return {
       min: minDate.toISOString().split('T')[0],
       max: maxDate.toISOString().split('T')[0]
     };
   };
-  
+
   const dateRange = getMinMaxDates();
 
   const handleDoubleClick = (transactionId, field, value) => {
@@ -1098,9 +1098,9 @@ useEffect(() => {
     notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
     notification.style.zIndex = '1000';
     notification.style.border = '1px solid #f5c6cb';
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       document.body.removeChild(notification);
     }, 5000);
@@ -1120,9 +1120,9 @@ useEffect(() => {
     notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
     notification.style.zIndex = '1000';
     notification.style.border = '1px solid #c3e6cb';
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       document.body.removeChild(notification);
     }, 3000);
@@ -1132,37 +1132,37 @@ useEffect(() => {
   const handleSplitConfigUpdate = async (transactionId, newLabelValue) => {
     try {
       setIsUpdating(true);
-      
+
       // Guard clause: return early if users is not loaded yet
       if (!users || !Array.isArray(users)) {
         throw new Error('Users data not loaded yet');
       }
-      
+
       const activeUsers = users.filter(user => user.username !== 'default');
-      
+
       if (newLabelValue === '' || newLabelValue === null) {
         // Delete existing split configuration
         try {
           const deleteResponse = await axios.delete(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=offset`));
-          
+
           if (deleteResponse.data.success) {
             // Update local state to reflect the change - clear legacy label
-            setTransactions(prevTransactions => 
-              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            setTransactions(prevTransactions =>
+              prevTransactions.map(t => t.id === transactionId ? { ...t, label: null } : t)
             );
-            setFilteredTransactions(prevFiltered => 
-              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            setFilteredTransactions(prevFiltered =>
+              prevFiltered.map(t => t.id === transactionId ? { ...t, label: null } : t)
             );
-            
+
             // Update split allocations state
             setSplitAllocations(prev => {
-              const updated = {...prev};
+              const updated = { ...prev };
               delete updated[transactionId];
               return updated;
             });
-            
+
             showSuccessNotification('Split configuration removed successfully');
-            
+
             // Clear edit state to exit edit mode
             setEditCell(null);
             return;
@@ -1171,24 +1171,24 @@ useEffect(() => {
           if (deleteErr.response?.status === 404) {
             // Split config doesn't exist, just update the label to null
             console.log(`ℹ️ No split configuration found to delete for transaction ${transactionId}`);
-            
+
             // Still update local state even if no split config existed - clear legacy label
-            setTransactions(prevTransactions => 
-              prevTransactions.map(t => t.id === transactionId ? {...t, label: null} : t)
+            setTransactions(prevTransactions =>
+              prevTransactions.map(t => t.id === transactionId ? { ...t, label: null } : t)
             );
-            setFilteredTransactions(prevFiltered => 
-              prevFiltered.map(t => t.id === transactionId ? {...t, label: null} : t)
+            setFilteredTransactions(prevFiltered =>
+              prevFiltered.map(t => t.id === transactionId ? { ...t, label: null } : t)
             );
-            
+
             // Update split allocations state
             setSplitAllocations(prev => {
-              const updated = {...prev};
+              const updated = { ...prev };
               delete updated[transactionId];
               return updated;
             });
-            
+
             showSuccessNotification('Label cleared successfully');
-            
+
             // Clear edit state to exit edit mode
             setEditCell(null);
             return;
@@ -1206,7 +1206,7 @@ useEffect(() => {
 
         // Determine users for the split based on the new label value
         let splitUsers = [];
-        
+
         if (newLabelValue === 'Both' || newLabelValue === 'All users') {
           // Equal split between all active users
           splitUsers = activeUsers.map(user => ({ id: user.id }));
@@ -1221,7 +1221,7 @@ useEffect(() => {
 
         // Check if split configuration already exists
         const existingConfigResponse = await axios.get(getApiUrl(`/transactions/${transactionId}/split-config?transaction_type=offset`));
-        
+
         if (existingConfigResponse.data.success && existingConfigResponse.data.data) {
           // Update existing configuration
           const updateResponse = await axios.put(getApiUrl(`/transactions/${transactionId}/split-config`), {
@@ -1229,7 +1229,7 @@ useEffect(() => {
             split_type_code: 'equal',
             users: splitUsers
           });
-          
+
           if (updateResponse.data.success) {
             // Update local split allocations
             const newAllocations = updateResponse.data.data.allocations.map(allocation => ({
@@ -1248,30 +1248,30 @@ useEffect(() => {
               split_type_code: 'equal',
               split_type_label: 'Equal Split'
             }));
-            
+
             setSplitAllocations(prev => ({
               ...prev,
               [transactionId]: newAllocations
             }));
-            
+
             // Update transaction state - clear the legacy label since we now have split allocations
-            setTransactions(prevTransactions => 
-              prevTransactions.map(t => 
-                t.id === transactionId 
-                  ? {...t, label: null} // Clear legacy label since we now use split allocations
+            setTransactions(prevTransactions =>
+              prevTransactions.map(t =>
+                t.id === transactionId
+                  ? { ...t, label: null } // Clear legacy label since we now use split allocations
                   : t
               )
             );
-            setFilteredTransactions(prevFiltered => 
-              prevFiltered.map(t => 
-                t.id === transactionId 
-                  ? {...t, label: null} // Clear legacy label since we now use split allocations
+            setFilteredTransactions(prevFiltered =>
+              prevFiltered.map(t =>
+                t.id === transactionId
+                  ? { ...t, label: null } // Clear legacy label since we now use split allocations
                   : t
               )
             );
-            
+
             showSuccessNotification('Split configuration updated successfully');
-            
+
             // Clear edit state to exit edit mode
             setEditCell(null);
           } else {
@@ -1284,7 +1284,7 @@ useEffect(() => {
             split_type_code: 'equal',
             users: splitUsers
           });
-          
+
           if (createResponse.data.success) {
             // Update local split allocations
             const newAllocations = createResponse.data.data.allocations.map(allocation => ({
@@ -1303,30 +1303,30 @@ useEffect(() => {
               split_type_code: 'equal',
               split_type_label: 'Equal Split'
             }));
-            
+
             setSplitAllocations(prev => ({
               ...prev,
               [transactionId]: newAllocations
             }));
-            
+
             // Update transaction state - clear the legacy label since we now have split allocations
-            setTransactions(prevTransactions => 
-              prevTransactions.map(t => 
-                t.id === transactionId 
-                  ? {...t, label: null} // Clear legacy label since we now use split allocations
+            setTransactions(prevTransactions =>
+              prevTransactions.map(t =>
+                t.id === transactionId
+                  ? { ...t, label: null } // Clear legacy label since we now use split allocations
                   : t
               )
             );
-            setFilteredTransactions(prevFiltered => 
-              prevFiltered.map(t => 
-                t.id === transactionId 
-                  ? {...t, label: null} // Clear legacy label since we now use split allocations
+            setFilteredTransactions(prevFiltered =>
+              prevFiltered.map(t =>
+                t.id === transactionId
+                  ? { ...t, label: null } // Clear legacy label since we now use split allocations
                   : t
               )
             );
-            
+
             showSuccessNotification('Split configuration created successfully');
-            
+
             // Clear edit state to exit edit mode
             setEditCell(null);
           } else {
@@ -1337,7 +1337,7 @@ useEffect(() => {
     } catch (error) {
       console.error('Error updating split configuration:', error);
       showErrorNotification(error.message || 'Failed to update split configuration');
-      
+
       // Clear edit state even on error
       setEditCell(null);
     } finally {
@@ -1352,15 +1352,15 @@ useEffect(() => {
       console.error('Users data not loaded yet');
       return;
     }
-    
+
     // If no label value is provided, don't create a split configuration
     if (!labelValue || labelValue === '') {
       return;
     }
-    
+
     // Determine users for the split based on the label value
     let splitUsers = [];
-    
+
     if (labelValue === 'Both' || labelValue === 'All users') {
       // Equal split between all active users (excluding default)
       const activeUsers = users.filter(user => user.username !== 'default' && user.is_active);
@@ -1387,10 +1387,10 @@ useEffect(() => {
     };
 
     const response = await axios.post(getApiUrl(`/transactions/${transactionId}/split-config`), splitConfigData);
-    
+
     if (response.data.success) {
       const { allocations } = response.data.data;
-      
+
       // Update split allocations state for this transaction
       setSplitAllocations(prev => ({
         ...prev,
@@ -1398,17 +1398,17 @@ useEffect(() => {
       }));
 
       // Update transaction state - clear the legacy label since we now have split allocations
-      setTransactions(prevTransactions => 
-        prevTransactions.map(t => 
-          t.id === transactionId 
-            ? {...t, label: null} // Clear legacy label since we now use split allocations
+      setTransactions(prevTransactions =>
+        prevTransactions.map(t =>
+          t.id === transactionId
+            ? { ...t, label: null } // Clear legacy label since we now use split allocations
             : t
         )
       );
-      setFilteredTransactions(prevFiltered => 
-        prevFiltered.map(t => 
-          t.id === transactionId 
-            ? {...t, label: null} // Clear legacy label since we now use split allocations
+      setFilteredTransactions(prevFiltered =>
+        prevFiltered.map(t =>
+          t.id === transactionId
+            ? { ...t, label: null } // Clear legacy label since we now use split allocations
             : t
         )
       );
@@ -1422,13 +1422,13 @@ useEffect(() => {
     } else {
       // For all other fields, use the existing optimized update handler
       await optimizedHandleOffsetUpdate(
-        transactionId, 
-        field, 
-        editValue, 
-        transactions, 
-        setTransactions, 
-        filteredTransactions.length ? setFilteredTransactions : null, 
-        setEditCell, 
+        transactionId,
+        field,
+        editValue,
+        transactions,
+        setTransactions,
+        filteredTransactions.length ? setFilteredTransactions : null,
+        setEditCell,
         setIsUpdating,
         showErrorNotification
       );
@@ -1477,10 +1477,10 @@ useEffect(() => {
           );
         case 'category':
           return (
-            <select 
+            <select
               className="modern-select"
-              value={editValue || ''} 
-              onChange={handleInputChange} 
+              value={editValue || ''}
+              onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1488,7 +1488,7 @@ useEffect(() => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
+              style={{
                 textAlign: 'center',
                 width: '100%',
                 position: 'relative',
@@ -1507,10 +1507,10 @@ useEffect(() => {
           );
         case 'label':
           return (
-            <select 
+            <select
               className="modern-select"
-              value={editValue || ''} 
-              onChange={handleInputChange} 
+              value={editValue || ''}
+              onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1518,7 +1518,7 @@ useEffect(() => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
+              style={{
                 textAlign: 'center',
                 width: '100%',
                 position: 'relative',
@@ -1559,33 +1559,33 @@ useEffect(() => {
     }
 
     // Display cell content
-    const isEmpty = 
-      transaction[field] === null || 
-      transaction[field] === undefined || 
+    const isEmpty =
+      transaction[field] === null ||
+      transaction[field] === undefined ||
       transaction[field] === '';
-    
+
     const isInEditMode = editCell && editCell.transactionId === transaction.id && editCell.field === field;
-  
+
     return (
-      <div 
-          className={isInEditMode ? '' : 'cell-content editable-cell'}
-          onDoubleClick={isInEditMode ? undefined : () => handleDoubleClick(transaction.id, field, transaction[field] || '')}
-          style={{
-            pointerEvents: isInEditMode ? 'none' : 'auto',
-            position: 'relative',
-            width: '100%',
-            height: '100%'
-          }}
-        >
+      <div
+        className={isInEditMode ? '' : 'cell-content editable-cell'}
+        onDoubleClick={isInEditMode ? undefined : () => handleDoubleClick(transaction.id, field, transaction[field] || '')}
+        style={{
+          pointerEvents: isInEditMode ? 'none' : 'auto',
+          position: 'relative',
+          width: '100%',
+          height: '100%'
+        }}
+      >
         {field === 'label' ? (
           (() => {
             const label = getTransactionLabel(transaction);
-            
+
             // Show loading indicator if data is still loading
             if (isTransactionsLoading || splitAllocations === null) {
               return <span style={{ color: '#999', fontStyle: 'italic', fontSize: '12px' }}>Loading...</span>;
             }
-            
+
             // Return clean label display
             return label || '';
           })()
@@ -1625,9 +1625,9 @@ useEffect(() => {
 
   const renderRelatedTransactionIndicator = (transaction) => {
     const relatedTransactions = getRelatedTransactions(transaction);
-    
+
     if (relatedTransactions.length === 0) return null;
-    
+
     if (transaction.has_split) {
       return (
         <span style={{
@@ -1644,7 +1644,7 @@ useEffect(() => {
           whiteSpace: 'nowrap'
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
           </svg>
           <span>Split ({relatedTransactions.length})</span>
         </span>
@@ -1666,7 +1666,7 @@ useEffect(() => {
           whiteSpace: 'nowrap'
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)" />
           </svg>
           <span>Split from</span>
         </span>
@@ -1805,11 +1805,11 @@ useEffect(() => {
             ) : (
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
-                  <tr 
-                    className={getRowLabelClass(transaction)} 
-                    style={{ 
-                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' : 
-                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                  <tr
+                    className={getRowLabelClass(transaction)}
+                    style={{
+                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' :
+                        transaction.split_from_id ? '#f7fbff' : undefined,
                       transition: 'background-color 0.2s',
                       borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
                     }}
@@ -1819,7 +1819,7 @@ useEffect(() => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
                           {transaction.split_from_id && (
-                            <span style={{ 
+                            <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               marginRight: '6px',
@@ -1827,12 +1827,12 @@ useEffect(() => {
                               flexShrink: 0
                             }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M7 17l-5-5 5-5"/>
+                                <path d="M7 17l-5-5 5-5" />
                               </svg>
                             </span>
                           )}
-                          <div style={{ 
-                            display: 'flex', 
+                          <div style={{
+                            display: 'flex',
                             alignItems: 'center',
                             minWidth: 0,
                             overflow: 'hidden',
@@ -1867,20 +1867,20 @@ useEffect(() => {
                           }}
                           title="Click to expand transaction options"
                         >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
                             strokeWidth="2"
-                            style={{ 
+                            style={{
                               transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
                               transition: 'transform 0.2s',
                               opacity: 0.7
                             }}
                           >
-                            <path d="M6 9l6 6 6-6"/>
+                            <path d="M6 9l6 6 6-6" />
                           </svg>
                         </button>
                       </div>
@@ -1891,12 +1891,12 @@ useEffect(() => {
                   </tr>
                   {expandedRow === transaction.id && (
                     <tr>
-                      <td colSpan="5" style={{ 
+                      <td colSpan="5" style={{
                         padding: '0',
                         backgroundColor: 'var(--color-backgroundTertiary)',
                         border: '1px solid var(--color-border)'
                       }}>
-                        <div style={{ 
+                        <div style={{
                           padding: '12px',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -1923,22 +1923,22 @@ useEffect(() => {
                               }}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z" />
                               </svg>
                               Split Transaction
                             </button>
                           </div>
-                          
+
                           {/* Show related transactions when expanded */}
                           {getRelatedTransactions(transaction).length > 0 && (
-                            <div style={{ 
-                              marginTop: '12px', 
+                            <div style={{
+                              marginTop: '12px',
                               borderTop: '1px dashed #cbd5e1',
                               paddingTop: '12px'
                             }}>
-                              <div style={{ 
-                                fontSize: '14px', 
-                                fontWeight: '500', 
+                              <div style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
                                 marginBottom: '8px',
                                 color: 'var(--color-text)'
                               }}>
@@ -1946,17 +1946,17 @@ useEffect(() => {
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {getRelatedTransactions(transaction).map(related => (
-                                  <div key={related.id} style={{ 
-                                    display: 'flex', 
+                                  <div key={related.id} style={{
+                                    display: 'flex',
                                     justifyContent: 'space-between',
                                     padding: '8px',
                                     backgroundColor: 'var(--color-backgroundSecondary)',
                                     borderRadius: '4px',
                                     border: '1px solid var(--color-border)'
                                   }}>
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      gap: '12px', 
+                                    <div style={{
+                                      display: 'flex',
+                                      gap: '12px',
                                       alignItems: 'center',
                                       fontSize: '13px',
                                       flex: 1,
@@ -1965,13 +1965,13 @@ useEffect(() => {
                                       <div>{new Date(related.date).toLocaleDateString()}</div>
                                       <div style={{ fontWeight: '500' }}>{related.description}</div>
                                     </div>
-                                    <div style={{ 
+                                    <div style={{
                                       fontWeight: '500',
                                       fontSize: '13px',
                                       color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
                                     }}>
-                                      {parseFloat(related.amount) < 0 ? 
-                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                      {parseFloat(related.amount) < 0 ?
+                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` :
                                         `$${parseFloat(related.amount).toFixed(2)}`}
                                     </div>
                                   </div>
@@ -2013,45 +2013,45 @@ useEffect(() => {
 
   const handleAddTransaction = async (e) => {
     e.preventDefault();
-    
+
     if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
       alert('Please fill out all required fields: Date, Description, and Amount');
       return;
     }
-    
+
     try {
       setIsUpdating(true);
-      
+
       const transactionData = {
         ...newTransaction,
         amount: parseFloat(newTransaction.amount)
       };
-      
+
       if (isNaN(transactionData.amount)) {
         alert('Please enter a valid number for the amount');
         setIsUpdating(false);
         return;
       }
-      
+
       const response = await axios.post(getApiUrl('/offset-transactions'), transactionData);
-      
+
       if (response.data.success) {
         const addedTransaction = response.data.data;
-        
+
         setTransactions(prev => [addedTransaction, ...prev]);
-        
+
         // Create split configuration if label is provided
         if (newTransaction.label) {
           await createSplitConfigForNewTransaction(addedTransaction.id, newTransaction.label);
         }
-        
+
         const transactionDate = new Date(addedTransaction.date);
-        const isInCurrentMonth = transactionDate.getMonth() === currentMonth && 
-                                transactionDate.getFullYear() === currentYear;
-        
+        const isInCurrentMonth = transactionDate.getMonth() === currentMonth &&
+          transactionDate.getFullYear() === currentYear;
+
         if (isInCurrentMonth) {
           let shouldAdd = true;
-          
+
           if (dateFilter.startDate || dateFilter.endDate) {
             if (dateFilter.startDate && new Date(addedTransaction.date) < new Date(dateFilter.startDate)) {
               shouldAdd = false;
@@ -2060,27 +2060,27 @@ useEffect(() => {
               shouldAdd = false;
             }
           }
-          
+
           if (categoryFilter.length > 0) {
-            if (!categoryFilter.includes(addedTransaction.category) && 
-                !(categoryFilter.includes(null) && !addedTransaction.category)) {
+            if (!categoryFilter.includes(addedTransaction.category) &&
+              !(categoryFilter.includes(null) && !addedTransaction.category)) {
               shouldAdd = false;
             }
           }
-          
+
           if (labelFilter.length > 0) {
             if (!labelFilter.includes(addedTransaction.label)) {
               shouldAdd = false;
             }
           }
-          
+
           if (shouldAdd) {
             setFilteredTransactions(prev => [addedTransaction, ...prev]);
           }
         }
-        
+
         showSuccessNotification('Transaction added successfully!');
-        
+
         resetNewTransactionForm();
         setIsAddingTransaction(false);
       } else {
@@ -2089,15 +2089,15 @@ useEffect(() => {
       }
     } catch (err) {
       console.error('Error adding transaction:', err);
-      
+
       let errorMessage = 'Failed to add transaction. Please try again.';
-      
+
       if (err.response && err.response.data) {
-        errorMessage = err.response.data.error || 
-                      (err.response.data.errors && err.response.data.errors.join(', ')) || 
-                      errorMessage;
+        errorMessage = err.response.data.error ||
+          (err.response.data.errors && err.response.data.errors.join(', ')) ||
+          errorMessage;
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -2125,17 +2125,17 @@ useEffect(() => {
   const handleDragStart = (e, category) => {
     createDragImage(e, setDraggedCategory, setIsDragging, category);
   };
-  
+
   const handleDragOver = (e, category) => {
     handleDragOverWithReorder(e, category, draggedCategory, categoryOrder, setCategoryOrder);
   };
-  
+
   const handleDragEnd = () => {
     handleDragEndCleanup(setDraggedCategory, setIsDragging);
-    
+
     // Persist the new order to localStorage
     localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(categoryOrder));
-    
+
     // Optional: Show a subtle notification that order was saved
     const notification = document.createElement('div');
     notification.textContent = 'Category order saved!';
@@ -2151,36 +2151,36 @@ useEffect(() => {
     notification.style.fontSize = '13px';
     notification.style.background = 'linear-gradient(90deg, #d4edda 0%, #d1ecf1 100%)';
     notification.style.border = '1px solid #bee5eb';
-    
+
     document.body.appendChild(notification);
-    
+
     // Fade out and remove
     setTimeout(() => {
       notification.style.opacity = '0';
       notification.style.transition = 'opacity 0.3s ease';
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 300);
     }, 1500);
   };
-  
+
   // Add a reset order function
   const resetCategoryOrder = () => {
     if (window.confirm('Are you sure you want to reset the category order to default?')) {
       // Clear saved order
       localStorage.removeItem(CATEGORY_ORDER_KEY);
-      
+
       // Reset to alphabetical order or original order
       const categoryData = transactions.reduce((acc, transaction) => {
         const category = transaction.category || 'Uncategorized';
         if (!acc[category]) acc[category] = true;
         return acc;
       }, {});
-      
+
       const defaultOrder = Object.keys(categoryData).sort();
       setCategoryOrder(defaultOrder);
-      
+
       // Show notification
       const notification = document.createElement('div');
       notification.textContent = 'Category order reset to default!';
@@ -2193,9 +2193,9 @@ useEffect(() => {
       notification.style.borderRadius = '4px';
       notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
       notification.style.zIndex = '1000';
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 3000);
@@ -2242,32 +2242,32 @@ useEffect(() => {
 
   const calculateRemainingAmount = () => {
     if (!transactionToSplit) return 0;
-    
+
     const originalAmount = parseFloat(transactionToSplit.amount) || 0;
     const splitTotal = splitTransactions.reduce((sum, split) => {
       return sum + (parseFloat(split.amount) || 0);
     }, 0);
-    
+
     return originalAmount - splitTotal;
   };
 
   const handleSaveSplit = async () => {
     // Validate split transactions
-    const hasEmptyFields = splitTransactions.some(split => 
+    const hasEmptyFields = splitTransactions.some(split =>
       !split.description || !split.amount || !split.category || split.amount === ''
     );
-    
+
     if (hasEmptyFields) {
       showErrorNotification('Please fill out all fields for each split transaction');
       return;
     }
-    
-    const totalSplitAmount = splitTransactions.reduce((sum, split) => 
+
+    const totalSplitAmount = splitTransactions.reduce((sum, split) =>
       sum + parseFloat(split.amount || 0), 0
     );
-    
+
     const originalAmount = parseFloat(transactionToSplit.amount) || 0;
-    
+
     // For negative transactions (expenses), ensure splits are also negative
     if (originalAmount < 0) {
       const hasPositiveSplit = splitTransactions.some(split => parseFloat(split.amount) > 0);
@@ -2276,7 +2276,7 @@ useEffect(() => {
         return;
       }
     }
-    
+
     // For positive transactions (income), ensure splits are also positive
     if (originalAmount > 0) {
       const hasNegativeSplit = splitTransactions.some(split => parseFloat(split.amount) < 0);
@@ -2285,7 +2285,7 @@ useEffect(() => {
         return;
       }
     }
-    
+
     // Check if the total split amount exceeds the original (considering sign)
     if (originalAmount < 0) {
       // For expenses: total splits should not be less than original (more negative)
@@ -2300,10 +2300,10 @@ useEffect(() => {
         return;
       }
     }
-    
+
     try {
       setIsSavingSplit(true);
-      
+
       // Prepare the data for the API (remove label field for new system)
       const splitData = {
         originalTransactionId: transactionToSplit.id,
@@ -2316,23 +2316,23 @@ useEffect(() => {
           // Note: label field removed - will be handled via split configs
         }))
       };
-      
+
       const response = await axios.post(getApiUrl('/offset-transactions/split'), splitData);
-      
+
       if (response.data.success) {
         // Refresh the transactions to get the newly created split transactions
         const transactionsResponse = await axios.get(getApiUrl('/offset-transactions'));
         setTransactions(transactionsResponse.data);
-        
+
         // Find the newly created split transactions (they have split_from_id = originalTransactionId)
         // Sort by ID descending to get the most recent ones first, then take only the number we just created
         const allSplitTransactions = transactionsResponse.data
           .filter(t => t.split_from_id === transactionToSplit.id)
           .sort((a, b) => b.id - a.id); // Sort by ID descending (highest/newest first)
-        
+
         // Take only the number of transactions we just created (they should be the newest ones)
         const newSplitTransactions = allSplitTransactions.slice(0, splitTransactions.length);
-        
+
         // Create split configurations for each split transaction that had a label
         const splitConfigPromises = splitTransactions.map(async (split, index) => {
           if (split.label && split.label !== '') {
@@ -2349,12 +2349,12 @@ useEffect(() => {
             }
           }
         });
-        
+
         // Wait for all split configurations to be created
         await Promise.all(splitConfigPromises);
-        
+
         showSuccessNotification('Transaction split successfully!');
-        
+
         // Close the modal
         setIsSplitting(false);
         setTransactionToSplit(null);
@@ -2364,7 +2364,7 @@ useEffect(() => {
           category: '',
           label: ''
         }]);
-        
+
         // Reapply filters to new data
         let filtered = applyFilters(transactionsResponse.data, {
           dateFilter,
@@ -2375,7 +2375,7 @@ useEffect(() => {
 
         // Apply month filtering for the table view ONLY if no date filter is active
         let tableFiltered = filtered;
-        
+
         // Only apply month filter if there's no date range filter
         if (!dateFilter.startDate && !dateFilter.endDate) {
           tableFiltered = filtered.filter(transaction => {
@@ -2423,34 +2423,34 @@ useEffect(() => {
   // Handle settings change
   const handleHideZeroBalanceBucketsChange = (checked) => {
     setHideZeroBalanceBuckets(checked);
-    saveSettings({ 
-      hideZeroBalanceBuckets: checked, 
-      selectedNegativeOffsetBucket: selectedNegativeOffsetBucket 
+    saveSettings({
+      hideZeroBalanceBuckets: checked,
+      selectedNegativeOffsetBucket: selectedNegativeOffsetBucket
     });
   };
 
   // Handle negative offset bucket selection change
   const handleNegativeOffsetBucketChange = (bucketName) => {
     setSelectedNegativeOffsetBucket(bucketName);
-    saveSettings({ 
-      hideZeroBalanceBuckets: hideZeroBalanceBuckets, 
-      selectedNegativeOffsetBucket: bucketName 
+    saveSettings({
+      hideZeroBalanceBuckets: hideZeroBalanceBuckets,
+      selectedNegativeOffsetBucket: bucketName
     });
   };
-  
+
   return (
     <div style={{ position: 'relative' }}>
 
       {isUpdating && (
-        <div style={{ 
-          position: 'absolute', 
-          top: '0', 
-          left: '0', 
-          width: '100%', 
-          height: '100%', 
-          backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div style={{
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
           zIndex: 10,
           borderRadius: '8px'
@@ -2469,17 +2469,17 @@ useEffect(() => {
               borderTop: '3px solid #4a90e2',
               animation: 'spin 1s linear infinite'
             }}></div>
-                            <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
+            <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
           </div>
         </div>
       )}
 
       {/* Active filters display */}
       {(dateFilter.startDate || dateFilter.endDate || categoryFilter.length > 0 || labelFilter.length > 0) && (
-        <div style={{ 
-          margin: '10px 0', 
-          padding: '12px', 
-          backgroundColor: '#e8f4fd', 
+        <div style={{
+          margin: '10px 0',
+          padding: '12px',
+          backgroundColor: '#e8f4fd',
           borderRadius: '8px',
           border: '1px solid #d0e8f9',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
@@ -2488,7 +2488,7 @@ useEffect(() => {
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <strong style={{ color: '#1e40af', fontSize: '14px' }}>Active Filters:</strong>
               {(dateFilter.startDate || dateFilter.endDate) && (
-                <span style={{ 
+                <span style={{
                   backgroundColor: '#dbeafe',
                   color: '#1e40af',
                   padding: '4px 8px',
@@ -2501,7 +2501,7 @@ useEffect(() => {
                 </span>
               )}
               {categoryFilter.length > 0 && (
-                <span style={{ 
+                <span style={{
                   backgroundColor: '#fef3c7',
                   color: '#92400e',
                   padding: '4px 8px',
@@ -2514,7 +2514,7 @@ useEffect(() => {
                 </span>
               )}
               {labelFilter.length > 0 && (
-                <span style={{ 
+                <span style={{
                   backgroundColor: '#fce7f3',
                   color: '#be185d',
                   padding: '4px 8px',
@@ -2526,19 +2526,19 @@ useEffect(() => {
                   👤 Labels: {labelFilter.slice(0, 3).join(', ')}{labelFilter.length > 3 ? ` +${labelFilter.length - 3} more` : ''}
                 </span>
               )}
-              <span style={{ 
-                fontSize: '13px', 
+              <span style={{
+                fontSize: '13px',
                 color: '#4b5563',
                 fontWeight: '500'
               }}>
                 ({filteredTransactions.length} transactions)
               </span>
             </div>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button 
+              <button
                 onClick={clearFilters}
-                style={{ 
+                style={{
                   padding: '8px 14px',
                   backgroundColor: 'var(--color-buttonSecondary)',
                   color: 'var(--color-buttonSecondaryText)',
@@ -2559,8 +2559,8 @@ useEffect(() => {
       )}
 
       {/* Category Savings Summary */}
-      <div style={{ 
-        marginBottom: '60px', 
+      <div style={{
+        marginBottom: '60px',
         background: 'transparent',
         padding: '24px', // Reduced from 32px
         position: 'relative',
@@ -2569,7 +2569,7 @@ useEffect(() => {
           <LoadingSpinner />
         ) : (
           <div>
-            <div style={{ 
+            <div style={{
               marginBottom: '20px',
               position: 'relative',
             }}>
@@ -2581,7 +2581,7 @@ useEffect(() => {
               }}>
                 <div></div>
                 <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>Savings Buckets</h2>
-                
+
                 {/* Settings and Reset Button Container */}
                 <div style={{
                   display: 'flex',
@@ -2597,12 +2597,12 @@ useEffect(() => {
                     title="Settings"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" />
                     </svg>
                     Settings
                   </button>
-                  
+
                   {/* Modern Reset Button */}
                   <button
                     onClick={resetCategoryOrder}
@@ -2618,11 +2618,11 @@ useEffect(() => {
                   </button>
                 </div>
               </div>
-              
+
               {/* HelpText below the title and buttons */}
               <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
-                  Drag category cards to reorder them. Your arrangement will be saved automatically. 
+                  Drag category cards to reorder them. Your arrangement will be saved automatically.
                 </HelpText>
               </div>
 
@@ -2632,7 +2632,7 @@ useEffect(() => {
                 </HelpText>
               </div>
             </div>
-            
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', // Reduced from 240px
@@ -2644,9 +2644,9 @@ useEffect(() => {
                   // Calculate raw category totals first
                   const rawCategoryData = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    const amount = typeof transaction.amount === 'number' ? 
+                    const amount = typeof transaction.amount === 'number' ?
                       transaction.amount : parseFloat(transaction.amount) || 0;
-                    
+
                     if (!acc[category]) {
                       acc[category] = {
                         total: 0,
@@ -2655,13 +2655,13 @@ useEffect(() => {
                     }
                     acc[category].total += amount;
                     acc[category].count += 1;
-                    
+
                     return acc;
                   }, {});
 
                   // New offsetting logic - keep negatives but adjust offset bucket
                   const categoryData = { ...rawCategoryData };
-                  
+
                   if (selectedNegativeOffsetBucket && categoryData[selectedNegativeOffsetBucket]) {
                     // Find all negative buckets (excluding the offset bucket itself)
                     const negativeBuckets = Object.entries(rawCategoryData).filter(([category, data]) => {
@@ -2691,27 +2691,27 @@ useEffect(() => {
                       const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
                       const isNegative = numTotal < 0;
                       const isOffsetBucket = category === selectedNegativeOffsetBucket;
-                      
+
                       // Include the bucket if it's not negative OR if it's the offset bucket
                       return !isNegative || isOffsetBucket;
                     })
                     .reduce((sum, [category, data]) => {
-                      const numTotal = typeof data.total === 'number' ? 
+                      const numTotal = typeof data.total === 'number' ?
                         data.total : parseFloat(data.total) || 0;
                       return sum + numTotal;
                     }, 0);
 
                   // Get latest closing balance with type safety
-                  const latestTransaction = transactions.length > 0 
+                  const latestTransaction = transactions.length > 0
                     ? transactions.reduce((latest, transaction) => {
-                        return (latest.id > transaction.id) ? latest : transaction;
-                      }, transactions[0])
+                      return (latest.id > transaction.id) ? latest : transaction;
+                    }, transactions[0])
                     : null;
-                  
-                  const latestClosingBalance = latestTransaction 
+
+                  const latestClosingBalance = latestTransaction
                     ? (typeof latestTransaction.closing_balance === 'number' ?
-                      latestTransaction.closing_balance : 
-                      parseFloat(latestTransaction.closing_balance) || 0) 
+                      latestTransaction.closing_balance :
+                      parseFloat(latestTransaction.closing_balance) || 0)
                     : 0;
 
                   // Format number with commas
@@ -2747,22 +2747,22 @@ useEffect(() => {
                   const sortedCategories = [...Object.keys(categoryData)].sort((a, b) => {
                     const indexA = categoryOrder.indexOf(a);
                     const indexB = categoryOrder.indexOf(b);
-                    
+
                     // If a category is not in the order array, place it at the end
                     if (indexA === -1) return 1;
                     if (indexB === -1) return -1;
-                    
+
                     return indexA - indexB;
                   });
 
                   // Filter out zero balance categories if setting is enabled
-                  const displayCategories = hideZeroBalanceBuckets 
+                  const displayCategories = hideZeroBalanceBuckets
                     ? sortedCategories.filter(category => {
-                        const data = categoryData[category];
-                        const numTotal = typeof data.total === 'number' ? 
-                          data.total : parseFloat(data.total) || 0;
-                        return Math.abs(numTotal) >= 0.01; // Consider anything less than 1 cent as zero
-                      })
+                      const data = categoryData[category];
+                      const numTotal = typeof data.total === 'number' ?
+                        data.total : parseFloat(data.total) || 0;
+                      return Math.abs(numTotal) >= 0.01; // Consider anything less than 1 cent as zero
+                    })
                     : sortedCategories;
 
                   // Check if reconciled
@@ -2774,11 +2774,11 @@ useEffect(() => {
                       {displayCategories.map((category, index) => {
                         const data = categoryData[category];
                         const rawData = rawCategoryData[category];
-                        const numTotal = typeof data.total === 'number' ? 
+                        const numTotal = typeof data.total === 'number' ?
                           data.total : parseFloat(data.total) || 0;
-                        const rawTotal = typeof rawData?.total === 'number' ? 
+                        const rawTotal = typeof rawData?.total === 'number' ?
                           rawData.total : parseFloat(rawData?.total) || 0;
-                        
+
                         // Calculate percentage based on categories that are included in sum
                         const totalForPercentage = Object.entries(categoryData)
                           .filter(([cat, catData]) => {
@@ -2794,17 +2794,17 @@ useEffect(() => {
 
                         // Check if this bucket is included in the sum calculation
                         const isIncludedInSum = numTotal >= 0 || category === selectedNegativeOffsetBucket;
-                        const percentage = isIncludedInSum && totalForPercentage !== 0 ? 
+                        const percentage = isIncludedInSum && totalForPercentage !== 0 ?
                           (numTotal / totalForPercentage) * 100 : 0;
-                        
+
                         const color = getCategoryColor(category, index);
-                        
+
                         // Check if this category has been affected by offsetting
                         const isOffsetBucket = category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && rawTotal !== numTotal;
                         const isExcludedNegative = rawTotal < 0 && category !== selectedNegativeOffsetBucket && selectedNegativeOffsetBucket;
-                          
+
                         return (
-                          <div 
+                          <div
                             key={category}
                             draggable={true}
                             onDragStart={(e) => handleDragStart(e, category)}
@@ -2822,16 +2822,16 @@ useEffect(() => {
                               height: '4px',
                               background: `linear-gradient(90deg, ${color.bg}, ${color.bg}dd)`,
                               borderRadius: '12px 12px 0 0',
-                            }}/>
-                            
+                            }} />
+
                             {/* UPDATED: "Was:" tag on the left */}
                             {isOffsetBucket && (
                               <div style={{
                                 position: 'absolute',
                                 top: '8px',
                                 left: '8px',
-                                fontSize: '9px', 
-                                color: '#64748b', 
+                                fontSize: '9px',
+                                color: '#64748b',
                                 backgroundColor: '#f1f5f9',
                                 padding: '2px 4px',
                                 borderRadius: '3px',
@@ -2842,7 +2842,7 @@ useEffect(() => {
                                 Was: {rawTotal >= 0 ? `$${formatNumber(rawTotal)}` : `-$${formatNumber(Math.abs(rawTotal))}`}
                               </div>
                             )}
-                            
+
                             {/* UPDATED: Right-side indicators without "Was:" tag */}
                             {(isOffsetBucket || isExcludedNegative) && (
                               <div style={{
@@ -2861,9 +2861,9 @@ useEffect(() => {
                                 {isOffsetBucket ? 'Offset Bucket' : 'Excluded'}
                               </div>
                             )}
-                            
+
                             {/* UPDATED: Category name without left margin */}
-                            <div style={{ 
+                            <div style={{
                               fontSize: '15px',
                               fontWeight: '600',
                               color: 'var(--color-text)',
@@ -2872,29 +2872,29 @@ useEffect(() => {
                             }}>
                               {category}
                             </div>
-                            
+
                             {/* UPDATED: Amount without left margin */}
-                            <div style={{ 
+                            <div style={{
                               fontSize: '26px',
                               fontWeight: '700',
                               color: numTotal >= 0 ? '#059669' : '#dc2626',
                               lineHeight: '1',
                               marginBottom: '12px'  // Removed marginLeft
                             }}>
-                              {numTotal >= 0 
-                                ? `$${formatNumber(numTotal)}` 
+                              {numTotal >= 0
+                                ? `$${formatNumber(numTotal)}`
                                 : `-$${formatNumber(Math.abs(numTotal))}`}
                             </div>
-                            
+
                             {/* UPDATED: Bottom section without left margin */}
-                            <div style={{ 
+                            <div style={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               fontSize: '12px',
                               color: 'var(--color-textSecondary)'  // Removed marginLeft
                             }}>
                               <span style={{ fontWeight: '500' }}>
-                                {isIncludedInSum 
+                                {isIncludedInSum
                                   ? `${percentage.toFixed(1)}% of total`
                                   : 'Excluded from total'
                                 }
@@ -2911,9 +2911,9 @@ useEffect(() => {
                 } catch (error) {
                   console.error("Error rendering category data:", error);
                   return (
-                    <div style={{ 
+                    <div style={{
                       padding: '24px', // Reduced from 32px
-                      textAlign: 'center', 
+                      textAlign: 'center',
                       color: '#dc2626',
                       backgroundColor: '#fef2f2',
                       borderRadius: '12px',
@@ -2944,20 +2944,20 @@ useEffect(() => {
                   // Calculate category total with new offsetting approach
                   const rawCategoryTotals = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    const amount = typeof transaction.amount === 'number' ? 
+                    const amount = typeof transaction.amount === 'number' ?
                       transaction.amount : parseFloat(transaction.amount) || 0;
-                    
+
                     if (!acc[category]) {
                       acc[category] = 0;
                     }
                     acc[category] += amount;
-                    
+
                     return acc;
                   }, {});
 
                   // Apply the new offsetting logic for balance summary
                   let adjustedTotals = { ...rawCategoryTotals };
-                  
+
                   if (selectedNegativeOffsetBucket && adjustedTotals[selectedNegativeOffsetBucket] !== undefined) {
                     // Find negative buckets and sum them
                     const negativeBuckets = Object.entries(rawCategoryTotals).filter(([category, total]) => {
@@ -2965,7 +2965,7 @@ useEffect(() => {
                     });
 
                     const totalNegativeAmount = negativeBuckets.reduce((sum, [_, total]) => sum + total, 0);
-                    
+
                     // Deduct negative amounts from offset bucket
                     if (totalNegativeAmount < 0) {
                       adjustedTotals[selectedNegativeOffsetBucket] = adjustedTotals[selectedNegativeOffsetBucket] + totalNegativeAmount;
@@ -2975,30 +2975,30 @@ useEffect(() => {
                   // Calculate total excluding negative buckets (except offset bucket)
                   const categoryTotal = Object.entries(adjustedTotals).reduce((sum, [category, total]) => {
                     const numAmount = typeof total === 'number' ? total : parseFloat(total) || 0;
-                    
+
                     // Include bucket if it's not negative OR if it's the offset bucket
                     const isNegative = numAmount < 0;
                     const isOffsetBucket = category === selectedNegativeOffsetBucket;
-                    
+
                     if (!isNegative || isOffsetBucket) {
                       return sum + numAmount;
                     }
                     return sum;
                   }, 0);
-                
+
                   // Get latest closing balance with type safety - FIXING THE BUG
-                  const latestTransaction = transactions.length > 0 
+                  const latestTransaction = transactions.length > 0
                     ? transactions.reduce((latest, transaction) => {
-                        return (latest.id > transaction.id) ? latest : transaction;
-                      }, transactions[0])
+                      return (latest.id > transaction.id) ? latest : transaction;
+                    }, transactions[0])
                     : null;
-                
-                  const latestClosingBalance = latestTransaction 
+
+                  const latestClosingBalance = latestTransaction
                     ? (typeof latestTransaction.closing_balance === 'number' ?
-                      latestTransaction.closing_balance : 
-                      parseFloat(latestTransaction.closing_balance) || 0) 
+                      latestTransaction.closing_balance :
+                      parseFloat(latestTransaction.closing_balance) || 0)
                     : 0;
-                
+
                   // Format number with commas
                   const formatNumber = (number) => {
                     try {
@@ -3011,12 +3011,12 @@ useEffect(() => {
                       return "0.00";
                     }
                   };
-                
+
                   // Check if reconciled
                   const isReconciled = Math.abs(categoryTotal - latestClosingBalance) < 0.01;
                   const difference = categoryTotal - latestClosingBalance;
                   const hasDifference = Math.abs(difference) >= 0.01;
-                  
+
                   return (
                     <>
                       <div style={{
@@ -3031,14 +3031,14 @@ useEffect(() => {
                           gap: '20px', // Further reduced
                           alignItems: 'center',
                         }}>
-                          <div style={{ 
+                          <div style={{
                             textAlign: 'center',
                             padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0fdf4',
-                            borderRadius: '8px', 
+                            borderRadius: '8px',
                             border: '1px solid #bbf7d0',
                           }}>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '11px',
                               color: '#059669',
                               marginBottom: '4px',
@@ -3048,7 +3048,7 @@ useEffect(() => {
                             }}>
                               Current Balance
                             </div>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '20px',
                               fontWeight: '700',
                               color: '#047857',
@@ -3056,14 +3056,14 @@ useEffect(() => {
                               ${formatNumber(latestClosingBalance)}
                             </div>
                           </div>
-                          
+
                           <div style={{
                             width: '2px',
                             height: '40px', // Further reduced
                             background: 'linear-gradient(180deg, transparent, #e5e7eb, transparent)',
-                          }}/>
-                          
-                          <div style={{ 
+                          }} />
+
+                          <div style={{
                             textAlign: 'center',
                             padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0f9ff',
@@ -3071,7 +3071,7 @@ useEffect(() => {
                             border: '1px solid #bae6fd',
                             position: 'relative', // Added for tooltip positioning
                           }}>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '11px',
                               color: '#0369a1',
                               marginBottom: '4px',
@@ -3081,7 +3081,7 @@ useEffect(() => {
                             }}>
                               Categories Sum
                             </div>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '20px',
                               fontWeight: '700',
                               color: '#0c4a6e',
@@ -3108,22 +3108,22 @@ useEffect(() => {
                             )}
                           </div>
                         </div>
-                        
+
                         {/* Compact Reconciliation Status */}
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
                           padding: '6px 12px',
-                          background: isReconciled 
-                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                          background: isReconciled
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
                             : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                           borderRadius: '16px',
                           fontSize: '12px',
                           fontWeight: '600',
                           color: isReconciled ? '#15803d' : '#b45309',
                           border: `1px solid ${isReconciled ? '#86efac' : '#fcd34d'}`,
-                          boxShadow: isReconciled 
+                          boxShadow: isReconciled
                             ? '0 2px 4px rgba(34, 197, 94, 0.2)'
                             : '0 2px 4px rgba(245, 158, 11, 0.2)',
                           whiteSpace: 'nowrap',
@@ -3131,14 +3131,14 @@ useEffect(() => {
                           {isReconciled ? (
                             <>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                               Reconciled
                             </>
                           ) : (
                             <>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                               Not Reconciled
                             </>
@@ -3150,9 +3150,9 @@ useEffect(() => {
                 } catch (error) {
                   console.error("Error rendering balance summary:", error);
                   return (
-                    <div style={{ 
-                      padding: '24px', 
-                      textAlign: 'center', 
+                    <div style={{
+                      padding: '24px',
+                      textAlign: 'center',
                       color: '#dc2626',
                       backgroundColor: '#fef2f2',
                       borderRadius: '12px',
@@ -3183,13 +3183,13 @@ useEffect(() => {
 
       <div className="table-navigation-container">
         <div className="table-navigation-left">
-          <button 
+          <button
             onClick={handlePrevMonth}
             className="modern-button navigation prev"
             style={{ marginRight: 0 }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Prev
           </button>
@@ -3200,7 +3200,7 @@ useEffect(() => {
           }}>
             {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short', year: 'numeric' })}
           </div>
-          <button 
+          <button
             onClick={handleNextMonth}
             className="modern-button navigation next"
             disabled={isCurrentMonthCurrent()}
@@ -3211,13 +3211,13 @@ useEffect(() => {
           >
             Next
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
-        
+
         <div className="table-navigation-right">
-          <button 
+          <button
             onClick={refreshOffsetBankFeeds}
             disabled={isRefreshing}
             style={{
@@ -3236,13 +3236,13 @@ useEffect(() => {
               opacity: isRefreshing ? 0.7 : 1
             }}
           >
-            <svg 
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
               style={{
                 animation: isRefreshing ? 'spin 2s linear infinite' : 'none'
               }}
@@ -3252,8 +3252,8 @@ useEffect(() => {
             </svg>
             {isRefreshing ? 'Refreshing...' : 'Refresh Bank Feeds'}
           </button>
-          
-          <button 
+
+          <button
             onClick={toggleAddTransactionForm}
             style={{
               display: 'flex',
@@ -3277,11 +3277,11 @@ useEffect(() => {
           </button>
         </div>
       </div>
-      
+
       <HelpText isVisible={helpTextVisible}>
         Use the month navigation to browse your personal transaction history. Only transactions from the selected month are shown unless a date filter is active.
       </HelpText>
-      
+
       {/* Settings Modal */}
       {showSettings && (
         <div style={{
@@ -3306,16 +3306,16 @@ useEffect(() => {
             maxHeight: '80vh',
             overflowY: 'auto'
           }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
               marginBottom: '20px',
               borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
-              <h2 style={{ 
-                margin: 0, 
+              <h2 style={{
+                margin: 0,
                 color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
@@ -3348,17 +3348,17 @@ useEffect(() => {
                 </svg>
               </button>
             </div>
-            
+
             <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ 
-                margin: '0 0 16px 0', 
+              <h3 style={{
+                margin: '0 0 16px 0',
                 color: '#374151',
                 fontSize: '16px',
                 fontWeight: '500'
               }}>
                 Display Options
               </h3>
-              
+
               <div style={{
                 padding: '16px',
                 backgroundColor: '#f9fafb',
@@ -3366,17 +3366,17 @@ useEffect(() => {
                 border: '1px solid #e5e7eb',
                 marginBottom: '16px'
               }}>
-                <label style={{ 
-                  display: 'flex', 
+                <label style={{
+                  display: 'flex',
                   alignItems: 'flex-start',
                   cursor: 'pointer',
                   gap: '12px'
                 }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={hideZeroBalanceBuckets}
                     onChange={(e) => handleHideZeroBalanceBucketsChange(e.target.checked)}
-                    style={{ 
+                    style={{
                       marginTop: '2px',
                       cursor: 'pointer',
                       width: '16px',
@@ -3384,7 +3384,7 @@ useEffect(() => {
                     }}
                   />
                   <div>
-                    <div style={{ 
+                    <div style={{
                       fontSize: '14px',
                       color: '#374151',
                       fontWeight: '500',
@@ -3392,7 +3392,7 @@ useEffect(() => {
                     }}>
                       Hide buckets with zero balance
                     </div>
-                    <div style={{ 
+                    <div style={{
                       fontSize: '13px',
                       color: '#6b7280',
                       lineHeight: '1.4'
@@ -3403,18 +3403,18 @@ useEffect(() => {
                 </label>
               </div>
             </div>
-            
+
             {/* Negative Bucket Offsetting Settings */}
             <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ 
-                margin: '0 0 16px 0', 
+              <h3 style={{
+                margin: '0 0 16px 0',
                 color: '#374151',
                 fontSize: '16px',
                 fontWeight: '500'
               }}>
                 Negative Bucket Offsetting
               </h3>
-              
+
               <div style={{
                 padding: '16px',
                 backgroundColor: 'var(--color-infoLight)',
@@ -3423,7 +3423,7 @@ useEffect(() => {
                 borderLeft: '4px solid var(--color-info)',
                 marginBottom: '12px'
               }}>
-                <div style={{ 
+                <div style={{
                   fontSize: '14px',
                   color: 'var(--color-info)',
                   fontWeight: '500',
@@ -3431,7 +3431,7 @@ useEffect(() => {
                 }}>
                   Selected Offset Bucket
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: '13px',
                   color: 'var(--color-info)',
                   lineHeight: '1.4',
@@ -3439,7 +3439,7 @@ useEffect(() => {
                 }}>
                   When buckets go negative, they remain visible but are excluded from the Categories Sum calculation. Their negative amounts are deducted from your selected offset bucket to keep totals balanced.
                 </div>
-                
+
                 <select
                   value={selectedNegativeOffsetBucket}
                   onChange={(e) => handleNegativeOffsetBucketChange(e.target.value)}
@@ -3460,7 +3460,7 @@ useEffect(() => {
                     </option>
                   ))}
                 </select>
-                
+
                 {selectedNegativeOffsetBucket && (
                   <div style={{
                     marginTop: '8px',
@@ -3476,10 +3476,10 @@ useEffect(() => {
                 )}
               </div>
             </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'flex-end', 
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
               gap: '12px',
               marginTop: '24px',
               paddingTop: '16px',
@@ -3536,8 +3536,8 @@ useEffect(() => {
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
-                          <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add Transaction</h2>
-            
+            <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add Transaction</h2>
+
             <form onSubmit={handleAddTransaction}>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
@@ -3559,7 +3559,7 @@ useEffect(() => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Description *
@@ -3581,7 +3581,7 @@ useEffect(() => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Amount *
@@ -3604,7 +3604,7 @@ useEffect(() => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Category
@@ -3630,7 +3630,7 @@ useEffect(() => {
                   ))}
                 </select>
               </div>
-              
+
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Label
@@ -3657,7 +3657,7 @@ useEffect(() => {
                   ))}
                 </select>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
                 <button
                   type="button"
@@ -3691,7 +3691,7 @@ useEffect(() => {
           </div>
         </div>
       )}
-      
+
       {/* Split Transaction Modal - REFACTORED VERSION */}
       {isSplitting && transactionToSplit && (
         <div style={{
@@ -3719,16 +3719,16 @@ useEffect(() => {
             flexDirection: 'column'
           }}>
             {/* Header */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '20px',
               borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
-              <h2 style={{ 
-                margin: 0, 
+              <h2 style={{
+                margin: 0,
                 color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
@@ -3755,41 +3755,41 @@ useEffect(() => {
                 </svg>
               </button>
             </div>
-            
+
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {/* Original Transaction Summary - Compact Version */}
-              <div style={{ 
-                marginBottom: '16px', 
-                padding: '12px', 
-                backgroundColor: 'var(--color-backgroundTertiary)', 
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: 'var(--color-backgroundTertiary)',
                 borderRadius: '8px',
                 border: '1px solid var(--color-border)'
               }}>
-                <div style={{ 
-                  display: 'flex', 
+                <div style={{
+                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'
                 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontSize: '13px', 
-                      color: 'var(--color-textSecondary)', 
+                    <div style={{
+                      fontSize: '13px',
+                      color: 'var(--color-textSecondary)',
                       marginBottom: '4px',
                       fontWeight: '500'
                     }}>
                       Original Transaction
                     </div>
-                    <div style={{ 
-                      fontSize: '14px', 
+                    <div style={{
+                      fontSize: '14px',
                       color: 'var(--color-text)',
                       fontWeight: '500'
                     }}>
                       {transactionToSplit.description}
                     </div>
-                    <div style={{ 
-                      display: 'flex', 
+                    <div style={{
+                      display: 'flex',
                       flexWrap: 'wrap',
-                      gap: '8px', 
+                      gap: '8px',
                       marginTop: '12px'
                     }}>
                       <span style={{
@@ -3841,15 +3841,15 @@ useEffect(() => {
                     color: parseFloat(transactionToSplit.amount) < 0 ? '#dc2626' : '#059669',
                     marginLeft: '16px'
                   }}>
-                    {parseFloat(transactionToSplit.amount) < 0 
-                      ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
+                    {parseFloat(transactionToSplit.amount) < 0
+                      ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}`
                       : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
                   </div>
                 </div>
               </div>
-              
+
               {/* Remaining Amount - Compact Status Bar */}
-              <div style={{ 
+              <div style={{
                 marginBottom: '16px',
                 padding: '10px 12px',
                 backgroundColor: calculateRemainingAmount() === 0 ? 'var(--color-successLight)' : 'var(--color-warningLight)',
@@ -3859,8 +3859,8 @@ useEffect(() => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span style={{ 
-                  fontSize: '13px', 
+                <span style={{
+                  fontSize: '13px',
                   color: 'var(--color-text)',
                   fontWeight: '500',
                   display: 'flex',
@@ -3868,45 +3868,45 @@ useEffect(() => {
                   gap: '8px'
                 }}>
                   <span>Remaining:</span>
-                  <span style={{ 
+                  <span style={{
                     color: calculateRemainingAmount() < 0 ? 'var(--color-error)' : 'var(--color-success)',
                     fontWeight: '600'
                   }}>
-                    {calculateRemainingAmount() < 0 
-                      ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}` 
+                    {calculateRemainingAmount() < 0
+                      ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}`
                       : `$${calculateRemainingAmount().toFixed(2)}`}
                   </span>
                 </span>
-                <span style={{ 
-                  fontSize: '12px', 
+                <span style={{
+                  fontSize: '12px',
                   color: calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'
                 }}>
-                  {calculateRemainingAmount() === 0 
-                    ? '✓ Fully allocated' 
+                  {calculateRemainingAmount() === 0
+                    ? '✓ Fully allocated'
                     : 'Will remain on original'}
                 </span>
               </div>
-              
+
               {/* Split Transactions - More Compact */}
-              <div style={{ 
-                flex: 1, 
+              <div style={{
+                flex: 1,
                 overflowY: 'auto',
                 marginBottom: '16px'
               }}>
-                <h3 style={{ 
-                  fontSize: '14px', 
+                <h3 style={{
+                  fontSize: '14px',
                   fontWeight: '600',
                   color: 'var(--color-text)',
                   marginBottom: '12px'
                 }}>
                   Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
                 </h3>
-                
+
                 {splitTransactions.map((split, index) => (
-                  <div key={index} style={{ 
-                    marginBottom: '12px', 
-                    padding: '12px', 
-                    backgroundColor: 'var(--color-backgroundSecondary)', 
+                  <div key={index} style={{
+                    marginBottom: '12px',
+                    padding: '12px',
+                    backgroundColor: 'var(--color-backgroundSecondary)',
                     borderRadius: '8px',
                     border: '1px solid var(--color-border)',
                     position: 'relative'
@@ -3937,13 +3937,13 @@ useEffect(() => {
                         </svg>
                       </button>
                     )}
-                    
+
                     {/* Modern form layout with labels */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '-8px' }}>
                         Split #{index + 1}
                       </div>
-                      
+
                       <div>
                         <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
                           Description *
@@ -3966,7 +3966,7 @@ useEffect(() => {
                           required
                         />
                       </div>
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                         <div>
                           <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
@@ -3991,7 +3991,7 @@ useEffect(() => {
                             required
                           />
                         </div>
-                        
+
                         <div>
                           <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
                             Category
@@ -4016,7 +4016,7 @@ useEffect(() => {
                             ))}
                           </select>
                         </div>
-                        
+
                         <div>
                           <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '13px', color: 'var(--color-text)' }}>
                             Label
@@ -4046,7 +4046,7 @@ useEffect(() => {
                     </div>
                   </div>
                 ))}
-                
+
                 {/* Add split button */}
                 <button
                   onClick={addSplitTransaction}
@@ -4084,11 +4084,11 @@ useEffect(() => {
                   Add Another Split
                 </button>
               </div>
-              
+
               {/* Action buttons - Sticky footer */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
                 gap: '8px',
                 paddingTop: '16px',
                 borderTop: '1px solid var(--color-border)'
@@ -4145,7 +4145,7 @@ useEffect(() => {
                 >
                   {isSavingSplit ? (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                         style={{ animation: 'spin 1s linear infinite' }}>
                         <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
                       </svg>
@@ -4163,7 +4163,7 @@ useEffect(() => {
         </div>
       )}
 
-      
+
       {/* Transactions table with modern styling */}
       {renderTransactionsTable()}
     </div>

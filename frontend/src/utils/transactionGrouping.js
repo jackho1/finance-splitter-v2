@@ -7,9 +7,9 @@
  * @returns {Array} - Filtered transactions
  */
 export const filterTransactionsByCategoryAndLabel = (
-  transactions, 
-  categoryFilter, 
-  labelFilter, 
+  transactions,
+  categoryFilter,
+  labelFilter,
   getTransactionLabel
 ) => {
   let filtered = transactions;
@@ -49,29 +49,29 @@ export const groupSplitTransactions = (transactions, allTransactions = null) => 
   const grouped = [];
   const processedIds = new Set();
   const transactionMap = new Map(transactions.map(t => [t.id, t]));
-  
+
   // If allTransactions provided, create a map for lookup
-  const allTransactionsMap = allTransactions 
+  const allTransactionsMap = allTransactions
     ? new Map(allTransactions.map(t => [t.id, t]))
     : transactionMap;
-  
+
   transactions.forEach(transaction => {
     if (processedIds.has(transaction.id)) return;
-    
+
     // If this is an original transaction that has been split
     if (transaction.has_split) {
       // Add the original transaction first
       grouped.push(transaction);
       processedIds.add(transaction.id);
-      
+
       // Find and add all split transactions that came from this original (only those in filtered set)
-      const splitTransactions = transactions.filter(t => 
+      const splitTransactions = transactions.filter(t =>
         t.split_from_id === transaction.id && !processedIds.has(t.id)
       );
-      
+
       // Sort split transactions by date to maintain consistency
       splitTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-      
+
       splitTransactions.forEach(splitTx => {
         grouped.push(splitTx);
         processedIds.add(splitTx.id);
@@ -81,21 +81,21 @@ export const groupSplitTransactions = (transactions, allTransactions = null) => 
     else if (transaction.split_from_id) {
       // Check if the parent is in the filtered set
       const parentInFilteredSet = transactionMap.has(transaction.split_from_id);
-      
+
       if (parentInFilteredSet && !processedIds.has(transaction.split_from_id)) {
         // Parent exists in filtered set, add it first
         const originalTransaction = transactionMap.get(transaction.split_from_id);
         grouped.push(originalTransaction);
         processedIds.add(originalTransaction.id);
-        
+
         // Find and add all split transactions from this original (only those in filtered set)
-        const allSplitTransactions = transactions.filter(t => 
+        const allSplitTransactions = transactions.filter(t =>
           t.split_from_id === originalTransaction.id && !processedIds.has(t.id)
         );
-        
+
         // Sort split transactions by date
         allSplitTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
+
         allSplitTransactions.forEach(splitTx => {
           grouped.push(splitTx);
           processedIds.add(splitTx.id);
@@ -112,7 +112,7 @@ export const groupSplitTransactions = (transactions, allTransactions = null) => 
       processedIds.add(transaction.id);
     }
   });
-  
+
   return grouped;
 };
 
@@ -129,7 +129,7 @@ export const filterByMonth = (transactions, currentMonth, currentYear, allTransa
     const date = new Date(transaction.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
   });
-  
+
   // Re-group after month filtering to maintain split transaction grouping
   return groupSplitTransactions(filtered, allTransactions);
 };

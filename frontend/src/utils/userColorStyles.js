@@ -116,7 +116,7 @@ export const generateUserRowCSS = (users) => {
   }
 
   let cssRules = `
-    /* Fallback for unlabeled rows */
+    /* Fallback for unlabeled rows inside legacy .modern-table tables */
     .modern-table tbody tr:not([class*="row-"]) {
       background-color: var(--color-tableRow) !important;
       border-left: 4px solid var(--color-borderSecondary) !important;
@@ -126,31 +126,45 @@ export const generateUserRowCSS = (users) => {
   // Use cached preferences (no API calls)
   users.forEach(user => {
     if (user.username === 'default') return;
-    
+
     const preferences = getUserPreferencesFromCache(user.id);
     if (!preferences) return;
-    
+
     const className = `row-${user.display_name.toLowerCase().replace(/\s+/g, '-')}`;
 
     const primaryColor = rgbaToString(preferences.primary);
 
-    // Extract RGBA values for creating background color  
+    // Extract RGBA values for creating background color
     const primaryMatch = primaryColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
 
     if (primaryMatch) {
       const [, primaryR, primaryG, primaryB] = primaryMatch;
 
+      // Two selector groups so the rules apply to BOTH the legacy
+      // `.modern-table` tables (Budgets/Personal/Offset) AND the new
+      // shadcn Table used on the Transactions page, which has no
+      // `.modern-table` ancestor. The generic `tr.${className}` plus
+      // `td.${className}` cover both cases.
       cssRules += `
         /* User preference styles for ${user.display_name} */
         .modern-table tbody tr.${className},
-        .modern-table .${className} {
+        .modern-table .${className},
+        tr.${className},
+        tr.${className} > td {
           background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BACKGROUND}) !important;
-          border-left: 4px solid rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BORDER}) !important;
           transition: background-color 0.2s ease !important;
         }
-        
+
+        .modern-table tbody tr.${className},
+        .modern-table .${className},
+        tr.${className} {
+          border-left: 4px solid rgba(${primaryR}, ${primaryG}, ${primaryB}, ${USER_COLOR_OPACITIES.BORDER}) !important;
+        }
+
         .modern-table tbody tr.${className}:hover,
-        .modern-table .${className}:hover {
+        .modern-table .${className}:hover,
+        tr.${className}:hover,
+        tr.${className}:hover > td {
           background-color: rgba(${primaryR}, ${primaryG}, ${primaryB}, 0.3) !important;
         }
       `;

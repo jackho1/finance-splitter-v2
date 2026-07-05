@@ -2,11 +2,23 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
+import { BrowserRouter, useLocation, useNavigate } from 'react-router-dom';
 import Budgets from './Budgets';
 import PersonalTransactions from './PersonalTransactions';
 import OffsetTransactions from './OffsetTransactions';
 import { UserPreferencesProvider, useUserPreferencesContext } from './contexts/UserPreferencesContext';
 import UserPreferencesModal from './components/UserPreferencesModal';
+import { AppLayout, useLayoutHelp } from './routes/AppLayout';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { AutoFitText } from '@/components/AutoFitText';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -393,58 +405,92 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
   const isActive = sortBy.startsWith(column);
   const isDesc = sortBy === `${column}-desc`;
 
-  // For headers without filters, use a simpler structure
-  if (!hasFilter) {
-    return (
-      <div 
-        className="modern-filter-header"
-      >
-        <div 
-          className="header-content"
-          onClick={() => onSort(column)}
-        >
-          <span>{children}</span>
-          <span className={`sort-indicator ${isActive ? 'active' : ''}`}>
-            <span className={`sort-arrow up ${isActive && !isDesc ? 'active' : ''}`}></span>
-            <span className={`sort-arrow down ${isActive && isDesc ? 'active' : ''}`}></span>
-          </span>
-        </div>
-      </div>
-  );
-  }
-
-  // For headers with filters
-    return (
-      <div 
-      className="modern-filter-header sortable"
-    >
-      <div 
-        className="sortable-header"
+  // Compact single-row layout that keeps the title centered and anchors
+  // the (optional) filter button at the right edge without stealing width
+  // from the label text. Used by every column header in the Transactions
+  // table; sizing is driven by the wrapping <th>'s col-* class.
+  return (
+    <div className="relative flex w-full items-center justify-center">
+      <button
+        type="button"
         onClick={() => onSort(column)}
-        style={{ width: 'calc(100% - 30px)' }}
+        className={cn(
+          'group inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-semibold uppercase tracking-wide transition-colors',
+          'text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          isActive && 'text-foreground'
+        )}
       >
-        <div className="header-content">
-          <span>{children}</span>
-          <span className={`sort-indicator ${isActive ? 'active' : ''}`}>
-            <span className={`sort-arrow up ${isActive && !isDesc ? 'active' : ''}`}></span>
-            <span className={`sort-arrow down ${isActive && isDesc ? 'active' : ''}`}></span>
-          </span>
-        </div>
-      </div>
-      <FilterButton
-        isActive={isFilterActive}
-        onClick={(e) => {
-          e.stopPropagation();
-          onFilterToggle();
-        }}
-      />
-      </div>
-    );
+        <span className="whitespace-nowrap">{children}</span>
+        <span
+          className={cn(
+            'flex h-3 w-3 flex-col items-center justify-center transition-opacity',
+            isActive ? 'opacity-100' : 'opacity-30 group-hover:opacity-70'
+          )}
+          aria-hidden
+        >
+          <span
+            className={cn(
+              'h-0 w-0 border-x-[3px] border-b-[4px] border-x-transparent',
+              isActive && !isDesc ? 'border-b-primary' : 'border-b-current'
+            )}
+          />
+          <span
+            className={cn(
+              'mt-[1px] h-0 w-0 border-x-[3px] border-t-[4px] border-x-transparent',
+              isActive && isDesc ? 'border-t-primary' : 'border-t-current'
+            )}
+          />
+        </span>
+      </button>
+      {hasFilter && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFilterToggle();
+          }}
+          title="Filter"
+          className={cn(
+            'absolute right-0 flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            isFilterActive && 'bg-primary/10 text-primary'
+          )}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 };
 
 // Create a separate component for the main app logic
 const AppContent = () => {
-  const [activeTab, setActiveTab] = useState('transactions');
+  // Route-driven active tab: the sidebar NavLinks change the URL, we read
+  // the URL here to decide which tab body to render. Keeps legacy conditional
+  // `{activeTab === 'budgets' && ...}` blocks working with zero rewriting.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = (() => {
+    const path = location.pathname.replace(/^\//, '').split('/')[0];
+    if (!path) return 'transactions';
+    if (['transactions', 'budgets', 'personal', 'offset', 'settings'].includes(path)) {
+      return path;
+    }
+    return 'transactions';
+  })();
+  const setActiveTab = (tab) => navigate(`/${tab}`);
+
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
@@ -478,8 +524,12 @@ const AppContent = () => {
     getTransactionRowColor
   } = useUserPreferencesContext();
   
-  // User preferences modal state
-  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  // Settings is now a route; the modal opens automatically when the URL is
+  // /settings and closes by navigating back to /transactions.
+  const isPreferencesModalOpen = activeTab === 'settings';
+  const setIsPreferencesModalOpen = (open) => {
+    if (!open) navigate('/transactions');
+  };
 
   // Column filtering states
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
@@ -499,8 +549,10 @@ const AppContent = () => {
     label: ''
   });
   
-  // Add help text visibility state
-  const [helpTextVisible, setHelpTextVisible] = useState(false);
+  // Help text visibility is owned by the layout shell (sidebar button)
+  // so every tab sees the same value. We keep the same variable names
+  // used throughout this file to minimize downstream churn.
+  const { helpVisible: helpTextVisible, setHelpVisible: setHelpTextVisible } = useLayoutHelp();
 
   // Add refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1878,6 +1930,10 @@ const AppContent = () => {
             </select>
           );
         default:
+          // No inline width here — .modern-input is box-sizing:border-box
+          // with width:100%, so the input fits exactly within the cell
+          // column width (previously hardcoded 400px/200px made the
+          // description edit burst out of its column).
           return (
             <input
               type="text"
@@ -1891,7 +1947,7 @@ const AppContent = () => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ width: field === 'description' ? '400px' : '200px', textAlign: 'center' }}
+              style={{ textAlign: 'left' }}
               autoFocus
             />
           );
@@ -1942,12 +1998,18 @@ const AppContent = () => {
             {transaction[field] < 0 ? `-$${Math.abs(transaction[field])}` : `$${transaction[field]}`}
           </span>
         ) : field === 'description' ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', width: '100%' }}>
-            <span style={{ flex: 1, textAlign: 'left', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-              {transaction[field]}
-            </span>
+          // Description renders via AutoFitText on a single line that
+          // shrinks to fit the full column width. The outer wrapper is
+          // `flex w-full min-w-0` so AutoFitText's container truly gets
+          // the remaining width of the description column, and a
+          // `min-w-0 flex-1` child is needed so the flex item doesn't
+          // expand to its intrinsic text width.
+          <div className="flex w-full min-w-0 items-center">
+            <div className="min-w-0 flex-1">
+              <AutoFitText text={String(transaction[field] ?? '')} />
+            </div>
             {transaction.mark && (
-              <div 
+              <div
                 className="paid-indicator"
                 title="Paid Off"
                 style={{
@@ -2326,16 +2388,20 @@ const AppContent = () => {
     return null;
   };
 
-  // Transactions table modernized render - update the renderCell for the description field
+  // Transactions table — rewritten with shadcn Table primitives and Tailwind
+  // chrome. Sorting, filtering, inline editing, split-row grouping, and
+  // expand-row actions are unchanged; only the markup and styling changed.
   const renderTransactionsTable = () => (
-    <div className="modern-table-container fade-in" style={{ marginTop: '2px' }}>
+    <div className="fade-in overflow-visible rounded-xl border border-border bg-card text-card-foreground shadow-sm">
       {isTransactionsLoading ? (
-        <div className="loading-spinner" />
+        <div className="flex h-52 items-center justify-center">
+          <div className="loading-spinner" />
+        </div>
       ) : (
-        <table className="modern-table">
-          <thead>
-            <tr>
-              <th className="col-date">
+        <Table className="table-fixed">
+          <TableHeader>
+            <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
+              <TableHead className="col-date relative h-9 px-2 text-center">
                 <SortableHeader
                   column="date"
                   sortBy={filters.sortBy}
@@ -2353,8 +2419,8 @@ const AppContent = () => {
                   onClear={() => setDateFilter({ startDate: '', endDate: '' })}
                   dateRange={dateRange}
                 />
-              </th>
-              <th className="col-description">
+              </TableHead>
+              <TableHead className="col-description h-9 px-3 text-center">
                 <SortableHeader
                   column="description"
                   sortBy={filters.sortBy}
@@ -2362,8 +2428,8 @@ const AppContent = () => {
                 >
                   Description
                 </SortableHeader>
-              </th>
-              <th className="col-amount">
+              </TableHead>
+              <TableHead className="col-amount h-9 px-2 text-center">
                 <SortableHeader
                   column="amount"
                   sortBy={filters.sortBy}
@@ -2371,8 +2437,8 @@ const AppContent = () => {
                 >
                   Amount
                 </SortableHeader>
-              </th>
-              <th className="col-category">
+              </TableHead>
+              <TableHead className="col-category relative h-9 px-2 text-center">
                 <SortableHeader
                   column="bank_category"
                   sortBy={filters.sortBy}
@@ -2392,8 +2458,8 @@ const AppContent = () => {
                   onClear={() => setBankCategoryFilter([])}
                   skipSearch={true}
                 />
-              </th>
-              <th className="col-label">
+              </TableHead>
+              <TableHead className="col-label relative h-9 px-2 text-center">
                 <SortableHeader
                   column="label"
                   sortBy={filters.sortBy}
@@ -2413,119 +2479,141 @@ const AppContent = () => {
                   onClear={() => setLabelFilter([])}
                   width="240px"
                 />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {filteredTransactions.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="empty-state">
-                  <div className="empty-state-icon">
+              <TableRow>
+                <TableCell colSpan="5" className="h-40 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
+                    <h3 className="text-sm font-semibold text-foreground">No transactions found</h3>
+                    <p className="text-xs">Try adjusting your filters or add a new transaction</p>
                   </div>
-                  <h3>No transactions found</h3>
-                  <p>Try adjusting your filters or add a new transaction</p>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
-              filteredTransactions.map(transaction => (
+              filteredTransactions.map(transaction => {
+                // Row label class (row-jack, row-ruby, row-group, …) drives
+                // the per-user background color via CSS injected by
+                // generateUserRowCSS(). When we have one of these classes,
+                // we deliberately leave backgroundColor off the inline
+                // style so the CSS class wins with the correct user's
+                // color — otherwise everyone ends up with the current
+                // viewer's accent instead of the allocated user's.
+                const labelClass = getRowLabelClass(
+                  getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading)
+                );
+                let rowBg;
+                if (expandedRow === transaction.id) {
+                  rowBg = 'var(--color-backgroundTertiary)';
+                } else if (transaction.split_from_id) {
+                  rowBg = 'var(--color-infoLight)';
+                } else if (!labelClass) {
+                  // Unlabelled row — rely on shadcn TableRow's themed bg.
+                  rowBg = undefined;
+                } else {
+                  // Labelled row — injected CSS (scoped to tr.row-*) paints
+                  // it with the allocated user's color. Inline bg stays
+                  // undefined so it can't override the CSS.
+                  rowBg = undefined;
+                }
+                return (
                 <React.Fragment key={transaction.id}>
-                  <tr 
-                    className={getRowLabelClass(getTransactionLabel(transaction, splitAllocations, users, isTransactionsLoading))} 
-                    style={{ 
-                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' : 
-                                     transaction.split_from_id ? '#f7fbff' : 
-                                     getTransactionRowColor(transaction, users, splitAllocations),
-                      transition: 'background-color 0.2s',
-                      borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
+                  <TableRow
+                    className={cn(
+                      labelClass,
+                      'transition-colors'
+                    )}
+                    style={{
+                      backgroundColor: rowBg,
+                      borderLeft: transaction.split_from_id ? '4px solid var(--color-info)' : undefined
                     }}
                   >
-                    <td className="col-date">{renderCell(transaction, 'date')}</td>
-                    <td className="col-description">
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
+                    <TableCell className="col-date px-2 py-1 text-sm">{renderCell(transaction, 'date')}</TableCell>
+                    <TableCell className="col-description px-3 py-1 text-sm">
+                      {/* In edit mode, delegate to renderCell which
+                          returns the editable <input>. Otherwise render
+                          the text directly via AutoFitText — we skip
+                          the legacy .cell-content/.editable-cell
+                          wrappers whose inherited display:flex and
+                          padding were constraining the column width. */}
+                      {editCell && editCell.transactionId === transaction.id && editCell.field === 'description' ? (
+                        renderCell(transaction, 'description')
+                      ) : (
+                        <div className="flex w-full items-center gap-1.5">
                           {transaction.split_from_id && (
-                            <span style={{ 
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              marginRight: '6px',
-                              color: '#3b82f6',
-                              flexShrink: 0
-                            }}>
+                            <span className="inline-flex shrink-0 items-center text-info">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M7 17l-5-5 5-5"/>
                               </svg>
                             </span>
                           )}
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            minWidth: 0,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {renderCell(transaction, 'description')}
-                            {renderRelatedTransactionIndicator(transaction)}
-                          </div>
-                        </div>
-                        <button
-          onClick={(e) => {
-            e.stopPropagation();
-                            setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '4px',
-                            transition: 'background-color 0.2s',
-                            flexShrink: 0
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f0f0f0';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                          title="Click to expand transaction options"
-                        >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2"
-                            style={{ 
-                              transform: expandedRow === transaction.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.2s',
-                              opacity: 0.7
-                            }}
+                          {/* min-w-0 lets the overflow-hidden child
+                              actually clip (without it, the flex item
+                              would expand to the text's intrinsic
+                              width and blow out the column). flex-1
+                              makes it take all remaining space.
+                              `editable-cell` reuses the same hover
+                              affordance (cursor + background highlight
+                              + border-radius) that date/amount/category/
+                              label cells already get, so users see
+                              consistent edit hints across all columns. */}
+                          <div
+                            className="editable-cell min-w-0 flex-1"
+                            onDoubleClick={() => handleDoubleClick(transaction.id, 'description', transaction.description || '')}
+                            title={transaction.description || ''}
                           >
-                            <path d="M6 9l6 6 6-6"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td className="col-amount">{renderCell(transaction, 'amount')}</td>
-                    <td className="col-category">{renderCell(transaction, 'bank_category')}</td>
-                    <td className="col-label">
+                            <AutoFitText text={String(transaction.description ?? '')} />
+                          </div>
+                          {transaction.mark && (
+                            <span
+                              className="flex shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground"
+                              style={{ fontSize: '9px', width: '14px', height: '14px', fontWeight: 600, opacity: 0.85 }}
+                              title="Paid Off"
+                            >
+                              ✓
+                            </span>
+                          )}
+                          {renderRelatedTransactionIndicator(transaction)}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRow(expandedRow === transaction.id ? null : transaction.id);
+                            }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            title="Click to expand transaction options"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className={cn(
+                                'transition-transform',
+                                expandedRow === transaction.id ? 'rotate-180' : 'rotate-0'
+                              )}
+                            >
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="col-amount px-2 py-1 text-sm">{renderCell(transaction, 'amount')}</TableCell>
+                    <TableCell className="col-category px-2 py-1 text-sm">{renderCell(transaction, 'bank_category')}</TableCell>
+                    <TableCell className="col-label px-2 py-1 text-sm">
                       {renderCell(transaction, 'label')}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {expandedRow === transaction.id && (
-                    <tr>
-                      <td colSpan="5" style={{ 
-                        padding: '0',
-                        backgroundColor: 'var(--color-backgroundTertiary)',
-                        border: '1px solid var(--color-border)'
-                      }}>
+                    <TableRow>
+                      <TableCell colSpan="5" className="border border-border bg-muted/60 p-0">
                         <div style={{ 
                           padding: '12px',
                           display: 'flex',
@@ -2662,14 +2750,15 @@ const AppContent = () => {
                             )}
                           </div>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
                 </React.Fragment>
-              ))
+                );
+              })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </div>
   );
@@ -3355,9 +3444,7 @@ const AppContent = () => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 className="dashboard-title">Finance Dashboard</h1>
-      
+    <div style={{ fontFamily: 'Arial, sans-serif' }}>
       {/* Global CSS styles */}
       
       <style>
@@ -3872,105 +3959,21 @@ const AppContent = () => {
       `}
       </style>
       
-      <div style={{ 
-        marginBottom: '20px',
-        display: 'flex',
-        gap: '10px',
-        alignItems: 'center'
-      }}>
-        <button 
-          onClick={() => setActiveTab('transactions')}
-          className={`nav-button ${activeTab === 'transactions' ? 'active' : ''}`}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
-            <path d="M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <path d="M8 3L8 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <path d="M16 3L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <rect x="7" y="14" width="4" height="2" rx="0.5" fill="currentColor" />
-            <rect x="13" y="14" width="4" height="2" rx="0.5" fill="currentColor" />
-            <rect x="7" y="17" width="4" height="2" rx="0.5" fill="currentColor" />
-            <rect x="13" y="17" width="4" height="2" rx="0.5" fill="currentColor" />
-          </svg>
-          Transactions
-        </button>
-        <button 
-          onClick={() => setActiveTab('budgets')}
-          className={`nav-button ${activeTab === 'budgets' ? 'active' : ''}`}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 3V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M5.5 13.5L7.5 10.5L10.5 11.5L13.5 6.5L16.5 9.5L19.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <rect x="7" y="14" width="2" height="4" rx="0.5" fill="currentColor"/>
-            <rect x="12" y="12" width="2" height="6" rx="0.5" fill="currentColor"/>
-            <rect x="17" y="10" width="2" height="8" rx="0.5" fill="currentColor"/>
-          </svg>
-          Budgets
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('personal')}
-          className={`nav-button ${activeTab === 'personal' ? 'active' : ''}`}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Personal
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('offset')}
-          className={`nav-button ${activeTab === 'offset' ? 'active' : ''}`}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Offset
-        </button>
-        
-        <button 
-          className="help-toggle"
-          onClick={() => setHelpTextVisible(!helpTextVisible)}
-          title={helpTextVisible ? "Hide help text" : "Show help text"}
-        >
-          {helpTextVisible ? (
-            <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M3 21L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Hide Help
-            </>
-          ) : (
-            <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Show Help
-            </>
-          )}
-        </button>
-        
-        <button 
-          onClick={() => setIsPreferencesModalOpen(true)}
-          className={`nav-button ${activeTab === 'settings' ? 'active' : ''}`}
-          title="Color preferences"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-            <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" strokeWidth="2"/>
-          </svg>
-          User Settings
-        </button>
-      </div>
+      {/* Top tab bar, help toggle, and settings gear button were removed in
+          the refactor to a sidebar layout. Navigation happens via the
+          Sidebar NavLinks which drive activeTab through useLocation(). The
+          help toggle and theme toggle live in the sidebar footer; settings
+          is its own route (/settings) which auto-opens UserPreferencesModal. */}
       {activeTab === 'transactions' && (
-        <div style={{ position: 'relative' }}>
+        <div className="space-y-6 relative">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Transactions
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Review, edit, split, and categorize your shared bank transactions.
+            </p>
+          </header>
           {isUpdating && (
             <div style={{ 
               position: 'absolute', 
@@ -4575,7 +4578,9 @@ const AppContent = () => {
             </div>
           )}
           
-          {/* Transactions table with modern styling */}
+          {/* Transactions table (shadcn Table primitives + Tailwind chrome).
+              renderTransactionsTable owns its own card styling; no extra
+              wrapper here to avoid double borders. */}
           {renderTransactionsTable()}
           
           {isTransactionsLoading ? (
@@ -4690,9 +4695,39 @@ const AppContent = () => {
           )}
         </div>
       )}
-      {activeTab === 'budgets' && <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />}
-      {activeTab === 'personal' && <PersonalTransactions helpTextVisible={helpTextVisible} users={users} splitAllocations={splitAllocations} />}
-      {activeTab === 'offset' && <OffsetTransactions helpTextVisible={helpTextVisible} />}
+      {activeTab === 'budgets' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Budgets</h1>
+            <p className="text-sm text-muted-foreground">
+              Plan monthly spending targets and reorder categories to match your priorities.
+            </p>
+          </header>
+          <Budgets helpTextVisible={helpTextVisible} onChartClick={handleBudgetChartClick} />
+        </div>
+      )}
+      {activeTab === 'personal' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Personal</h1>
+            <p className="text-sm text-muted-foreground">
+              Track your personal transactions and organize your saving buckets.
+            </p>
+          </header>
+          <PersonalTransactions helpTextVisible={helpTextVisible} users={users} splitAllocations={splitAllocations} />
+        </div>
+      )}
+      {activeTab === 'offset' && (
+        <div className="space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Offset</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage offset account transactions and categorizations.
+            </p>
+          </header>
+          <OffsetTransactions helpTextVisible={helpTextVisible} />
+        </div>
+      )}
       
       {/* User Preferences Modal */}
       <UserPreferencesModal 
@@ -5225,12 +5260,20 @@ const AppContent = () => {
   );
 };
 
-// Main App component that provides user preferences context
+// Main App component. Order of providers from outside in:
+//   BrowserRouter   — enables useLocation/useNavigate/NavLink
+//   UserPreferencesProvider — existing per-user theme + accent pipeline
+//   AppLayout       — sidebar + main content shell (owns help-visible state)
+//   AppContent      — legacy top-level with all data fetching and tab bodies
 const App = () => {
   return (
-    <UserPreferencesProvider>
-      <AppContent />
-    </UserPreferencesProvider>
+    <BrowserRouter>
+      <UserPreferencesProvider>
+        <AppLayout>
+          <AppContent />
+        </AppLayout>
+      </UserPreferencesProvider>
+    </BrowserRouter>
   );
 };
 

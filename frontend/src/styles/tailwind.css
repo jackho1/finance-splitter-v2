@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* -----------------------------------------------------------
+   Tailwind v4 theme bridge.
+
+   The app's *runtime* tokens live in src/theme.css as plain CSS
+   variables (e.g. --color-background, --color-buttonPrimary).
+   Those values flip on html.theme-dark and are overridden
+   per-user at runtime by UserPreferencesProvider.
+
+   Tailwind v4 looks up tokens declared in @theme. We declare
+   each color token as a reference to the runtime variable, so
+   Tailwind utilities (bg-background, text-foreground, etc.) and
+   all shadcn/ui components read the same live variables and
+   react automatically to theme switches and accent changes.
+   ----------------------------------------------------------- */
+
+@theme {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-text);
+
+  --color-card: var(--color-backgroundSecondary);
+  --color-card-foreground: var(--color-text);
+
+  --color-popover: var(--color-backgroundElevated);
+  --color-popover-foreground: var(--color-text);
+
+  --color-primary: var(--color-buttonPrimary);
+  --color-primary-foreground: var(--color-buttonPrimaryText);
+
+  --color-secondary: var(--color-buttonSecondary);
+  --color-secondary-foreground: var(--color-buttonSecondaryText);
+
+  --color-muted: var(--color-backgroundTertiary);
+  --color-muted-foreground: var(--color-textSecondary);
+
+  --color-accent: var(--color-backgroundHover);
+  --color-accent-foreground: var(--color-text);
+
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-errorLight);
+
+  --color-border: var(--color-border);
+  --color-input: var(--color-inputBorder);
+  --color-ring: var(--color-borderFocus);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-info: var(--color-info);
+
+  --color-sidebar: var(--color-backgroundSecondary);
+  --color-sidebar-foreground: var(--color-text);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-accent: var(--color-backgroundHover);
+  --color-sidebar-accent-foreground: var(--color-text);
+  --color-sidebar-primary: var(--color-buttonPrimary);
+  --color-sidebar-primary-foreground: var(--color-buttonPrimaryText);
+
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Tailwind v4 needs an explicit dark variant since we toggle by class
+   on <html> (html.theme-dark), not via prefers-color-scheme. */
+@custom-variant dark (&:where(html.theme-dark, html.theme-dark *));
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

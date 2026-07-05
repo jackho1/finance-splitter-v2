@@ -98,17 +98,17 @@ describe('groupSplitTransactions', () => {
       const result = groupSplitTransactions(transactions);
 
       expect(result).toHaveLength(7);
-      
+
       // First group should be original1 and its splits (split1_1 triggers this first)
       expect(result[0]).toEqual(original1);
       expect(result[1]).toEqual(split1_1);
       expect(result[2]).toEqual(split1_2);
-      
+
       // Second group should be original2 and its splits
       expect(result[3]).toEqual(original2);
       expect(result[4]).toEqual(split2_1);
       expect(result[5]).toEqual(split2_2);
-      
+
       // Regular transaction
       expect(result[6]).toEqual(regularTransaction);
     });
@@ -173,7 +173,7 @@ describe('groupSplitTransactions', () => {
     test('should not modify original transaction objects', () => {
       const originalTransaction = createTransaction(1, 'Original', -300, '2024-01-01', true);
       const splitTransaction = createTransaction(2, 'Split', -100, '2024-01-01', false, 1);
-      
+
       const originalCopy = { ...originalTransaction };
       const splitCopy = { ...splitTransaction };
 
@@ -195,7 +195,7 @@ describe('groupSplitTransactions', () => {
       const result = groupSplitTransactions(transactions);
 
       expect(result).toHaveLength(5);
-      
+
       // Check that all original transactions are present
       const resultIds = result.map(t => t.id).sort();
       const originalIds = transactions.map(t => t.id).sort();
@@ -231,11 +231,11 @@ describe('groupSplitTransactions', () => {
       const result = groupSplitTransactions(transactions);
 
       expect(result).toHaveLength(7);
-      
+
       // Should maintain grouping while preserving order of first appearance
       const groupStarts = [];
       let currentGroup = null;
-      
+
       result.forEach((transaction, index) => {
         if (transaction.has_split || (!transaction.split_from_id && !transaction.has_split)) {
           if (currentGroup !== null) {
@@ -255,10 +255,10 @@ describe('groupSplitTransactions', () => {
     test('should handle large number of split transactions', () => {
       const originalTransaction = createTransaction(1, 'Original with many splits', -1000, '2024-01-01', true);
       const splitTransactions = [];
-      
+
       // Create 50 split transactions
       for (let i = 2; i <= 51; i++) {
-        splitTransactions.push(createTransaction(i, `Split ${i-1}`, -20, `2024-01-0${(i % 9) + 1}`, false, 1));
+        splitTransactions.push(createTransaction(i, `Split ${i - 1}`, -20, `2024-01-0${(i % 9) + 1}`, false, 1));
       }
 
       const transactions = [originalTransaction, ...splitTransactions];
@@ -266,7 +266,7 @@ describe('groupSplitTransactions', () => {
 
       expect(result).toHaveLength(51);
       expect(result[0]).toEqual(originalTransaction);
-      
+
       // All remaining should be split transactions
       for (let i = 1; i < result.length; i++) {
         expect(result[i].split_from_id).toBe(1);
@@ -277,7 +277,7 @@ describe('groupSplitTransactions', () => {
   describe('Performance considerations', () => {
     test('should handle reasonable number of transactions efficiently', () => {
       const transactions = [];
-      
+
       // Create 1000 regular transactions
       for (let i = 1; i <= 1000; i++) {
         transactions.push(createTransaction(i, `Transaction ${i}`, -Math.random() * 100, '2024-01-01'));

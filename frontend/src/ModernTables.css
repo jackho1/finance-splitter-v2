@@ -79,11 +79,12 @@
   padding: 0.5rem 0;
 }
 
-/* Totals container to match table width */
+/* Totals container spans the full width of its parent (the page
+   container already caps width) so the totals right-edge aligns with
+   the table's right-edge. Individual totals rows still push themselves
+   right via `margin-left: auto`. */
 .totals-container {
-  max-width: 1300px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -128,7 +129,9 @@
 
 .modern-table th {
   background-color: var(--color-tableHeader) !important;
-  padding: 1rem;
+  /* Tightened from 1rem to match the modernized transactions table so
+     screen grabs can fit more rows without scrolling. */
+  padding: 0.5rem 0.75rem;
   text-align: left;
   font-weight: 600;
   color: var(--color-tableHeaderText) !important;
@@ -143,7 +146,9 @@
 }
 
 .modern-table td {
-  padding: 0.75rem 1rem;
+  /* Vertical padding reduced from 0.75rem to 0.375rem (applies to Personal
+     and Offset tables for visual consistency with the Transactions table). */
+  padding: 0.375rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
   position: relative;
 }
@@ -168,8 +173,12 @@
 .editable-cell {
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  /* Sharpened corners. 2px keeps a tiny softness but avoids the
+     "pill/oval" look the previous 4px was giving, especially on the
+     narrower edit inputs. Applied consistently across all editable
+     columns in the transactions table. */
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
 }
 
 .editable-cell:hover {
@@ -182,54 +191,105 @@
   font-size: 0.85rem;
 }
 
+/* Amount values are the primary readable signal in a finance table.
+   Bumped from 500 to 700 weight and switched to tabular-nums so digits
+   align across rows. Slightly larger font so they stand out from the
+   surrounding descriptive text. */
 .amount-negative {
   color: var(--color-error);
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .amount-positive {
   color: var(--color-success);
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-/* Modern input elements */
+/* Modern input elements. Border-radius sharpened from 4px → 2px so
+   edit fields stop looking oval/pill-shaped. Consistent across every
+   editable column in the transactions table.
+
+   box-sizing: border-box is critical — without it, width: 100% plus
+   horizontal padding + border overflows the cell by ~30px on every
+   edit, which made all edit fields burst beyond their column width.
+   min-width: 0 + max-width: 100% lets the input shrink to its
+   container (native date/number inputs otherwise try to enforce
+   browser-default minimum widths). Padding reduced so narrow columns
+   (col-date / col-amount / col-label ~130px) still fit the content. */
 .modern-input {
+  box-sizing: border-box;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
   border: 1px solid var(--color-inputBorder);
-  border-radius: 4px;
+  border-radius: 2px;
   background-color: var(--color-inputBackground);
-  transition: all 0.15s ease-in-out;
-  font-size: 0.9rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-size: 0.85rem;
+  line-height: 1.2;
   color: var(--color-inputText);
 }
 
 .modern-input:focus {
   border-color: var(--color-borderFocus);
-  box-shadow: 0 0 0 3px var(--color-shadowLight);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
   outline: none;
 }
 
+/* Native date/number inputs let you hide the spinners/indicators so
+   they don't eat horizontal space in narrow columns. */
+.modern-input[type="date"]::-webkit-calendar-picker-indicator,
+.modern-input[type="date"]::-webkit-inner-spin-button,
+.modern-input[type="date"]::-webkit-clear-button {
+  margin-left: 2px;
+  padding: 0;
+}
+.modern-input[type="number"]::-webkit-outer-spin-button,
+.modern-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.modern-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .modern-select {
+  box-sizing: border-box;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  padding-right: 1.75rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 20px 4px 6px; /* right padding leaves room for the chevron */
   border: 1px solid var(--color-inputBorder);
-  border-radius: 4px;
+  border-radius: 2px;
   background-color: var(--color-inputBackground);
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 1rem;
-  transition: all 0.15s ease-in-out;
-  font-size: 0.9rem;
+  background-position: right 4px center;
+  background-size: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-size: 0.85rem;
+  line-height: 1.2;
   color: var(--color-inputText);
+  /* Ensure long option text inside the displayed value is clipped
+     gracefully rather than stretching the select wider than its cell. */
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .modern-select:focus {
   border-color: var(--color-borderFocus);
-  box-shadow: 0 0 0 3px var(--color-shadowLight);
+  box-shadow: 0 0 0 2px var(--color-shadowLight);
   outline: none;
 }
 
@@ -431,18 +491,24 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Column-specific styles for table layout */
+/* Column-specific styles for table layout.
+   With table-layout: fixed and other columns at explicit pixel widths,
+   `width: 100%` on this cell makes it absorb all remaining space —
+   which is what we want for the description column. `width: auto`
+   produced an unpredictably narrow column in the new shadcn table, so
+   we revert to 100%. The inner AutoFitText handles single-line
+   rendering so we no longer want wrap/break rules here. */
 .col-description {
-  width: 100%; /* Takes up remaining space */
-  white-space: normal;
-  word-break: break-word;
+  width: 100%;
 }
 
-.col-date { width: 100px; }
-.col-amount { width: 100px; }
+/* Widened from 100/100/80 so the sortable header (title + sort arrow +
+   filter button + cell padding) fits without truncating "Date"/"Label". */
+.col-date { width: 130px; }
+.col-amount { width: 130px; }
 .col-budget-category { width: 150px; }
-.col-category { width: 200px; }
-.col-label { width: 80px; }
+.col-category { width: 220px; }
+.col-label { width: 140px; }
 .col-budget { width: 80px; }
 .col-spend { width: 80px; }
 .col-remaining { width: 120px; }
