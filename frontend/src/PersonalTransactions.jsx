@@ -45,13 +45,13 @@ import { cn } from '@/lib/utils';
 // Help Text Component for consistent styling
 const HelpText = ({ children, isVisible }) => {
   if (!isVisible) return null;
-  
+
   return (
     <div className="help-text">
       <div className="help-text-icon" style={{ lineHeight: 0, marginBottom: 0 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+          <path d="M12 16V12M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
       <div className="help-text-content">{children}</div>
@@ -61,7 +61,7 @@ const HelpText = ({ children, isVisible }) => {
 
 // Refactored FilterButton component for more streamlined appearance
 const FilterButton = ({ isActive, onClick, count = 0 }) => (
-  <button 
+  <button
     className={`filter-button compact ${isActive ? 'active' : ''}`}
     onClick={onClick}
     title="Filter"
@@ -76,9 +76,9 @@ const FilterButton = ({ isActive, onClick, count = 0 }) => (
 );
 
 // Refactored table dropdown menu component
-const TableDropdownMenu = ({ 
-  isActive, 
-  onClose, 
+const TableDropdownMenu = ({
+  isActive,
+  onClose,
   availableOptions,
   selectedOptions,
   onChange,
@@ -90,11 +90,11 @@ const TableDropdownMenu = ({
 }) => {
   // Stop clicks from propagating and closing the dropdown
   const handleClick = (e) => e.stopPropagation();
-  
+
   if (!isActive) return null;
-  
+
   return (
-    <div 
+    <div
       className="filter-dropdown"
       onClick={handleClick}
       style={{
@@ -128,20 +128,20 @@ const TableDropdownMenu = ({
           />
         </div>
       )}
-      
-      <div className="filter-options" style={{ 
-        overflowY: 'auto', 
+
+      <div className="filter-options" style={{
+        overflowY: 'auto',
         flex: '1 1 auto',
-        padding: '8px 0' 
+        padding: '8px 0'
       }}>
         {/* Display non-null options */}
         {availableOptions
           .filter(option => option !== null && option !== undefined && option !== '')
           .map(option => (
-            <div 
-              key={option} 
+            <div
+              key={option}
               className="filter-option"
-              style={{ 
+              style={{
                 padding: '3px 1px',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
@@ -155,10 +155,10 @@ const TableDropdownMenu = ({
                 onChange(option, e);
               }}
             >
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={selectedOptions.includes(option)}
-                onChange={() => {}} // Handled by parent div onClick
+                onChange={() => { }} // Handled by parent div onClick
                 style={{ marginRight: '6px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '13px' }}>
@@ -167,12 +167,12 @@ const TableDropdownMenu = ({
             </div>
           ))
         }
-        
+
         {/* Display null/empty option at the bottom if it exists */}
         {availableOptions.some(option => option === null || option === undefined || option === '') && (
-          <div 
+          <div
             className="filter-option"
-            style={{ 
+            style={{
               padding: '6px 4px',
               cursor: 'pointer',
               transition: 'background 0.2s',
@@ -189,10 +189,10 @@ const TableDropdownMenu = ({
               onChange(null, e);
             }}
           >
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={selectedOptions.includes(null)}
-              onChange={() => {}} // Handled by parent div onClick
+              onChange={() => { }} // Handled by parent div onClick
               style={{ marginRight: '6px', cursor: 'pointer' }}
             />
             <span style={{ fontSize: '13px', fontStyle: 'italic', color: '#6b7280' }}>
@@ -201,12 +201,12 @@ const TableDropdownMenu = ({
           </div>
         )}
       </div>
-      
+
       {/* Footer with clear button only */}
       {selectedOptions.length > 0 && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
           padding: '3px 4px',
           borderTop: '1px solid var(--color-border)',
           backgroundColor: 'var(--color-backgroundElevated)',
@@ -216,12 +216,12 @@ const TableDropdownMenu = ({
           bottom: 0,
           flex: '0 0 auto'
         }}>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onClear();
             }}
-            style={{ 
+            style={{
               padding: '3px 6px',
               backgroundColor: 'transparent',
               color: '#6b7280',
@@ -249,8 +249,8 @@ const TableDropdownMenu = ({
 };
 
 // Specialized date filter dropdown component
-const DateFilterDropdown = ({ 
-  isActive, 
+const DateFilterDropdown = ({
+  isActive,
   dateFilter,
   onChange,
   onClear,
@@ -259,11 +259,11 @@ const DateFilterDropdown = ({
 }) => {
   // Stop clicks from propagating and closing the dropdown
   const handleClick = (e) => e.stopPropagation();
-  
+
   if (!isActive) return null;
-  
+
   return (
-    <div 
+    <div
       className="filter-dropdown"
       onClick={handleClick}
       style={{
@@ -280,17 +280,17 @@ const DateFilterDropdown = ({
       }}
     >
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: '12px', 
-          fontWeight: '500', 
-          color: 'var(--color-text)', 
-          marginBottom: '4px' 
+        <label style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: 'var(--color-text)',
+          marginBottom: '4px'
         }}>
           From:
         </label>
-        <input 
-          type="date" 
+        <input
+          type="date"
           name="startDate"
           value={dateFilter.startDate}
           onChange={onChange}
@@ -309,17 +309,17 @@ const DateFilterDropdown = ({
         />
       </div>
       <div style={{ marginBottom: '12px' }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: '12px', 
-          fontWeight: '500', 
-          color: 'var(--color-text)', 
-          marginBottom: '4px' 
+        <label style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: 'var(--color-text)',
+          marginBottom: '4px'
         }}>
           To:
         </label>
-        <input 
-          type="date" 
+        <input
+          type="date"
           name="endDate"
           value={dateFilter.endDate}
           onChange={onChange}
@@ -338,18 +338,18 @@ const DateFilterDropdown = ({
         />
       </div>
       {(dateFilter.startDate || dateFilter.endDate) && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
           paddingTop: '8px',
           borderTop: '1px solid var(--color-border)'
         }}>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onClear();
             }}
-            style={{ 
+            style={{
               padding: '4px 8px',
               backgroundColor: 'transparent',
               color: 'var(--color-textSecondary)',
@@ -384,10 +384,10 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
   // For headers without filters, use a simpler structure
   if (!hasFilter) {
     return (
-      <div 
+      <div
         className="modern-filter-header"
       >
-        <div 
+        <div
           className="header-content"
           onClick={() => onSort(column)}
         >
@@ -398,15 +398,15 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
           </span>
         </div>
       </div>
-  );
+    );
   }
 
   // For headers with filters
-    return (
-      <div 
+  return (
+    <div
       className="modern-filter-header sortable"
     >
-      <div 
+      <div
         className="sortable-header"
         onClick={() => onSort(column)}
         style={{ width: 'calc(100% - 30px)' }}
@@ -426,14 +426,14 @@ const SortableHeader = ({ column, sortBy, onSort, children, hasFilter = false, o
           onFilterToggle();
         }}
       />
-      </div>
-    );
+    </div>
+  );
 };
 
 const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   // TEMPORARY: Balance subtraction from .env (easily removable)
   const [BALANCE_SUBTRACTION, setBALANCE_SUBTRACTION] = useState(0);
-  
+
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [allFilteredTransactions, setAllFilteredTransactions] = useState([]);
@@ -451,7 +451,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [categoryOrder, setCategoryOrder] = useState([]);
   const [draggedCategory, setDraggedCategory] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   // Split transaction states
   const [isSplitting, setIsSplitting] = useState(false);
   const [transactionToSplit, setTransactionToSplit] = useState(null);
@@ -461,7 +461,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     category: ''
   }]);
   const [isSavingSplit, setIsSavingSplit] = useState(false);
-  
+
   // Smart splitting based on shared transactions states
   const [useSmartSplit, setUseSmartSplit] = useState(false);
   const [smartSplitData, setSmartSplitData] = useState(null);
@@ -471,19 +471,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     endDate: '',
     user: 'Jack'
   });
-  
+
   // Add state for expanded row
   const [expandedRow, setExpandedRow] = useState(null);
-  
+
   // Add settings states
   const [showSettings, setShowSettings] = useState(false);
   const [hideZeroBalanceBuckets, setHideZeroBalanceBuckets] = useState(false);
   // Add state for negative bucket offset setting
   const [enableNegativeOffsetBucket, setEnableNegativeOffsetBucket] = useState(false);
   const [selectedNegativeOffsetBucket, setSelectedNegativeOffsetBucket] = useState('');
-  
 
-  
+
+
   // Updated states for multiple auto distributions
   const [autoDistributionEnabled, setAutoDistributionEnabled] = useState(false);
   const [autoDistributionRules, setAutoDistributionRules] = useState([]);
@@ -493,10 +493,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
   const autoRulesButtonRef = useRef(null);
   const [popupPosition, setPopupPosition] = useState({ top: '60px', left: '0' });
-  
+
   // Add state to track initial loading completion
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  
+
   // Personal Split Configuration States
   const [personalSplitEnabled, setPersonalSplitEnabled] = useState(false);
   const [personalSplitDefaultDays, setPersonalSplitDefaultDays] = useState(7);
@@ -507,21 +507,21 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [showPersonalSplitConfig, setShowPersonalSplitConfig] = useState(false);
   const [isLoadingPersonalSplitConfig, setIsLoadingPersonalSplitConfig] = useState(false);
   const [showAddGroupForm, setShowAddGroupForm] = useState(false);
-  const [newGroupForm, setNewGroupForm] = useState({ 
-    group_name: '', 
+  const [newGroupForm, setNewGroupForm] = useState({
+    group_name: '',
     personal_category: '',
     budget_categories: []
   });
-  
+
   // Edit mode states
   const [editingGroups, setEditingGroups] = useState({}); // Track which groups are being edited
   const [editingChanges, setEditingChanges] = useState({}); // Track changes for each group
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
-  
+
   // Get user ID from the new user management system
   const [userId, setUserId] = useState(null);
-  
+
   // Fetch the current user ID from the user management system
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -541,14 +541,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         setUserId(1);
       }
     };
-    
+
     fetchCurrentUser();
   }, []);
-  
+
   // Database API functions for auto distribution rules
   const loadAutoDistributionRules = async () => {
     if (!userId) return;
-    
+
     try {
       const response = await axios.get(getApiUrlWithParams('/auto-distribution-rules/:userId', { userId }));
       if (response.data.success) {
@@ -568,7 +568,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const savePersonalSettings = async (settingsUpdate) => {
     if (!userId) return;
-    
+
     try {
       await axios.put(getApiUrlWithParams('/personal-settings/:userId', { userId }), settingsUpdate);
     } catch (error) {
@@ -579,28 +579,28 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   // Personal Split Configuration API Functions
   const loadPersonalSplitConfig = async () => {
     if (!userId) return;
-    
+
     try {
       setIsLoadingPersonalSplitConfig(true);
-      
+
       // Load split groups, budget categories, and personal categories
       const [groupsResponse, budgetCategoriesResponse, personalCategoriesResponse] = await Promise.all([
         axios.get(getApiUrlWithParams('/personal-split-groups/:userId', { userId })),
         axios.get(getApiUrl('/budget-categories')),
         axios.get(getApiUrl('/personal-categories'))
       ]);
-      
 
-      
+
+
       if (groupsResponse.data.success) {
         setPersonalSplitGroups(groupsResponse.data.data);
       }
-      
+
       // Budget categories returns { success: true, data: ["category1", "category2"] }
       if (budgetCategoriesResponse.data.success) {
         setAvailableBudgetCategories(budgetCategoriesResponse.data.data);
       }
-      
+
       // Personal categories returns the array directly without success wrapper
       if (personalCategoriesResponse.data && Array.isArray(personalCategoriesResponse.data)) {
         setAvailablePersonalCategories(personalCategoriesResponse.data);
@@ -616,13 +616,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const createPersonalSplitGroup = async (groupData) => {
     if (!userId) return;
-    
+
     try {
       const response = await axios.post(getApiUrl('/personal-split-groups'), {
         user_id: userId,
         ...groupData
       });
-      
+
       if (response.data.success) {
         await loadPersonalSplitConfig(); // Reload configuration
         return response.data.data;
@@ -636,7 +636,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const updatePersonalSplitGroup = async (groupId, updates) => {
     try {
       const response = await axios.put(getApiUrlWithParams('/personal-split-groups/:groupId', { groupId }), updates);
-      
+
       if (response.data.success) {
         await loadPersonalSplitConfig(); // Reload configuration
         return response.data.data;
@@ -650,7 +650,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const deletePersonalSplitGroup = async (groupId) => {
     try {
       const response = await axios.delete(getApiUrlWithParams('/personal-split-groups/:groupId', { groupId }));
-      
+
       if (response.data.success) {
         await loadPersonalSplitConfig(); // Reload configuration
       }
@@ -662,7 +662,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const updatePersonalSplitMapping = async (groupId, budgetCategories) => {
     if (!userId) return;
-    
+
     try {
       // First, delete existing mappings for this group
       const existingMappings = personalSplitGroups.find(g => g.id === groupId)?.mapped_categories || [];
@@ -674,7 +674,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           }
         });
       }
-      
+
       // Then, create new mappings
       if (budgetCategories.length > 0) {
         await axios.post(getApiUrl('/personal-split-mapping'), {
@@ -683,7 +683,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           budget_categories: budgetCategories
         });
       }
-      
+
       await loadPersonalSplitConfig(); // Reload configuration
     } catch (error) {
       console.error('Error updating personal split mappings:', error);
@@ -693,7 +693,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const loadPersonalSettings = async () => {
     if (!userId) return;
-    
+
     try {
       const response = await axios.get(getApiUrlWithParams('/personal-settings/:userId', { userId }));
       if (response.data.success) {
@@ -701,11 +701,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         setHideZeroBalanceBuckets(settings.hide_zero_balance_buckets || false);
         setEnableNegativeOffsetBucket(settings.enable_negative_offset_bucket || false);
         setSelectedNegativeOffsetBucket(settings.selected_negative_offset_bucket || '');
-        
+
         // Personal split settings
         setPersonalSplitEnabled(settings.personal_split_enabled || false);
         setPersonalSplitDefaultDays(settings.personal_split_default_days || 7);
-        
+
         // Make sure category_order is handled correctly if it's a string
         if (settings.category_order) {
           if (typeof settings.category_order === 'string') {
@@ -723,7 +723,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         } else {
           setCategoryOrder([]);
         }
-        
+
         setAutoDistributionEnabled(settings.auto_distribution_enabled || false);
         setLastAutoDistributionMonth(settings.last_auto_distribution_month || '');
       }
@@ -731,12 +731,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       console.error('Error loading personal settings:', error);
     }
   };
-  
+
   // Keys for localStorage (category order now stored in database)
   const SETTINGS_KEY = 'personal_transactions_settings';
   const AUTO_DISTRIBUTION_KEY = 'personal_auto_distribution_settings';
   const LAST_DISTRIBUTION_KEY = 'personal_last_auto_distribution';
-  
+
   // Date formatting utility - concise version for transaction descriptions
   const formatDateRangeConcise = (startDate, endDate) => {
     const formatDate = (dateStr) => {
@@ -745,16 +745,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       const month = date.toLocaleString('default', { month: 'short' });
       return `${day} ${month}`;
     };
-    
+
     return `${formatDate(startDate)}-${formatDate(endDate)}`;
   };
-  
+
   const formatDateRange = (startDate, endDate) => {
     const formatDate = (dateStr) => {
       const date = new Date(dateStr);
       const day = date.getDate();
       const month = date.toLocaleString('default', { month: 'long' });
-      
+
       // Add ordinal suffix
       const getOrdinalSuffix = (day) => {
         if (day > 3 && day < 21) return 'th';
@@ -765,30 +765,30 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           default: return 'th';
         }
       };
-      
+
       return `${day}${getOrdinalSuffix(day)} ${month}`;
     };
-    
+
     return `from ${formatDate(startDate)} to ${formatDate(endDate)}`;
   };
-  
+
   // Double-click feature
   const handleCategoryDoubleClick = (category) => {
     // Get the earliest date from all transactions
     const earliestDate = getMinMaxDates().min;
-    
+
     // Set date filter to show from earliest date to today
-    setDateFilter({ 
-      startDate: earliestDate, 
+    setDateFilter({
+      startDate: earliestDate,
       endDate: '' // This will default to today/current date
     });
-    
+
     // Set category filter to only show this category
     setCategoryFilter([category]);
-    
+
     // Close any active filter dropdowns
     setActiveFilterColumn(null);
-    
+
     // Show notification
     const notification = document.createElement('div');
     notification.textContent = `Now showing all transactions for "${category}"`;
@@ -802,19 +802,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
     notification.style.zIndex = '1000';
     notification.style.border = '1px solid #90caf9';
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       notification.style.opacity = '0';
       notification.style.transition = 'opacity 0.3s ease';
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 300);
     }, 2000);
   };
-  
+
   // Load saved settings on mount - includes negative offset bucket settings
   useEffect(() => {
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
@@ -830,7 +830,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       }
     }
   }, []);
-  
+
   // Load auto distribution settings on mount
   useEffect(() => {
     const savedAutoDistribution = localStorage.getItem(AUTO_DISTRIBUTION_KEY);
@@ -838,7 +838,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       try {
         const parsedSettings = JSON.parse(savedAutoDistribution);
         setAutoDistributionEnabled(parsedSettings.enabled || false);
-        
+
         // Ensure each rule has a name property when loading from storage
         const rules = parsedSettings.rules || [];
         const updatedRules = rules.map(rule => ({
@@ -848,51 +848,51 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           sourceBucket: rule.sourceBucket || '',
           destBucket: rule.destBucket || ''
         }));
-        
+
         setAutoDistributionRules(updatedRules);
       } catch (error) {
         console.error('Error parsing auto distribution settings:', error);
         localStorage.removeItem(AUTO_DISTRIBUTION_KEY);
       }
     }
-    
+
     const lastDistribution = localStorage.getItem(LAST_DISTRIBUTION_KEY);
     if (lastDistribution) {
       setLastAutoDistributionMonth(lastDistribution);
     }
   }, []);
-  
+
   // Function to perform auto distribution using backend endpoint
   const performAutoDistribution = async () => {
     if (!userId || !autoDistributionRules || autoDistributionRules.length === 0) {
       return;
     }
-    
+
     try {
       setIsDistributing(true);
-      
+
       const currentDate = new Date();
       const monthYearStr = `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
-      
+
       // Use the backend endpoint for atomic distribution
       const response = await axios.post(getApiUrl('/auto-distribution/apply'), {
         user_id: userId, // This should now be a numeric ID from the user management system
         month_year: monthYearStr
       });
-      
+
       if (response.data.success) {
         const { appliedCount, failedCount, createdTransactions, lastDistributionMonth } = response.data.data;
-        
+
         // Update the last distribution month from backend response
         setLastAutoDistributionMonth(lastDistributionMonth);
         setHasRunAutoDistributionThisSession(true); // Mark as run this session
         console.log('✅ Auto distribution completed, updated lastDistributionMonth to:', lastDistributionMonth);
         // Backend now properly updates personal settings
-        
+
         // Refresh transactions
         const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
-        
+
         // Show success notification
         const notification = document.createElement('div');
         notification.textContent = `Monthly distribution completed: ${appliedCount} rules applied successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`;
@@ -907,13 +907,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         notification.style.zIndex = '1000';
         notification.style.maxWidth = '400px';
         notification.style.border = `1px solid ${failedCount > 0 ? '#ffeaa7' : '#c3e6cb'}`;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           notification.style.opacity = '0';
           notification.style.transition = 'opacity 0.3s ease';
-          
+
           setTimeout(() => {
             document.body.removeChild(notification);
           }, 300);
@@ -921,7 +921,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       } else {
         throw new Error(response.data.error || 'Auto distribution failed');
       }
-      
+
     } catch (error) {
       console.error('Error performing auto distribution:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Error performing monthly distribution. Please check console for details.';
@@ -930,14 +930,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       setIsDistributing(false);
     }
   };
-  
-    // Check if we need to perform auto distribution (only after initial load is complete)
+
+  // Check if we need to perform auto distribution (only after initial load is complete)
   // Note: Auto-distribution is now prevented from running automatically on page refresh
   useEffect(() => {
     if (initialLoadComplete && autoDistributionEnabled && autoDistributionRules.length > 0 && !hasRunAutoDistributionThisSession) {
       const currentDate = new Date();
       const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
-      
+
       console.log('Auto distribution check (session-based):', {
         initialLoadComplete,
         autoDistributionEnabled,
@@ -960,7 +960,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       }
     }
   }, [initialLoadComplete, autoDistributionEnabled, lastAutoDistributionMonth, autoDistributionRules, hasRunAutoDistributionThisSession]);
-  
+
   // Initialize or update category order when transactions change
   // Modified to respect database as source of truth and only update when there are actual changes
   useEffect(() => {
@@ -974,15 +974,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             count: 0
           };
         }
-        const amount = typeof transaction.amount === 'number' ? 
+        const amount = typeof transaction.amount === 'number' ?
           transaction.amount : parseFloat(transaction.amount) || 0;
         acc[category].total += amount;
         acc[category].count += 1;
         return acc;
       }, {});
-      
+
       const currentCategories = Object.keys(categoryData);
-      
+
       // Only update category order if:
       // 1. We already have a category order (from database) AND
       // 2. There are new or removed categories
@@ -990,14 +990,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         // Check for new categories or removed categories
         const newCategories = currentCategories.filter(cat => !categoryOrder.includes(cat));
         const removedCategories = categoryOrder.filter(cat => !currentCategories.includes(cat));
-        
+
         if (newCategories.length > 0 || removedCategories.length > 0) {
           // Update the order: keep existing order but add new categories and remove old ones  
           const updatedOrder = [
             ...categoryOrder.filter(cat => currentCategories.includes(cat)), // Keep existing categories in order
             ...newCategories // Add new categories at the end
           ];
-          
+
           setCategoryOrder(updatedOrder);
           savePersonalSettings({ category_order: updatedOrder });
         }
@@ -1011,7 +1011,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
   const filterPopupRef = useRef(null);
-  
+
   // Add new transaction state
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
@@ -1020,7 +1020,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     amount: '',
     category: null
   });
-  
+
   // Add refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -1028,25 +1028,25 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   useEffect(() => {
     // Only fetch initial data when userId is available
     if (!userId) return;
-    
+
     const fetchInitialData = async () => {
       setIsTransactionsLoading(true);
-      
+
       try {
         // Single API call to get all personal initial data with userId
         const response = await axios.get(getApiUrlWithParams('/personal-initial-data/:userId', { userId }));
-        
+
         if (response.data.success) {
           const { personalTransactions, personalCategories, autoDistributionRules, personalSettings } = response.data.data;
-          
+
           // Set all data from the combined response
           setTransactions(personalTransactions);
           setFilteredTransactions(personalTransactions);
           setAllFilteredTransactions(personalTransactions);
-          
+
           const categories = personalCategories.map(item => item.category);
           setAvailableCategories(categories);
-          
+
           // Transform auto distribution rules to match expected frontend format
           const transformedRules = autoDistributionRules.map(rule => ({
             id: rule.id,
@@ -1056,7 +1056,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             destBucket: rule.dest_bucket
           }));
           setAutoDistributionRules(transformedRules);
-          
+
           // Load personal settings using the dedicated function to ensure proper boolean handling
           if (personalSettings && Object.keys(personalSettings).length > 0) {
             // Use proper boolean handling - only default to false if the value is null/undefined
@@ -1065,11 +1065,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             setLastAutoDistributionMonth(personalSettings.last_auto_distribution_month || '');
             setEnableNegativeOffsetBucket(personalSettings.enable_negative_offset_bucket ?? false);
             setSelectedNegativeOffsetBucket(personalSettings.selected_negative_offset_bucket || '');
-            
+
             // Personal split settings
             setPersonalSplitEnabled(personalSettings.personal_split_enabled ?? false);
             setPersonalSplitDefaultDays(personalSettings.personal_split_default_days || 7);
-            
+
             // Handle category order if it exists in database
             if (personalSettings.category_order) {
               if (typeof personalSettings.category_order === 'string') {
@@ -1107,18 +1107,18 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
               setCategoryOrder(Object.keys(categoryData).sort());
             }
           }
-          
+
           // Load personal split configuration
           await loadPersonalSplitConfig();
-          
+
           // Also call loadPersonalSettings as a backup to ensure proper boolean handling
           await loadPersonalSettings();
-          
+
           // TEMPORARY: Fetch balance subtraction (easily removable)
-          try { const sub = await axios.get(getApiUrl('/balance-subtraction')); setBALANCE_SUBTRACTION(sub.data.amount); } catch (e) {}
-          
+          try { const sub = await axios.get(getApiUrl('/balance-subtraction')); setBALANCE_SUBTRACTION(sub.data.amount); } catch (e) { }
+
           setIsTransactionsLoading(false);
-          
+
           // Mark initial loading as complete after a small delay to prevent immediate auto distribution
           setTimeout(() => {
             setInitialLoadComplete(true);
@@ -1131,19 +1131,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         setIsTransactionsLoading(false);
       }
     };
-    
+
     fetchInitialData();
   }, [userId]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) && 
-          !event.target.closest('button[data-filter="category"]')) {
+      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target) &&
+        !event.target.closest('button[data-filter="category"]')) {
         setActiveFilterColumn(null);
       }
     }
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -1155,14 +1155,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     if (e) {
       e.stopPropagation();
     }
-    
+
     setCategoryFilter(prev => {
-      const isAlreadyIncluded = prev.some(item => 
+      const isAlreadyIncluded = prev.some(item =>
         (item === null && category === null) || item === category
       );
 
       if (isAlreadyIncluded) {
-        return prev.filter(item => 
+        return prev.filter(item =>
           !((item === null && category === null) || item === category)
         );
       } else {
@@ -1181,7 +1181,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     const now = new Date();
     const currentMonthDate = new Date(currentYear, currentMonth);
     const nextMonthDate = new Date(currentYear, currentMonth + 1);
-    
+
     if (nextMonthDate <= now) {
       setCurrentMonth(prev => (prev === 11 ? 0 : prev + 1));
       setCurrentYear(prev => (currentMonth === 11 ? prev + 1 : prev));
@@ -1192,7 +1192,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     const now = new Date();
     const currentMonthDate = new Date(currentYear, currentMonth);
     const nextMonthDate = new Date(currentYear, currentMonth + 1);
-    
+
     return nextMonthDate > now;
   };
 
@@ -1200,9 +1200,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const refreshPersonalBankFeeds = async () => {
     try {
       setIsRefreshing(true);
-      
+
       const response = await axios.post(getApiUrl('/refresh-personal-bank-feeds'));
-      
+
       if (response.data.success) {
         // Show success notification
         const notification = document.createElement('div');
@@ -1216,23 +1216,23 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 3000);
-        
+
         // Refresh the transactions data
         const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
-        
+
         // Reapply filters to new data
         let filtered = applyFilters(transactionsResponse.data, {
           dateFilter,
           sortBy: filters.sortBy
         });
-        
+
         if (categoryFilter.length > 0) {
           filtered = filtered.filter(transaction => {
             if (categoryFilter.includes(null) && transaction.category === null) {
@@ -1241,9 +1241,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             return categoryFilter.includes(transaction.category);
           });
         }
-        
+
         setAllFilteredTransactions(filtered);
-        
+
         // Apply month filtering for table view
         let tableFiltered = filtered;
         if (!dateFilter.startDate && !dateFilter.endDate) {
@@ -1252,9 +1252,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
           });
         }
-        
+
         setFilteredTransactions(tableFiltered);
-        
+
       } else {
         // Show error notification
         const notification = document.createElement('div');
@@ -1268,16 +1268,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 5000);
       }
     } catch (error) {
       console.error('Error refreshing personal bank feeds:', error);
-      
+
       const notification = document.createElement('div');
       notification.textContent = 'Error refreshing personal bank feeds. Check console for details.';
       notification.style.position = 'fixed';
@@ -1289,9 +1289,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       notification.style.borderRadius = '4px';
       notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
       notification.style.zIndex = '1000';
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 5000);
@@ -1317,35 +1317,35 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         return categoryFilter.includes(transaction.category);
       });
     }
-    
+
     // Group split transactions together after filtering and sorting
     filtered = groupSplitTransactions(filtered);
-    
+
     setAllFilteredTransactions(filtered);
-    
+
     let tableFiltered = filtered;
     if (!dateFilter.startDate && !dateFilter.endDate) {
       tableFiltered = filtered.filter(transaction => {
         const date = new Date(transaction.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
-      
+
       // Re-group after month filtering to maintain split transaction grouping
       tableFiltered = groupSplitTransactions(tableFiltered);
     }
-    
+
     setFilteredTransactions(tableFiltered);
   }, [transactions, filters.sortBy, dateFilter, categoryFilter, currentMonth, currentYear]);
 
   const toggleColumnFilter = (column) => {
     setActiveFilterColumn(activeFilterColumn === column ? null : column);
   };
-  
+
   // Handle sorting when clicking on table headers
   const handleHeaderSort = (column) => {
     const currentSort = filters.sortBy;
     let newSort;
-    
+
     // Determine new sort direction
     if (currentSort === `${column}-desc`) {
       newSort = `${column}-asc`;
@@ -1355,39 +1355,39 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       // Default to descending for the clicked column
       newSort = `${column}-desc`;
     }
-    
+
     setFilters(prev => ({ ...prev, sortBy: newSort }));
   };
-  
+
   const handleDateFilterChange = (e) => {
     const { name, value } = e.target;
     setDateFilter(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const clearFilters = () => {
     setDateFilter({ startDate: '', endDate: '' });
     setCategoryFilter([]);
     setActiveFilterColumn(null);
   };
-  
+
   const getMinMaxDates = () => {
     if (transactions.length === 0) return { min: '', max: '' };
-    
+
     let minDate = new Date(transactions[0].date);
     let maxDate = new Date(transactions[0].date);
-    
+
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
       if (date < minDate) minDate = date;
       if (date > maxDate) maxDate = date;
     });
-    
+
     return {
       min: minDate.toISOString().split('T')[0],
       max: maxDate.toISOString().split('T')[0]
     };
   };
-  
+
   const dateRange = getMinMaxDates();
 
   const handleDoubleClick = (transactionId, field, value) => {
@@ -1413,9 +1413,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
     notification.style.zIndex = '1000';
     notification.style.border = '1px solid #f5c6cb';
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       document.body.removeChild(notification);
     }, 5000);
@@ -1423,13 +1423,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const handleUpdate = async (transactionId, field) => {
     await optimizedHandlePersonalUpdate(
-      transactionId, 
-      field, 
-      editValue, 
-      transactions, 
-      setTransactions, 
-      setFilteredTransactions, 
-      setEditCell, 
+      transactionId,
+      field,
+      editValue,
+      transactions,
+      setTransactions,
+      setFilteredTransactions,
+      setEditCell,
       setIsUpdating,
       showErrorNotification
     );
@@ -1477,10 +1477,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           );
         case 'category':
           return (
-            <select 
+            <select
               className="modern-select"
-              value={editValue || ''} 
-              onChange={handleInputChange} 
+              value={editValue || ''}
+              onChange={handleInputChange}
               onBlur={() => handleUpdate(transaction.id, field)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1488,7 +1488,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   handleUpdate(transaction.id, field);
                 }
               }}
-              style={{ 
+              style={{
                 textAlign: 'center',
                 width: '100%',
                 position: 'relative',
@@ -1527,13 +1527,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     }
 
     // Display cell content
-    const isEmpty = 
-      transaction[field] === null || 
-      transaction[field] === undefined || 
+    const isEmpty =
+      transaction[field] === null ||
+      transaction[field] === undefined ||
       transaction[field] === '';
-    
+
     return (
-      <div 
+      <div
         className="cell-content editable-cell"
         onDoubleClick={() => handleDoubleClick(transaction.id, field, transaction[field] || '')}
       >
@@ -1573,9 +1573,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const renderRelatedTransactionIndicator = (transaction) => {
     const relatedTransactions = getRelatedTransactions(transaction);
-    
+
     if (relatedTransactions.length === 0) return null;
-    
+
     if (transaction.has_split) {
       return (
         <span style={{
@@ -1592,7 +1592,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           whiteSpace: 'nowrap'
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+            <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
           </svg>
           <span>Split ({relatedTransactions.length})</span>
         </span>
@@ -1614,7 +1614,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           whiteSpace: 'nowrap'
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)"/>
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" transform="rotate(180 12 12)" />
           </svg>
           <span>Split from</span>
         </span>
@@ -1713,10 +1713,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             ) : (
               filteredTransactions.map(transaction => (
                 <React.Fragment key={transaction.id}>
-                  <tr 
-                    style={{ 
-                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' : 
-                                     transaction.split_from_id ? '#f7fbff' : undefined,
+                  <tr
+                    style={{
+                      backgroundColor: expandedRow === transaction.id ? 'var(--color-backgroundTertiary)' :
+                        transaction.split_from_id ? '#f7fbff' : undefined,
                       transition: 'background-color 0.2s',
                       borderLeft: transaction.split_from_id ? '4px solid #93c5fd' : undefined
                     }}
@@ -1726,7 +1726,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', maxWidth: 'calc(100% - 30px)' }}>
                           {transaction.split_from_id && (
-                            <span style={{ 
+                            <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               marginRight: '6px',
@@ -1734,12 +1734,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               flexShrink: 0
                             }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M7 17l-5-5 5-5"/>
+                                <path d="M7 17l-5-5 5-5" />
                               </svg>
                             </span>
                           )}
-                          <div style={{ 
-                            display: 'flex', 
+                          <div style={{
+                            display: 'flex',
                             alignItems: 'center',
                             minWidth: 0,
                             overflow: 'hidden',
@@ -1785,12 +1785,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   </tr>
                   {expandedRow === transaction.id && (
                     <tr>
-                      <td colSpan="4" style={{ 
+                      <td colSpan="4" style={{
                         padding: '0',
                         backgroundColor: 'var(--color-backgroundTertiary)',
                         border: '1px solid var(--color-border)'
                       }}>
-                        <div style={{ 
+                        <div style={{
                           padding: '12px',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -1817,22 +1817,22 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               }}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z"/>
+                                <path d="M8 7v8a2 2 0 002 2h6M16 17l-2-2v4l2-2z" />
                               </svg>
                               Split Transaction
                             </button>
                           </div>
-                          
+
                           {/* Show related transactions when expanded */}
                           {getRelatedTransactions(transaction).length > 0 && (
-                            <div style={{ 
-                              marginTop: '12px', 
+                            <div style={{
+                              marginTop: '12px',
                               borderTop: '1px dashed #cbd5e1',
                               paddingTop: '12px'
                             }}>
-                              <div style={{ 
-                                fontSize: '14px', 
-                                fontWeight: '500', 
+                              <div style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
                                 marginBottom: '8px',
                                 color: 'var(--color-text)'
                               }}>
@@ -1840,17 +1840,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {getRelatedTransactions(transaction).map(related => (
-                                  <div key={related.id} style={{ 
-                                    display: 'flex', 
+                                  <div key={related.id} style={{
+                                    display: 'flex',
                                     justifyContent: 'space-between',
                                     padding: '8px',
                                     backgroundColor: 'var(--color-backgroundSecondary)',
                                     borderRadius: '4px',
                                     border: '1px solid var(--color-border)'
                                   }}>
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      gap: '12px', 
+                                    <div style={{
+                                      display: 'flex',
+                                      gap: '12px',
                                       alignItems: 'center',
                                       fontSize: '13px',
                                       flex: 1,
@@ -1859,13 +1859,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                       <div>{new Date(related.date).toLocaleDateString()}</div>
                                       <div style={{ fontWeight: '500' }}>{related.description}</div>
                                     </div>
-                                    <div style={{ 
+                                    <div style={{
                                       fontWeight: '500',
                                       fontSize: '13px',
                                       color: parseFloat(related.amount) < 0 ? '#dc2626' : '#16a34a'
                                     }}>
-                                      {parseFloat(related.amount) < 0 ? 
-                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` : 
+                                      {parseFloat(related.amount) < 0 ?
+                                        `-$${Math.abs(parseFloat(related.amount)).toFixed(2)}` :
                                         `$${parseFloat(related.amount).toFixed(2)}`}
                                     </div>
                                   </div>
@@ -1906,40 +1906,40 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const handleAddTransaction = async (e) => {
     e.preventDefault();
-    
+
     if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
       alert('Please fill out all required fields: Date, Description, and Amount');
       return;
     }
-    
+
     try {
       setIsUpdating(true);
-      
+
       const transactionData = {
         ...newTransaction,
         amount: parseFloat(newTransaction.amount)
       };
-      
+
       if (isNaN(transactionData.amount)) {
         alert('Please enter a valid number for the amount');
         setIsUpdating(false);
         return;
       }
-      
+
       const response = await axios.post(getApiUrl('/personal-transactions'), transactionData);
-      
+
       if (response.data.success) {
         const addedTransaction = response.data.data;
-        
+
         setTransactions(prev => [addedTransaction, ...prev]);
-        
+
         const transactionDate = new Date(addedTransaction.date);
-        const isInCurrentMonth = transactionDate.getMonth() === currentMonth && 
-                                transactionDate.getFullYear() === currentYear;
-        
+        const isInCurrentMonth = transactionDate.getMonth() === currentMonth &&
+          transactionDate.getFullYear() === currentYear;
+
         if (isInCurrentMonth) {
           let shouldAdd = true;
-          
+
           if (dateFilter.startDate || dateFilter.endDate) {
             if (dateFilter.startDate && new Date(addedTransaction.date) < new Date(dateFilter.startDate)) {
               shouldAdd = false;
@@ -1948,19 +1948,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
               shouldAdd = false;
             }
           }
-          
+
           if (categoryFilter.length > 0) {
-            if (!categoryFilter.includes(addedTransaction.category) && 
-                !(categoryFilter.includes(null) && !addedTransaction.category)) {
+            if (!categoryFilter.includes(addedTransaction.category) &&
+              !(categoryFilter.includes(null) && !addedTransaction.category)) {
               shouldAdd = false;
             }
           }
-          
+
           if (shouldAdd) {
             setFilteredTransactions(prev => [addedTransaction, ...prev]);
           }
         }
-        
+
         const notification = document.createElement('div');
         notification.textContent = 'Transaction added successfully!';
         notification.style.position = 'fixed';
@@ -1972,13 +1972,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 3000);
-        
+
         resetNewTransactionForm();
         setIsAddingTransaction(false);
       } else {
@@ -1987,15 +1987,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       }
     } catch (err) {
       console.error('Error adding transaction:', err);
-      
+
       let errorMessage = 'Failed to add transaction. Please try again.';
-      
+
       if (err.response && err.response.data) {
-        errorMessage = err.response.data.error || 
-                      (err.response.data.errors && err.response.data.errors.join(', ')) || 
-                      errorMessage;
+        errorMessage = err.response.data.error ||
+          (err.response.data.errors && err.response.data.errors.join(', ')) ||
+          errorMessage;
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -2023,17 +2023,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const handleDragStart = (e, category) => {
     createDragImage(e, setDraggedCategory, setIsDragging, category);
   };
-  
+
   const handleDragOver = (e, category) => {
     handleDragOverWithReorder(e, category, draggedCategory, categoryOrder, setCategoryOrder);
   };
-  
+
   const handleDragEnd = () => {
     handleDragEndCleanup(setDraggedCategory, setIsDragging);
-    
+
     // Persist the new order to database
     savePersonalSettings({ category_order: categoryOrder });
-    
+
     // Optional: Show a subtle notification that order was saved
     const notification = document.createElement('div');
     notification.textContent = 'Category order saved!';
@@ -2049,20 +2049,20 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     notification.style.fontSize = '13px';
     notification.style.background = 'linear-gradient(90deg, #d4edda 0%, #d1ecf1 100%)';
     notification.style.border = '1px solid #bee5eb';
-    
+
     document.body.appendChild(notification);
-    
+
     // Fade out and remove
     setTimeout(() => {
       notification.style.opacity = '0';
       notification.style.transition = 'opacity 0.3s ease';
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 300);
     }, 1500);
   };
-  
+
   // Add a reset order function
   const resetCategoryOrder = () => {
     if (window.confirm('Are you sure you want to reset the category order to alphabetical?')) {
@@ -2072,11 +2072,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         if (!acc[category]) acc[category] = true;
         return acc;
       }, {});
-      
+
       const defaultOrder = Object.keys(categoryData).sort();
       setCategoryOrder(defaultOrder);
       savePersonalSettings({ category_order: defaultOrder });
-      
+
       // Show notification
       const notification = document.createElement('div');
       notification.textContent = 'Category order reset to alphabetical!';
@@ -2089,9 +2089,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       notification.style.borderRadius = '4px';
       notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
       notification.style.zIndex = '1000';
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         document.body.removeChild(notification);
       }, 3000);
@@ -2132,7 +2132,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     }
     try {
       setIsLoadingSmartSplit(true);
-      
+
       // 3. Fetch shared transactions for the date range using the API
       const sharedTransactionsResponse = await axios.get(getApiUrl('/shared-transactions-filtered'), {
         params: {
@@ -2142,15 +2142,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           userId: userId
         }
       });
-      
+
       if (!sharedTransactionsResponse.data.success) {
         throw new Error('Failed to fetch shared transactions for smart split');
       }
-      
+
       const sharedTransactionsData = sharedTransactionsResponse.data.data;
       const sharedTransactions = sharedTransactionsData.transactions || [];
       const groupedTotals = sharedTransactionsData.groupedTotals || {};
-      
+
       // 4. Create split transactions based on the grouped totals from the API
       const newSplitTransactions = [];
       Object.entries(groupedTotals).forEach(([groupName, data]) => {
@@ -2162,7 +2162,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           });
         }
       });
-      
+
       if (newSplitTransactions.length > 0) {
         setSplitTransactions(newSplitTransactions);
       } else {
@@ -2183,7 +2183,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - personalSplitDefaultDays);
     const daysAgoString = daysAgo.toISOString().split('T')[0];
-    
+
     setTransactionToSplit(transaction);
     setSplitTransactions([{
       description: '',
@@ -2192,14 +2192,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     }]);
     setUseSmartSplit(personalSplitEnabled); // Auto-enable if configured
     setSmartSplitData(null);
-    
+
     // Auto-populate smart split filters with user's configured default date range
     setSmartSplitFilters({
       startDate: daysAgoString,
       endDate: today,
       user: 'Jack' // This will be replaced with logged-in user when authentication is implemented
     });
-    
+
     setIsSplitting(true);
   };
 
@@ -2230,32 +2230,32 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
   const calculateRemainingAmount = () => {
     if (!transactionToSplit) return 0;
-    
+
     const originalAmount = parseFloat(transactionToSplit.amount) || 0;
     const splitTotal = splitTransactions.reduce((sum, split) => {
       return sum + (parseFloat(split.amount) || 0);
     }, 0);
-    
+
     return originalAmount - splitTotal;
   };
 
   const handleSaveSplit = async () => {
     // Validate split transactions
-    const hasEmptyFields = splitTransactions.some(split => 
+    const hasEmptyFields = splitTransactions.some(split =>
       !split.description || !split.amount || !split.category || split.amount === ''
     );
-    
+
     if (hasEmptyFields) {
       showErrorNotification('Please fill out all fields for each split transaction');
       return;
     }
-    
-    const totalSplitAmount = splitTransactions.reduce((sum, split) => 
+
+    const totalSplitAmount = splitTransactions.reduce((sum, split) =>
       sum + parseFloat(split.amount || 0), 0
     );
-    
+
     const originalAmount = parseFloat(transactionToSplit.amount) || 0;
-    
+
     // For negative transactions (expenses), ensure splits are also negative
     if (originalAmount < 0) {
       const hasPositiveSplit = splitTransactions.some(split => parseFloat(split.amount) > 0);
@@ -2264,7 +2264,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         return;
       }
     }
-    
+
     // For positive transactions (income), ensure splits are also positive
     if (originalAmount > 0) {
       const hasNegativeSplit = splitTransactions.some(split => parseFloat(split.amount) < 0);
@@ -2273,7 +2273,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         return;
       }
     }
-    
+
     // Check if the total split amount exceeds the original (considering sign)
     if (originalAmount < 0) {
       // For expenses: total splits should not be less than original (more negative)
@@ -2288,10 +2288,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         return;
       }
     }
-    
+
     try {
       setIsSavingSplit(true);
-      
+
       // Prepare the data for the API
       const splitData = {
         originalTransactionId: transactionToSplit.id,
@@ -2303,14 +2303,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           category: split.category
         }))
       };
-      
+
       const response = await axios.post(getApiUrl('/personal-transactions/split'), splitData);
-      
+
       if (response.data.success) {
         // Refresh the transactions
         const transactionsResponse = await axios.get(getApiUrl('/personal-transactions'));
         setTransactions(transactionsResponse.data);
-        
+
         // Show success notification
         const notification = document.createElement('div');
         notification.textContent = 'Transaction split successfully!';
@@ -2323,13 +2323,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         notification.style.borderRadius = '4px';
         notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
         notification.style.zIndex = '1000';
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
           document.body.removeChild(notification);
         }, 3000);
-        
+
         // Close the modal
         setIsSplitting(false);
         setTransactionToSplit(null);
@@ -2377,7 +2377,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
     setEnableNegativeOffsetBucket(checked);
     const updatedSelectedBucket = checked ? selectedNegativeOffsetBucket : '';
     setSelectedNegativeOffsetBucket(updatedSelectedBucket);
-    savePersonalSettings({ 
+    savePersonalSettings({
       enable_negative_offset_bucket: checked,
       selected_negative_offset_bucket: updatedSelectedBucket
     });
@@ -2429,7 +2429,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       delete newState[groupId];
       return newState;
     });
-    
+
     // Check if there are any remaining unsaved changes
     const remainingChanges = Object.keys(editingChanges).filter(id => id !== groupId);
     setHasUnsavedChanges(remainingChanges.length > 0);
@@ -2438,20 +2438,20 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   const saveEditingGroup = async (groupId) => {
     try {
       const newCategories = editingChanges[groupId] || [];
-      
+
       // Check for category conflicts with other groups
       const usedCategories = getUsedBudgetCategories(groupId);
-      const conflictingCategories = newCategories.filter(category => 
+      const conflictingCategories = newCategories.filter(category =>
         usedCategories.has(category)
       );
-      
+
       if (conflictingCategories.length > 0) {
         showErrorNotification(`The following categories are already used in other groups: ${conflictingCategories.join(', ')}. Please remove them from other groups first.`);
         return;
       }
-      
+
       await updatePersonalSplitMapping(groupId, newCategories);
-      
+
       // Clear editing state for this group
       setEditingGroups(prev => {
         const newState = { ...prev };
@@ -2463,7 +2463,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         delete newState[groupId];
         return newState;
       });
-      
+
       // Check if there are any remaining unsaved changes
       const remainingChanges = Object.keys(editingChanges).filter(id => id !== groupId);
       setHasUnsavedChanges(remainingChanges.length > 0);
@@ -2478,7 +2478,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       const updatedCategories = isSelected
         ? [...currentCategories, category]
         : currentCategories.filter(c => c !== category);
-      
+
       setHasUnsavedChanges(true);
       return {
         ...prev,
@@ -2511,7 +2511,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
   // Helper function to get all used budget categories across all groups
   const getUsedBudgetCategories = (excludeGroupId = null) => {
     const usedCategories = new Set();
-    
+
     personalSplitGroups.forEach(group => {
       if (group.id !== excludeGroupId && group.mapped_categories) {
         group.mapped_categories.forEach(mapping => {
@@ -2519,7 +2519,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         });
       }
     });
-    
+
     // Also include categories from other groups being edited
     Object.entries(editingChanges).forEach(([groupId, categories]) => {
       if (parseInt(groupId) !== excludeGroupId) {
@@ -2528,7 +2528,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         });
       }
     });
-    
+
     return usedCategories;
   };
 
@@ -2562,10 +2562,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
     // Check for category conflicts
     const usedCategories = getUsedBudgetCategories();
-    const conflictingCategories = newGroupForm.budget_categories.filter(category => 
+    const conflictingCategories = newGroupForm.budget_categories.filter(category =>
       usedCategories.has(category)
     );
-    
+
     if (conflictingCategories.length > 0) {
       showErrorNotification(`The following categories are already used in other groups: ${conflictingCategories.join(', ')}. Please remove them from other groups first.`);
       return;
@@ -2577,12 +2577,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         group_name: newGroupForm.group_name,
         personal_category: newGroupForm.personal_category
       });
-      
+
       // Then create the mappings
       if (createdGroup && newGroupForm.budget_categories.length > 0) {
         await updatePersonalSplitMapping(createdGroup.id, newGroupForm.budget_categories);
       }
-      
+
       setNewGroupForm({ group_name: '', personal_category: '', budget_categories: [] });
       setShowAddGroupForm(false);
     } catch (error) {
@@ -2605,7 +2605,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         source_bucket: '',
         destBucket: ''
       };
-      
+
       const response = await axios.post(getApiUrl('/auto-distribution-rules'), newRule);
       if (response.data.success) {
         await loadAutoDistributionRules(); // Reload to get updated rules with database IDs
@@ -2637,12 +2637,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         sourceBucket: 'source_bucket',
         destBucket: 'dest_bucket'
       };
-      
+
       const dbField = fieldMap[field] || field;
       const response = await axios.put(getApiUrlWithParams('/auto-distribution-rules/:id', { id }), {
         [dbField]: value
       });
-      
+
       if (response.data.success) {
         await loadAutoDistributionRules(); // Reload to get updated rules
       }
@@ -2650,23 +2650,23 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       console.error('Error updating distribution rule:', error);
     }
   };
-  
+
   // State for mapping bank_category/subcategory to main category
   // Remove unused categoryMainMap logic since we use existing categoryMappings
-  
+
   return (
     <div style={{ position: 'relative' }}>
 
       {isUpdating && (
-        <div style={{ 
-          position: 'absolute', 
-          top: '0', 
-          left: '0', 
-          width: '100%', 
-          height: '100%', 
-          backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div style={{
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
           zIndex: 10,
           borderRadius: '8px'
@@ -2685,17 +2685,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
               borderTop: '3px solid #4a90e2',
               animation: 'spin 1s linear infinite'
             }}></div>
-                            <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
+            <div style={{ fontWeight: 'bold', color: 'var(--color-text)' }}>Updating transaction...</div>
           </div>
         </div>
       )}
 
       {/* Active Filters Display */}
       {(dateFilter.startDate || dateFilter.endDate || categoryFilter.length > 0) && (
-        <div style={{ 
-          margin: '10px 0', 
-          padding: '12px', 
-          backgroundColor: '#e8f4fd', 
+        <div style={{
+          margin: '10px 0',
+          padding: '12px',
+          backgroundColor: '#e8f4fd',
           borderRadius: '8px',
           border: '1px solid #d0e8f9',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
@@ -2704,7 +2704,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <strong style={{ color: '#1e40af', fontSize: '14px' }}>Active Filters:</strong>
               {(dateFilter.startDate || dateFilter.endDate) && (
-                <span style={{ 
+                <span style={{
                   backgroundColor: '#dbeafe',
                   color: '#1e40af',
                   padding: '4px 8px',
@@ -2717,7 +2717,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 </span>
               )}
               {categoryFilter.length > 0 && (
-                <span style={{ 
+                <span style={{
                   backgroundColor: '#fef3c7',
                   color: '#92400e',
                   padding: '4px 8px',
@@ -2729,19 +2729,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   📋 Categories: {categoryFilter.slice(0, 3).map(cat => cat === null ? '(empty)' : cat).join(', ')}{categoryFilter.length > 3 ? ` +${categoryFilter.length - 3} more` : ''}
                 </span>
               )}
-              <span style={{ 
-                fontSize: '13px', 
+              <span style={{
+                fontSize: '13px',
                 color: '#4b5563',
                 fontWeight: '500'
               }}>
                 ({filteredTransactions.length} transactions)
               </span>
             </div>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button 
+              <button
                 onClick={clearFilters}
-                style={{ 
+                style={{
                   padding: '8px 14px',
                   backgroundColor: 'var(--color-buttonSecondary)',
                   color: 'var(--color-buttonSecondaryText)',
@@ -2762,8 +2762,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
       )}
 
       {/* Category Savings Summary */}
-      <div style={{ 
-        marginBottom: '60px', 
+      <div style={{
+        marginBottom: '60px',
         background: 'transparent',
         padding: '24px',
         position: 'relative',
@@ -2772,7 +2772,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           <LoadingSpinner />
         ) : (
           <div>
-            <div style={{ 
+            <div style={{
               marginBottom: '20px',
               position: 'relative',
             }}>
@@ -2802,7 +2802,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         borderRadius: '8px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        display: 'flex', 
+                        display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                       }}
@@ -2817,12 +2817,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       title="View and manage split groups"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                        <path d="M12 11h4"/>
-                        <path d="M12 16h4"/>
-                        <path d="M8 11h.01"/>
-                        <path d="M8 16h.01"/>
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        <path d="M12 11h4" />
+                        <path d="M12 16h4" />
+                        <path d="M8 11h.01" />
+                        <path d="M8 16h.01" />
                       </svg>
                       {personalSplitGroups.length} Split Group{personalSplitGroups.length > 1 ? 's' : ''}
                     </button>
@@ -2838,14 +2838,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           const buttonEl = autoRulesButtonRef.current;
                           const buttonRect = buttonEl.getBoundingClientRect();
                           const container = buttonEl.closest('.modern-table-wrapper') || buttonEl.offsetParent;
-                          
+
                           if (container) {
                             const containerRect = container.getBoundingClientRect();
                             // Calculate left position: button's left edge relative to container
                             const leftPosition = buttonRect.left - containerRect.left + 20;
                             // Calculate top position: button's bottom edge + small gap
                             const topPosition = buttonRect.bottom - containerRect.top + 27;
-                            
+
                             setPopupPosition({
                               top: `${topPosition}px`,
                               left: `${leftPosition}px`
@@ -2869,7 +2869,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         borderRadius: '8px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        display: 'flex', 
+                        display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                       }}
@@ -2884,9 +2884,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       title="View auto distribution summary"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <circle cx="12" cy="12" r="8" strokeDasharray="3 3"/>
-                        <path d="M12 2v6m0 6v6m10-8h-6m-6 0H2"/>
+                        <circle cx="12" cy="12" r="3" />
+                        <circle cx="12" cy="12" r="8" strokeDasharray="3 3" />
+                        <path d="M12 2v6m0 6v6m10-8h-6m-6 0H2" />
                       </svg>
                       {autoDistributionRules.length} Auto Rule{autoDistributionRules.length > 1 ? 's' : ''}
                     </button>
@@ -2894,7 +2894,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 </div>
 
                 <h2 className="section-title" style={{ margin: 0, textAlign: 'center' }}>Savings Buckets</h2>
-                
+
                 {/* Settings and Reset Button Container - Right Side */}
                 <div style={{
                   display: 'flex',
@@ -2910,12 +2910,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     title="Settings"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" />
                     </svg>
                     Settings
                   </button>
-                  
+
                   {/* Modern Reset Button */}
                   <button
                     onClick={resetCategoryOrder}
@@ -2931,11 +2931,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   </button>
                 </div>
               </div>
-              
+
               {/* HelpText below the title and buttons */}
               <div style={{ marginBottom: '6px' }}>
                 <HelpText isVisible={helpTextVisible}>
-                  Drag category cards to reorder them. Your arrangement will be saved automatically. 
+                  Drag category cards to reorder them. Your arrangement will be saved automatically.
                 </HelpText>
               </div>
 
@@ -2945,10 +2945,10 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 </HelpText>
               </div>
             </div>
-            
+
             {/* Auto Distribution Summary Popup */}
             {showDistributionSummary && autoDistributionRules.length > 0 && (
-              <div               style={{
+              <div style={{
                 position: 'absolute',
                 top: popupPosition.top,
                 left: popupPosition.left,
@@ -2960,83 +2960,83 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 zIndex: 100,
                 width: '320px'
               }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '12px',
-                    borderBottom: '1px solid #f3f4f6',
-                    paddingBottom: '8px'
-                  }}>
-                    <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--color-text)' }}>Monthly Auto Distribution</h4>
-                    <button
-                      onClick={() => setShowDistributionSummary(false)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#9ca3af'
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '13px' }}>
-                    {autoDistributionRules.map((rule, index) => (
-                      <div key={rule.id} style={{ 
-                        marginBottom: '8px',
-                        padding: '8px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '6px'
-                      }}>
-                        <div style={{ 
-                          color: '#374151', 
-                          marginBottom: '4px', 
-                          fontWeight: '500', 
-                          fontSize: '14px'
-                        }}>
-                          {rule.name || `Rule ${index + 1}`}
-                        </div>
-                        <div style={{ color: '#374151', marginBottom: '4px' }}>
-                          <strong>${rule.amount}</strong> per month
-                        </div>
-                        <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                          From: <strong>{rule.sourceBucket || 'Not set'}</strong>
-                        </div>
-                        <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                          To: <strong>{rule.destBucket || 'Not set'}</strong>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px',
+                  borderBottom: '1px solid #f3f4f6',
+                  paddingBottom: '8px'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--color-text)' }}>Monthly Auto Distribution</h4>
                   <button
-                    onClick={() => {
-                      performAutoDistribution();
-                      setShowDistributionSummary(false);
-                    }}
-                    disabled={isDistributing}
+                    onClick={() => setShowDistributionSummary(false)}
                     style={{
-                      width: '100%',
-                      marginTop: '12px',
-                      padding: '8px',
-                      backgroundColor: isDistributing ? '#94a3b8' : '#3b82f6',
-                      color: 'white',
+                      background: 'none',
                       border: 'none',
-                      borderRadius: '6px',
-                      cursor: isDistributing ? 'not-allowed' : 'pointer',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      transition: 'background-color 0.2s'
+                      cursor: 'pointer',
+                      color: '#9ca3af'
                     }}
                   >
-                    {isDistributing ? 'Distributing...' : 'Distribute Now'}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                   </button>
+                </div>
+                <div style={{ fontSize: '13px' }}>
+                  {autoDistributionRules.map((rule, index) => (
+                    <div key={rule.id} style={{
+                      marginBottom: '8px',
+                      padding: '8px',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{
+                        color: '#374151',
+                        marginBottom: '4px',
+                        fontWeight: '500',
+                        fontSize: '14px'
+                      }}>
+                        {rule.name || `Rule ${index + 1}`}
+                      </div>
+                      <div style={{ color: '#374151', marginBottom: '4px' }}>
+                        <strong>${rule.amount}</strong> per month
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                        From: <strong>{rule.sourceBucket || 'Not set'}</strong>
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                        To: <strong>{rule.destBucket || 'Not set'}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    performAutoDistribution();
+                    setShowDistributionSummary(false);
+                  }}
+                  disabled={isDistributing}
+                  style={{
+                    width: '100%',
+                    marginTop: '12px',
+                    padding: '8px',
+                    backgroundColor: isDistributing ? '#94a3b8' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: isDistributing ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  {isDistributing ? 'Distributing...' : 'Distribute Now'}
+                </button>
               </div>
             )}
-            
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
@@ -3048,9 +3048,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   // Calculate raw category totals first
                   const rawCategoryData = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    const amount = typeof transaction.amount === 'number' ? 
+                    const amount = typeof transaction.amount === 'number' ?
                       transaction.amount : parseFloat(transaction.amount) || 0;
-                    
+
                     if (!acc[category]) {
                       acc[category] = {
                         total: 0,
@@ -3059,13 +3059,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     }
                     acc[category].total += amount;
                     acc[category].count += 1;
-                    
+
                     return acc;
                   }, {});
 
                   // New offsetting logic - keep negatives but adjust offset bucket
                   const categoryData = { ...rawCategoryData };
-                  
+
                   if (enableNegativeOffsetBucket && selectedNegativeOffsetBucket && categoryData[selectedNegativeOffsetBucket]) {
                     // Find all negative buckets (excluding the offset bucket itself)
                     const negativeBuckets = Object.entries(rawCategoryData).filter(([category, data]) => {
@@ -3095,26 +3095,26 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       const numTotal = typeof data.total === 'number' ? data.total : parseFloat(data.total) || 0;
                       const isNegative = numTotal < 0;
                       const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket;
-                      
+
                       // Include the bucket if it's not negative OR if it's the offset bucket
                       return !isNegative || isOffsetBucket;
                     })
                     .reduce((sum, [category, data]) => {
-                      const numTotal = typeof data.total === 'number' ? 
+                      const numTotal = typeof data.total === 'number' ?
                         data.total : parseFloat(data.total) || 0;
                       return sum + numTotal;
                     }, 0);
 
                   // Get latest closing balance with type safety
-                  const latestTransaction = transactions.length > 0 
+                  const latestTransaction = transactions.length > 0
                     ? transactions.reduce((latest, transaction) => {
-                        return (latest.id > transaction.id) ? latest : transaction;
-                      }, transactions[0])
+                      return (latest.id > transaction.id) ? latest : transaction;
+                    }, transactions[0])
                     : null;
-                  
-                  const latestClosingBalance = latestTransaction 
+
+                  const latestClosingBalance = latestTransaction
                     ? (typeof latestTransaction.closing_balance === 'number' ?
-                      latestTransaction.closing_balance : 
+                      latestTransaction.closing_balance :
                       parseFloat(latestTransaction.closing_balance) || 0) - BALANCE_SUBTRACTION
                     : 0;
 
@@ -3125,7 +3125,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       });
-    } catch (error) {
+                    } catch (error) {
                       console.error("Error formatting number:", error);
                       return "0.00";
                     }
@@ -3150,22 +3150,22 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   const sortedCategories = [...Object.keys(categoryData)].sort((a, b) => {
                     const indexA = categoryOrder.indexOf(a);
                     const indexB = categoryOrder.indexOf(b);
-                    
+
                     // If a category is not in the order array, place it at the end
                     if (indexA === -1) return 1;
                     if (indexB === -1) return -1;
-                    
+
                     return indexA - indexB;
                   });
 
                   // Filter out zero balance categories if setting is enabled
-                  const displayCategories = hideZeroBalanceBuckets 
+                  const displayCategories = hideZeroBalanceBuckets
                     ? sortedCategories.filter(category => {
-                        const data = categoryData[category];
-                        const numTotal = typeof data.total === 'number' ? 
-                          data.total : parseFloat(data.total) || 0;
-                        return Math.abs(numTotal) >= 0.01; // Consider anything less than 1 cent as zero
-                      })
+                      const data = categoryData[category];
+                      const numTotal = typeof data.total === 'number' ?
+                        data.total : parseFloat(data.total) || 0;
+                      return Math.abs(numTotal) >= 0.01; // Consider anything less than 1 cent as zero
+                    })
                     : sortedCategories;
 
                   // Check if reconciled
@@ -3177,11 +3177,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       {displayCategories.map((category, index) => {
                         const data = categoryData[category];
                         const rawData = rawCategoryData[category];
-                        const numTotal = typeof data.total === 'number' ? 
+                        const numTotal = typeof data.total === 'number' ?
                           data.total : parseFloat(data.total) || 0;
-                        const rawTotal = typeof rawData?.total === 'number' ? 
+                        const rawTotal = typeof rawData?.total === 'number' ?
                           rawData.total : parseFloat(rawData?.total) || 0;
-                        
+
                         // Calculate percentage based on categories that are included in sum
                         const totalForPercentage = Object.entries(categoryData)
                           .filter(([cat, catData]) => {
@@ -3197,17 +3197,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
                         // Check if this bucket is included in the sum calculation
                         const isIncludedInSum = numTotal >= 0 || (enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket);
-                        const percentage = isIncludedInSum && totalForPercentage !== 0 ? 
+                        const percentage = isIncludedInSum && totalForPercentage !== 0 ?
                           (numTotal / totalForPercentage) * 100 : 0;
-                        
+
                         const color = getCategoryColor(category, index);
-                        
+
                         // Check if this category has been affected by offsetting
                         const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket && selectedNegativeOffsetBucket && Math.abs(rawTotal - numTotal) > 0.01;
                         const isExcludedNegative = rawTotal < 0 && (!enableNegativeOffsetBucket || category !== selectedNegativeOffsetBucket) && enableNegativeOffsetBucket;
-                          
+
                         return (
-                          <div 
+                          <div
                             key={category}
                             draggable={true}
                             onDragStart={(e) => handleDragStart(e, category)}
@@ -3225,16 +3225,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               height: '4px',
                               background: `linear-gradient(90deg, ${color.bg}, ${color.bg}dd)`,
                               borderRadius: '12px 12px 0 0',
-                            }}/>
-                            
+                            }} />
+
                             {/* UPDATED: "Was:" tag on the left */}
                             {isOffsetBucket && (
                               <div style={{
                                 position: 'absolute',
                                 top: '8px',
                                 left: '8px',
-                                fontSize: '9px', 
-                                color: '#64748b', 
+                                fontSize: '9px',
+                                color: '#64748b',
                                 backgroundColor: '#f1f5f9',
                                 padding: '2px 4px',
                                 borderRadius: '3px',
@@ -3245,7 +3245,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 Was: {rawTotal >= 0 ? `$${formatNumber(rawTotal)}` : `-$${formatNumber(Math.abs(rawTotal))}`}
                               </div>
                             )}
-                            
+
                             {/* UPDATED: Right-side indicators without "Was:" tag */}
                             {(isOffsetBucket || isExcludedNegative) && (
                               <div style={{
@@ -3264,9 +3264,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 {isOffsetBucket ? 'Offset Bucket' : 'Excluded'}
                               </div>
                             )}
-                            
+
                             {/* UPDATED: Category name without left margin */}
-                            <div style={{ 
+                            <div style={{
                               fontSize: '15px',
                               fontWeight: '600',
                               color: 'var(--color-text)',
@@ -3275,29 +3275,29 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             }}>
                               {category}
                             </div>
-                            
+
                             {/* UPDATED: Amount without left margin */}
-                            <div style={{ 
+                            <div style={{
                               fontSize: '26px',
                               fontWeight: '700',
                               color: numTotal >= 0 ? '#059669' : '#dc2626',
                               lineHeight: '1',
                               marginBottom: '12px'  // Removed marginLeft
                             }}>
-                              {numTotal >= 0 
-                                ? `$${formatNumber(numTotal)}` 
+                              {numTotal >= 0
+                                ? `$${formatNumber(numTotal)}`
                                 : `-$${formatNumber(Math.abs(numTotal))}`}
                             </div>
-                            
+
                             {/* UPDATED: Bottom section without left margin */}
-                            <div style={{ 
+                            <div style={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               fontSize: '12px',
                               color: 'var(--color-textSecondary)'  // Removed marginLeft
                             }}>
                               <span style={{ fontWeight: '500' }}>
-                                {isIncludedInSum 
+                                {isIncludedInSum
                                   ? `${percentage.toFixed(1)}% of total`
                                   : 'Excluded from total'
                                 }
@@ -3311,12 +3311,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       })}
                     </>
                   );
-    } catch (error) {
+                } catch (error) {
                   console.error("Error rendering category data:", error);
                   return (
-                    <div style={{ 
+                    <div style={{
                       padding: '24px',
-                      textAlign: 'center', 
+                      textAlign: 'center',
                       color: '#dc2626',
                       backgroundColor: '#fef2f2',
                       borderRadius: '12px',
@@ -3347,20 +3347,20 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   // Calculate category total with new offsetting approach
                   const rawCategoryTotals = transactions.reduce((acc, transaction) => {
                     const category = transaction.category || 'Uncategorized';
-                    const amount = typeof transaction.amount === 'number' ? 
+                    const amount = typeof transaction.amount === 'number' ?
                       transaction.amount : parseFloat(transaction.amount) || 0;
-                    
+
                     if (!acc[category]) {
                       acc[category] = 0;
                     }
                     acc[category] += amount;
-                    
+
                     return acc;
                   }, {});
 
                   // Apply the new offsetting logic for balance summary
                   let adjustedTotals = { ...rawCategoryTotals };
-                  
+
                   if (enableNegativeOffsetBucket && selectedNegativeOffsetBucket && adjustedTotals[selectedNegativeOffsetBucket] !== undefined) {
                     // Find negative buckets and sum them
                     const negativeBuckets = Object.entries(rawCategoryTotals).filter(([category, total]) => {
@@ -3368,7 +3368,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     });
 
                     const totalNegativeAmount = negativeBuckets.reduce((sum, [_, total]) => sum + total, 0);
-                    
+
                     // Deduct negative amounts from offset bucket
                     if (totalNegativeAmount < 0) {
                       adjustedTotals[selectedNegativeOffsetBucket] = adjustedTotals[selectedNegativeOffsetBucket] + totalNegativeAmount;
@@ -3378,30 +3378,30 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   // Calculate total excluding negative buckets (except offset bucket)
                   const categoryTotal = Object.entries(adjustedTotals).reduce((sum, [category, total]) => {
                     const numAmount = typeof total === 'number' ? total : parseFloat(total) || 0;
-                    
+
                     // Include bucket if it's not negative OR if it's the offset bucket
                     const isNegative = numAmount < 0;
                     const isOffsetBucket = enableNegativeOffsetBucket && category === selectedNegativeOffsetBucket;
-                    
+
                     if (!isNegative || isOffsetBucket) {
                       return sum + numAmount;
                     }
                     return sum;
                   }, 0);
-                
+
                   // Get latest closing balance with type safety
-                  const latestTransaction = transactions.length > 0 
+                  const latestTransaction = transactions.length > 0
                     ? transactions.reduce((latest, transaction) => {
-                        return (latest.id > transaction.id) ? latest : transaction;
-                      }, transactions[0])
+                      return (latest.id > transaction.id) ? latest : transaction;
+                    }, transactions[0])
                     : null;
-                
-                  const latestClosingBalance = latestTransaction 
+
+                  const latestClosingBalance = latestTransaction
                     ? (typeof latestTransaction.closing_balance === 'number' ?
-                      latestTransaction.closing_balance : 
+                      latestTransaction.closing_balance :
                       parseFloat(latestTransaction.closing_balance) || 0) - BALANCE_SUBTRACTION
                     : 0;
-                
+
                   // Format number with commas
                   const formatNumber = (number) => {
                     try {
@@ -3409,17 +3409,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       });
-    } catch (error) {
+                    } catch (error) {
                       console.error("Error formatting number:", error);
                       return "0.00";
                     }
                   };
-                
+
                   // Check if reconciled
                   const isReconciled = Math.abs(categoryTotal - latestClosingBalance) < 0.01;
                   const difference = categoryTotal - latestClosingBalance;
                   const hasDifference = Math.abs(difference) >= 0.01;
-                  
+
                   return (
                     <>
                       <div style={{
@@ -3434,14 +3434,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           gap: '20px', // Further reduced
                           alignItems: 'center',
                         }}>
-                          <div style={{ 
+                          <div style={{
                             textAlign: 'center',
                             padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0fdf4',
-                            borderRadius: '8px', 
+                            borderRadius: '8px',
                             border: '1px solid #bbf7d0',
                           }}>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '11px',
                               color: '#059669',
                               marginBottom: '4px',
@@ -3451,7 +3451,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             }}>
                               Current Balance
                             </div>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '20px',
                               fontWeight: '700',
                               color: '#047857',
@@ -3459,14 +3459,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               ${formatNumber(latestClosingBalance)}
                             </div>
                           </div>
-                          
+
                           <div style={{
                             width: '2px',
                             height: '40px', // Further reduced
                             background: 'linear-gradient(180deg, transparent, #e5e7eb, transparent)',
-                          }}/>
-                          
-                          <div style={{ 
+                          }} />
+
+                          <div style={{
                             textAlign: 'center',
                             padding: '10px 16px', // Further reduced
                             backgroundColor: '#f0f9ff',
@@ -3474,7 +3474,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             border: '1px solid #bae6fd',
                             position: 'relative', // Added for tooltip positioning
                           }}>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '11px',
                               color: '#0369a1',
                               marginBottom: '4px',
@@ -3484,7 +3484,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             }}>
                               Categories Sum
                             </div>
-                            <div style={{ 
+                            <div style={{
                               fontSize: '20px',
                               fontWeight: '700',
                               color: '#0c4a6e',
@@ -3511,22 +3511,22 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             )}
                           </div>
                         </div>
-                        
+
                         {/* Compact Reconciliation Status */}
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
                           padding: '6px 12px',
-                          background: isReconciled 
-                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                          background: isReconciled
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
                             : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                           borderRadius: '16px',
                           fontSize: '12px',
                           fontWeight: '600',
                           color: isReconciled ? '#15803d' : '#b45309',
                           border: `1px solid ${isReconciled ? '#86efac' : '#fcd34d'}`,
-                          boxShadow: isReconciled 
+                          boxShadow: isReconciled
                             ? '0 2px 4px rgba(34, 197, 94, 0.2)'
                             : '0 2px 4px rgba(245, 158, 11, 0.2)',
                           whiteSpace: 'nowrap',
@@ -3534,14 +3534,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           {isReconciled ? (
                             <>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                               Reconciled
                             </>
                           ) : (
                             <>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M12 9v4M12 17h.01M5.07 19a10 10 0 1 1 13.86 0" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                               Not Reconciled
                             </>
@@ -3553,9 +3553,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 } catch (error) {
                   console.error("Error rendering balance summary:", error);
                   return (
-                    <div style={{ 
-                      padding: '24px', 
-                      textAlign: 'center', 
+                    <div style={{
+                      padding: '24px',
+                      textAlign: 'center',
                       color: '#dc2626',
                       backgroundColor: '#fef2f2',
                       borderRadius: '12px',
@@ -3586,13 +3586,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
       <div className="table-navigation-container">
         <div className="table-navigation-left">
-          <button 
+          <button
             onClick={handlePrevMonth}
             className="modern-button navigation prev"
             style={{ marginRight: 0 }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Prev
           </button>
@@ -3603,7 +3603,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           }}>
             {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'short', year: 'numeric' })}
           </div>
-          <button 
+          <button
             onClick={handleNextMonth}
             className="modern-button navigation next"
             disabled={isCurrentMonthCurrent()}
@@ -3614,13 +3614,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           >
             Next
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
-        
+
         <div className="table-navigation-right">
-          <button 
+          <button
             onClick={refreshPersonalBankFeeds}
             disabled={isRefreshing}
             style={{
@@ -3639,13 +3639,13 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
               opacity: isRefreshing ? 0.7 : 1
             }}
           >
-            <svg 
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
               style={{
                 animation: isRefreshing ? 'spin 2s linear infinite' : 'none'
               }}
@@ -3655,8 +3655,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             </svg>
             {isRefreshing ? 'Refreshing...' : 'Refresh Bank Feeds'}
           </button>
-          
-          <button 
+
+          <button
             onClick={toggleAddTransactionForm}
             style={{
               display: 'flex',
@@ -3680,11 +3680,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           </button>
         </div>
       </div>
-      
+
       <HelpText isVisible={helpTextVisible}>
         Use the month navigation to browse your personal transaction history. Only transactions from the selected month are shown unless a date filter is active.
       </HelpText>
-      
+
       {/* Settings Modal - CONDENSED VERSION with reduced padding/whitespace */}
       {/* Modernized Personal settings modal. shadcn Dialog + Card sections
           replace the old inline-styled modal. State handlers
@@ -4026,12 +4026,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
 
             {isLoadingPersonalSplitConfig ? (
               <div style={{ textAlign: 'center', padding: '30px' }}> {/* Reduced from 40px */}
-                <div style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  border: '4px solid #f3f4f6', 
-                  borderTop: '4px solid #3b82f6', 
-                  borderRadius: '50%', 
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  border: '4px solid #f3f4f6',
+                  borderTop: '4px solid #3b82f6',
+                  borderRadius: '50%',
                   animation: 'spin 1s linear infinite',
                   margin: '0 auto 16px'
                 }}></div>
@@ -4040,15 +4040,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             ) : (
               <div>
                 <div style={{ marginBottom: '16px' }}> {/* Reduced from 20px */}
-                  <p style={{ 
-                    color: '#6b7280', 
+                  <p style={{
+                    color: '#6b7280',
                     fontSize: '13px', // Reduced from 14px
                     margin: '0 0 12px 0', // Reduced from 16px
                     lineHeight: '1.4'
                   }}>
                     Configure how budget categories from shared transactions are grouped and mapped to your personal savings buckets.
                   </p>
-                  
+
                   {!showAddGroupForm ? (
                     <button
                       onClick={() => setShowAddGroupForm(true)}
@@ -4077,24 +4077,24 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       border: '1px solid var(--color-border)',
                       marginBottom: '12px' // Reduced from 16px
                     }}>
-                      <h4 style={{ 
+                      <h4 style={{
                         margin: '0 0 10px 0', // Reduced from 12px
-                        color: 'var(--color-text)', 
+                        color: 'var(--color-text)',
                         fontSize: '14px', // Reduced from 16px
                         fontWeight: '600'
                       }}>
                         Add New Split Group
                       </h4>
-                      
+
                       <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
                         <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
-                          <label style={{ 
-                            display: 'block', 
-                            marginBottom: '4px', 
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '4px',
                             marginLeft: '0px',
                             fontSize: '13px', // Reduced from 14px
-                            fontWeight: '500', 
-                            color: '#374151' 
+                            fontWeight: '500',
+                            color: '#374151'
                           }}>
                             Group Name
                           </label>
@@ -4115,19 +4115,19 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             }}
                           />
                         </div>
-                        
+
                         <div style={{ marginBottom: '10px' }}> {/* Reduced from 12px */}
-                          <label style={{ 
-                            display: 'block', 
+                          <label style={{
+                            display: 'block',
                             marginBottom: '6px', // Reduced from 8px
                             marginLeft: '0px',
                             fontSize: '13px', // Reduced from 14px
-                            fontWeight: '500', 
-                            color: 'var(--color-text)' 
+                            fontWeight: '500',
+                            color: 'var(--color-text)'
                           }}>
                             Budget Categories ({newGroupForm.budget_categories.length} selected)
                           </label>
-                          
+
                           {/* Compact category selection - optimized for single category selection */}
                           <div style={{
                             border: '1px solid var(--color-border)',
@@ -4183,7 +4183,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 ))}
                               </div>
                             )}
-                            
+
                             {/* Category checkboxes - ultra compact */}
                             <div style={{
                               display: 'grid',
@@ -4194,7 +4194,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 const isAvailable = isCategoryAvailable(category);
                                 const isSelected = newGroupForm.budget_categories.includes(category);
                                 const isDisabled = !isAvailable && !isSelected;
-                                
+
                                 return (
                                   <label key={category} style={{
                                     display: 'flex',
@@ -4208,8 +4208,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                     fontSize: '12px', // Reduced from 13px
                                     lineHeight: '1.2' // Tighter line height
                                   }}
-                                  onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
+                                    onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
                                   >
                                     <input
                                       type="checkbox"
@@ -4229,7 +4229,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                         height: '12px' // Reduced from 14px
                                       }}
                                     />
-                                    <span style={{ 
+                                    <span style={{
                                       color: isDisabled ? '#9ca3af' : '#374151',
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -4253,16 +4253,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div>
-                          <label style={{ 
-                            display: 'block', 
+                          <label style={{
+                            display: 'block',
                             marginTop: '20px',
                             marginBottom: '0px',
                             marginLeft: '0px',
                             fontSize: '13px', // Reduced from 14px
                             fontWeight: '500',
-                            color: '#374151' 
+                            color: '#374151'
                           }}>
                             Personal Bucket
                           </label>
@@ -4291,7 +4291,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           </select>
                         </div>
                       </div>
-                      
+
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button
                           onClick={cancelAddGroup}
@@ -4342,7 +4342,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     </div>
                   )}
                 </div>
-                
+
                 {personalSplitGroups.length === 0 ? (
                   <div style={{
                     padding: '30px', // Reduced from 40px
@@ -4355,9 +4355,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     <p style={{ fontSize: '13px' }}>Click "Add Split Group" to create your first group.</p>
                   </div>
                 ) : (
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
                     gap: '6px', // Reduced from 8px
                     maxHeight: '400px', // Add max height for scrolling
                     overflowY: 'auto'
@@ -4369,30 +4369,30 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         borderRadius: '6px',
                         border: '1px solid var(--color-border)'
                       }}>
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
                           alignItems: 'flex-start',
                           marginBottom: '6px'
                         }}>
                           <div style={{ flex: 1, minWidth: 0 }}> {/* Added minWidth: 0 for text truncation */}
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
                               gap: '6px',
                               marginBottom: '2px',
                               flexWrap: 'wrap' // Allow wrapping on small screens
                             }}>
-                              <h4 style={{ 
-                                margin: '0', 
-                                color: '#1e293b', 
+                              <h4 style={{
+                                margin: '0',
+                                color: '#1e293b',
                                 fontSize: '14px',
                                 fontWeight: '600',
                                 lineHeight: '1.2'
                               }}>
                                 {group.group_name}
                               </h4>
-                              <span style={{ 
+                              <span style={{
                                 fontSize: '12px',
                                 color: '#64748b',
                                 backgroundColor: '#e2e8f0',
@@ -4404,9 +4404,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 {group.mapped_categories ? group.mapped_categories.length : 0} {group.mapped_categories?.length === 1 ? 'category' : 'categories'}
                               </span>
                             </div>
-                            <p style={{ 
-                              margin: '0', 
-                              color: '#64748b', 
+                            <p style={{
+                              margin: '0',
+                              color: '#64748b',
                               fontSize: '12px', // Reduced from 13px
                               display: 'flex',
                               alignItems: 'center',
@@ -4415,9 +4415,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               → <strong style={{ color: '#4b5563' }}>{group.personal_category}</strong>
                             </p>
                           </div>
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: '4px',
                             flexShrink: 0 // Prevent button shrinking
                           }}>
@@ -4530,12 +4530,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                             )}
                           </div>
                         </div>
-                        
+
                         {/* Categories display */}
                         {!editingGroups[group.id] ? (
-                          <div style={{ 
-                            display: 'flex', 
-                            flexWrap: 'wrap', 
+                          <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
                             gap: '3px',
                             maxHeight: group.mapped_categories?.length <= 3 ? 'auto' : '50px', // Auto height for 3 or fewer categories
                             overflowY: group.mapped_categories?.length > 3 ? 'auto' : 'visible',
@@ -4561,8 +4561,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                 </span>
                               ))
                             ) : (
-                              <span style={{ 
-                                color: 'var(--color-textSecondary)', 
+                              <span style={{
+                                color: 'var(--color-textSecondary)',
                                 fontSize: '11px',
                                 fontStyle: 'italic',
                                 padding: '2px'
@@ -4587,11 +4587,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                               gap: '1px' // Reduced from 2px
                             }}>
                               {availableBudgetCategories.map(category => {
-                                const isSelected = editingChanges[group.id] ? 
+                                const isSelected = editingChanges[group.id] ?
                                   editingChanges[group.id].includes(category) : false;
                                 const isAvailable = isCategoryAvailable(category, group.id);
                                 const isDisabled = !isAvailable && !isSelected;
-                                
+
                                 return (
                                   <label key={category} style={{
                                     display: 'flex',
@@ -4605,8 +4605,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                     lineHeight: '1.2', // Tighter line height
                                     transition: 'background-color 0.2s'
                                   }}
-                                  onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
+                                    onMouseEnter={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : '#f9fafb')}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f0f4ff' : 'transparent'}
                                   >
                                     <input
                                       type="checkbox"
@@ -4622,7 +4622,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                                         height: '12px' // Updated to match add form (was 11px)
                                       }}
                                     />
-                                    <span style={{ 
+                                    <span style={{
                                       color: isDisabled ? '#9ca3af' : '#374151',
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -4652,7 +4652,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 )}
               </div>
             )}
-            
+
           </div>
           <DialogFooter className="border-t border-border px-6 py-4">
             <Button type="button" onClick={handleClosePersonalSplitConfig}>
@@ -4687,8 +4687,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
-                          <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add Personal Transaction</h2>
-            
+            <h2 style={{ marginTop: 0, color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px' }}>Add Personal Transaction</h2>
+
             <form onSubmit={handleAddTransaction}>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
@@ -4710,7 +4710,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Description *
@@ -4732,7 +4732,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Amount *
@@ -4755,7 +4755,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   required
                 />
               </div>
-              
+
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Category
@@ -4781,7 +4781,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   ))}
                 </select>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
                 <button
                   type="button"
@@ -4815,7 +4815,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
           </div>
         </div>
       )}
-      
+
       {/* Split Transaction Modal - REFACTORED VERSION */}
       {isSplitting && transactionToSplit && (
         <div style={{
@@ -4843,16 +4843,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             flexDirection: 'column'
           }}>
             {/* Header */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '20px',
               borderBottom: '1px solid var(--color-border)',
               paddingBottom: '16px'
             }}>
-              <h2 style={{ 
-                margin: 0, 
+              <h2 style={{
+                margin: 0,
                 color: 'var(--color-text)',
                 fontSize: '20px',
                 fontWeight: '600'
@@ -4879,41 +4879,41 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 </svg>
               </button>
             </div>
-            
+
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {/* Original Transaction Summary - Compact Version */}
-              <div style={{ 
-                marginBottom: '16px', 
-                padding: '12px', 
-                backgroundColor: 'var(--color-backgroundTertiary)', 
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: 'var(--color-backgroundTertiary)',
                 borderRadius: '8px',
                 border: '1px solid var(--color-border)'
               }}>
-                <div style={{ 
-                  display: 'flex', 
+                <div style={{
+                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'
                 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontSize: '13px', 
-                      color: 'var(--color-textSecondary)', 
+                    <div style={{
+                      fontSize: '13px',
+                      color: 'var(--color-textSecondary)',
                       marginBottom: '4px',
                       fontWeight: '500'
                     }}>
                       Original Transaction
                     </div>
-                    <div style={{ 
-                      fontSize: '14px', 
+                    <div style={{
+                      fontSize: '14px',
                       color: 'var(--color-text)',
                       fontWeight: '500'
                     }}>
                       {transactionToSplit.description}
                     </div>
-                    <div style={{ 
-                      display: 'flex', 
+                    <div style={{
+                      display: 'flex',
                       flexWrap: 'wrap',
-                      gap: '8px', 
+                      gap: '8px',
                       marginTop: '12px'
                     }}>
                       <span style={{
@@ -4952,15 +4952,15 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     color: parseFloat(transactionToSplit.amount) < 0 ? '#dc2626' : '#059669',
                     marginLeft: '16px'
                   }}>
-                    {parseFloat(transactionToSplit.amount) < 0 
-                      ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}` 
+                    {parseFloat(transactionToSplit.amount) < 0
+                      ? `-$${Math.abs(parseFloat(transactionToSplit.amount)).toFixed(2)}`
                       : `$${parseFloat(transactionToSplit.amount).toFixed(2)}`}
                   </div>
                 </div>
               </div>
-              
+
               {/* Remaining Amount - Compact Status Bar */}
-              <div style={{ 
+              <div style={{
                 marginBottom: '16px',
                 padding: '10px 12px',
                 backgroundColor: calculateRemainingAmount() === 0 ? 'var(--color-successLight)' : 'var(--color-warningLight)',
@@ -4970,8 +4970,8 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span style={{ 
-                  fontSize: '13px', 
+                <span style={{
+                  fontSize: '13px',
                   color: 'var(--color-text)',
                   fontWeight: '500',
                   display: 'flex',
@@ -4979,43 +4979,43 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   gap: '8px'
                 }}>
                   <span>Remaining:</span>
-                  <span style={{ 
+                  <span style={{
                     color: calculateRemainingAmount() < 0 ? 'var(--color-error)' : 'var(--color-success)',
                     fontWeight: '600'
                   }}>
-                    {calculateRemainingAmount() < 0 
-                      ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}` 
+                    {calculateRemainingAmount() < 0
+                      ? `-$${Math.abs(calculateRemainingAmount()).toFixed(2)}`
                       : `$${calculateRemainingAmount().toFixed(2)}`}
                   </span>
                 </span>
-                <span style={{ 
-                  fontSize: '12px', 
+                <span style={{
+                  fontSize: '12px',
                   color: calculateRemainingAmount() === 0 ? 'var(--color-success)' : 'var(--color-warning)'
                 }}>
-                  {calculateRemainingAmount() === 0 
-                    ? '✓ Fully allocated' 
+                  {calculateRemainingAmount() === 0
+                    ? '✓ Fully allocated'
                     : 'Will remain on original'}
                 </span>
               </div>
-              
+
               {/* Personal Split Options - Simplified */}
               {personalSplitEnabled && personalSplitGroups.length > 0 && (
-                <div style={{ 
+                <div style={{
                   marginBottom: '16px',
                   padding: '12px',
                   backgroundColor: 'var(--color-purpleLight)',
                   borderRadius: '8px',
                   border: '1px solid var(--color-purple)'
                 }}>
-                  <label style={{ 
-                    display: 'flex', 
+                  <label style={{
+                    display: 'flex',
                     alignItems: 'flex-start',
                     cursor: 'pointer',
                     gap: '8px',
                     marginBottom: useSmartSplit ? '12px' : '0'
                   }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={useSmartSplit}
                       onChange={(e) => {
                         setUseSmartSplit(e.target.checked);
@@ -5024,7 +5024,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           setTimeout(() => loadSmartSplitData(), 100);
                         }
                       }}
-                      style={{ 
+                      style={{
                         cursor: 'pointer',
                         width: '16px',
                         height: '16px',
@@ -5032,14 +5032,14 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       }}
                     />
                     <div>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '14px',
                         color: 'var(--color-purple)',
                         fontWeight: '500'
                       }}>
                         Use configured split groups
                       </div>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '12px',
                         color: 'var(--color-purple)',
                         marginTop: '2px',
@@ -5049,16 +5049,16 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       </div>
                     </div>
                   </label>
-                  
+
                   {useSmartSplit && (
-                    <div style={{ 
+                    <div style={{
                       display: 'flex',
                       gap: '8px',
                       alignItems: 'center',
                       marginBottom: '8px'
                     }}>
                       <div style={{ flex: 1 }}>
-                        <label style={{ 
+                        <label style={{
                           fontSize: '11px',
                           color: '#6b7280',
                           fontWeight: '500',
@@ -5101,7 +5101,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           />
                         </div>
                       </div>
-                      
+
                       <button
                         onClick={loadSmartSplitData}
                         disabled={isLoadingSmartSplit}
@@ -5122,7 +5122,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       </button>
                     </div>
                   )}
-                  
+
                   {smartSplitData && (
                     <div style={{
                       padding: '8px',
@@ -5135,17 +5135,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                       <div style={{ marginBottom: '6px', fontWeight: '500' }}>
                         ✓ Loaded {smartSplitData.count} transactions • Total: {smartSplitData.totalAmount < 0 ? `-$${Math.abs(smartSplitData.totalAmount).toFixed(2)}` : `$${smartSplitData.totalAmount.toFixed(2)}`}
                       </div>
-                      
+
                       {/* Show configured group breakdown */}
                       <div style={{ fontSize: '11px', color: 'var(--color-success)' }}>
                         {Object.entries(smartSplitData.groupedTotals).map(([groupName, data]) => {
                           const groupConfig = personalSplitGroups.find(g => g.group_name === groupName);
-                          
+
                           if (groupConfig && groupConfig.personal_category !== 'original') {
                             return (
-                              <div key={groupName} style={{ 
-                                marginLeft: '8px', 
-                                display: 'flex', 
+                              <div key={groupName} style={{
+                                marginLeft: '8px',
+                                display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                               }}>
@@ -5163,17 +5163,17 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   )}
                 </div>
               )}
-              
+
               {/* Show message if personal split is not configured */}
               {(!personalSplitEnabled || personalSplitGroups.length === 0) && (
-                <div style={{ 
+                <div style={{
                   marginBottom: '16px',
                   padding: '12px',
                   backgroundColor: 'var(--color-warningLight)',
                   borderRadius: '8px',
                   border: '1px solid var(--color-warning)'
                 }}>
-                  <div style={{ 
+                  <div style={{
                     fontSize: '13px',
                     color: 'var(--color-warning)',
                     fontWeight: '500',
@@ -5181,12 +5181,12 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   }}>
                     Personal Split Not Configured
                   </div>
-                  <div style={{ 
+                  <div style={{
                     fontSize: '12px',
                     color: 'var(--color-warning)',
                     lineHeight: '1.3'
                   }}>
-                    {!personalSplitEnabled 
+                    {!personalSplitEnabled
                       ? 'Enable personal split in Settings to use automatic category mapping.'
                       : 'Configure split groups in Settings to use automatic splitting.'}
                   </div>
@@ -5194,25 +5194,25 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
               )}
 
               {/* Split Transactions - More Compact */}
-              <div style={{ 
-                flex: 1, 
+              <div style={{
+                flex: 1,
                 overflowY: 'auto',
                 marginBottom: '16px'
               }}>
-                <h3 style={{ 
-                  fontSize: '14px', 
+                <h3 style={{
+                  fontSize: '14px',
                   fontWeight: '600',
                   color: 'var(--color-text)',
                   marginBottom: '12px'
                 }}>
                   Split Into {splitTransactions.length} Transaction{splitTransactions.length > 1 ? 's' : ''}
                 </h3>
-                
+
                 {splitTransactions.map((split, index) => (
-                  <div key={index} style={{ 
-                    marginBottom: '12px', 
-                    padding: '12px', 
-                    backgroundColor: 'var(--color-backgroundSecondary)', 
+                  <div key={index} style={{
+                    marginBottom: '12px',
+                    padding: '12px',
+                    backgroundColor: 'var(--color-backgroundSecondary)',
                     borderRadius: '8px',
                     border: '1px solid var(--color-border)',
                     position: 'relative'
@@ -5243,7 +5243,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         </svg>
                       </button>
                     )}
-                    
+
                     {/* Compact form layout */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <input
@@ -5265,7 +5265,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                         onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
                         onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                       />
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <input
                           type="number"
@@ -5286,7 +5286,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                           onFocus={(e) => e.target.style.borderColor = 'var(--color-borderFocus)'}
                           onBlur={(e) => e.target.style.borderColor = 'var(--color-inputBorder)'}
                         />
-                        
+
                         <select
                           value={split.category}
                           onChange={(e) => handleSplitChange(index, 'category', e.target.value)}
@@ -5313,7 +5313,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                     </div>
                   </div>
                 ))}
-                
+
                 {/* Add split button */}
                 <button
                   onClick={addSplitTransaction}
@@ -5351,11 +5351,11 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                   Add Another Split
                 </button>
               </div>
-              
+
               {/* Action buttons - Sticky footer */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
                 gap: '8px',
                 paddingTop: '16px',
                 borderTop: '1px solid var(--color-border)'
@@ -5412,7 +5412,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 >
                   {isSavingSplit ? (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                         style={{ animation: 'spin 1s linear infinite' }}>
                         <circle cx="12" cy="12" r="10" strokeDasharray="30 60" />
                       </svg>
@@ -5430,7 +5430,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
         </div>
       )}
 
-      
+
       {/* Transactions table with modern styling */}
       {renderTransactionsTable()}
 
@@ -5473,9 +5473,9 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 marginRight: '12px'
               }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               </div>
               <h3 style={{
@@ -5487,7 +5487,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
                 Unsaved Changes
               </h3>
             </div>
-            
+
             <p style={{
               margin: '0 0 20px 0',
               fontSize: '14px',
@@ -5496,7 +5496,7 @@ const PersonalTransactions = ({ helpTextVisible, users, splitAllocations }) => {
             }}>
               You have unsaved changes to your split group configuration. Are you sure you want to close without saving? All changes will be discarded.
             </p>
-            
+
             <div style={{
               display: 'flex',
               justifyContent: 'flex-end',

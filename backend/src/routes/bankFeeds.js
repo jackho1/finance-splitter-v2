@@ -7,6 +7,10 @@ const { asyncRoute } = require('../helpers');
 const execPromise = util.promisify(exec);
 const router = express.Router();
 
+// Allow overriding the Python interpreter (e.g. a virtualenv) via env var.
+// Defaults to the system "python3" so existing setups keep working.
+const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+
 const FEEDS = {
   shared:   { script: 'shared_bank_feed.py',   label: 'Bank feeds',           successPhrase: 'Transactions inserted successfully' },
   personal: { script: 'personal_bank_feed.py', label: 'Personal bank feeds',  successPhrase: 'Successfully processed' },
@@ -19,7 +23,7 @@ function makeHandler(key) {
 
   return asyncRoute(async (_req, res) => {
     console.log(`Refreshing ${cfg.label} data...`);
-    const { stdout, stderr } = await execPromise(`python3 ${scriptPath}`);
+    const { stdout, stderr } = await execPromise(`${PYTHON_BIN} ${scriptPath}`);
     if (stderr) console.warn(`Python script warnings: ${stderr}`);
     console.log(`Python script output: ${stdout}`);
 
