@@ -1,4 +1,9 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Postgres bigint (OID 20) comes back as a string by default to avoid precision
+// loss past Number.MAX_SAFE_INTEGER. Our bigint columns (transaction ids) never
+// get close to that, and the frontend compares ids numerically, so parse as int.
+types.setTypeParser(20, (val) => parseInt(val, 10));
 
 const pool = new Pool({
   user: process.env.DB_USER,
