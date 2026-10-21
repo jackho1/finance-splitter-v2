@@ -20,7 +20,7 @@ async function ensureSplitColumns(client) {
     }
     if (!have.has(`${table}.split_from_id`)) {
       await client.query(
-        `ALTER TABLE ${table} ADD COLUMN split_from_id INTEGER REFERENCES ${table}(id) ON DELETE SET NULL`,
+        `ALTER TABLE ${table} ADD COLUMN split_from_id BIGINT REFERENCES ${table}(id) ON DELETE SET NULL`,
       );
       console.log(`Added split_from_id column to ${table}`);
     }
