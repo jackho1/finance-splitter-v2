@@ -47,7 +47,7 @@ router.put('/transactions/bulk-update-mark', asyncRoute(async (req, res) => {
   const push = (sql, val) => { params.push(val); conds.push(sql.replace('?', `$${params.length}`)); };
 
   if (Array.isArray(transaction_ids) && transaction_ids.length) {
-    push('id = ANY(?::integer[])', transaction_ids.map((id) => parseInt(id, 10)));
+    push('id = ANY(?::bigint[])', transaction_ids.map((id) => parseInt(id, 10)));
   }
   if (date_from) push('date >= ?', date_from);
   if (date_to)   push('date <= ?', date_to);
